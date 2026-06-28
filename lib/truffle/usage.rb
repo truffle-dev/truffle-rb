@@ -67,6 +67,30 @@ module Truffle
       pricing ? usage.with_cost(pricing) : usage
     end
 
+    # Build a Usage from Anthropic's Messages API usage hash. Unlike OpenAI,
+    # Anthropic reports input_tokens directly (already net of cache reads and
+    # writes), so input is taken as-is rather than computed as a residual.
+    # cache_creation_input_tokens is the total cache write; its 1h-retention
+    # slice (cache_creation.ephemeral_1h_input_tokens) is split out so
+    # with_cost can bill it at 2x base input, the way pi's calculateCost does.
+    # reasoning comes from output_tokens_details.thinking_tokens, a subset of
+    # output. Faithful to pi's message_start/message_delta usage capture.
+    def self.from_anthropic(raw, pricing: nil)
+      raw ||= {}
+      cache_creation = raw["cache_creation"] || {}
+      output_details = raw["output_tokens_details"] || {}
+
+      usage = new(
+        input: (raw["input_tokens"] || 0).to_i,
+        output: (raw["output_tokens"] || 0).to_i,
+        cache_read: (raw["cache_read_input_tokens"] || 0).to_i,
+        cache_write: (raw["cache_creation_input_tokens"] || 0).to_i,
+        cache_write_1h: (cache_creation["ephemeral_1h_input_tokens"] || 0).to_i,
+        reasoning: (output_details["thinking_tokens"] || 0).to_i
+      )
+      pricing ? usage.with_cost(pricing) : usage
+    end
+
     # Return a copy of this usage with cost computed from a per-million rate hash.
     # Port of pi's calculateCost: Anthropic bills 1h cache writes at 2x base input,
     # so the 1h slice is split out; OpenAI never sets it, leaving short = cache_write.

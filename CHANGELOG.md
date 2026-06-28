@@ -14,6 +14,28 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A native Anthropic Messages provider (`Providers::Anthropic`), ported from pi's
+  `anthropic-messages.ts` wire shapes and hand-written on `Net::HTTP` with no
+  client gem. `Truffle.agent(provider: :anthropic)` drives a full tool round
+  trip. The request body follows the Messages API: the system prompt is lifted
+  out of the message list into the top-level `system` field, `max_tokens` is
+  always sent because the API requires it, message content is a block array, tool
+  calls are `tool_use` blocks, and tool results come back as a `user` message of
+  `tool_result` blocks with consecutive results coalesced into one message. Tool
+  schemas go under `input_schema`. Assistant replay handles pi's edge cases: an
+  empty text block is dropped, a redacted thinking block round-trips as
+  `redacted_thinking`, and an unsigned thinking block is downgraded to plain text
+  since Anthropic rejects unsigned thinking on replay. Stop reasons map onto
+  `Truffle::StopReason` (`end_turn`/`stop_sequence`/`pause_turn` to stop,
+  `max_tokens` to length, `tool_use` to tool use, `refusal`/`sensitive` to error
+  with an explanation), and an unknown reason folds to an error carrying the raw
+  string rather than crashing the loop. Usage is read with `Usage.from_anthropic`:
+  `input_tokens` is taken directly (Anthropic reports it net of cache, unlike
+  OpenAI's residual), and the 1h cache write is billed at twice base input.
+  `Pricing` gains the Anthropic per-million-token table, and `base_model` now
+  strips both date-snapshot forms (OpenAI's dashed `-2024-08-06` and Anthropic's
+  compact `-20250929`). This is the non-streaming `#chat` half; a streaming
+  `#chat_stream` over the same transforms is the next slice.
 - Cooperative cancellation, ported from pi's `AbortSignal` threading through the
   agent loop and the streaming reader. `Truffle::AbortSignal` is a thread-safe
   token (`#abort`, `#aborted?`, `#reason`, and an `AbortSignal.aborted`

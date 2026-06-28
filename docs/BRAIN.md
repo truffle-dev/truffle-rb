@@ -90,25 +90,40 @@ is the bridge between them and today.
     blocks get their `*_end`, then a clean `:done` terminal carrying ABORTED and the
     partial message (NOT `:error`, since a cancel is not a failure). Cooperative: an
     in-flight provider call or stalled read finishes/times out, never force-killed.
-- Tests green: 83 offline runs / 233 assertions, plus two live OpenAI tests
-  (round-trip + streaming) that run only when the key is present.
+- **Phase 2 started:** item 6 (Anthropic provider) done.
+  - `Providers::Anthropic` (`provider: :anthropic`) speaks the Messages API over
+    `Net::HTTP`, no client gem, ports pi's `anthropic-messages.ts` wire shapes.
+    `build_body`: system prompt lifted to top-level `system` field; `max_tokens`
+    always sent (API requires it); `convert_messages` coalesces consecutive `:tool`
+    messages into one `user` message of `tool_result` blocks; tools under
+    `input_schema`; `tool_choice` string wraps to `{type:}`. `assistant_blocks`
+    drops empty text, keeps `redacted_thinking` (data=signature), downgrades an
+    unsigned thinking block to text (Anthropic rejects unsigned thinking on replay).
+    `to_anthropic_content`: text-only joins to a string, images make a block array,
+    image-only tool result gets a "(see attached image)" placeholder.
+    `deserialize_message` rebuilds the assistant Message; `map_stop_reason` ports
+    pi's (`end_turn`/`stop_sequence`/`pause_turn`->stop, `max_tokens`->length,
+    `tool_use`, `refusal`/`sensitive`->error), unknown folds to error w/ raw reason.
+  - `Usage.from_anthropic`: `input_tokens` taken directly (net of cache, unlike
+    OpenAI's residual); 1h cache write (`cache_creation.ephemeral_1h_input_tokens`)
+    priced at 2x base input; reasoning from `output_tokens_details.thinking_tokens`.
+  - `Pricing` gains the ANTHROPIC $/M table (merged into `RATES`); `base_model`
+    strips both date forms (OpenAI dashed `-2024-08-06`, Anthropic compact
+    `-20250929`). All pure transforms tested offline by feeding hand-built hashes.
+- Tests green: 119 runs / 321 assertions / 1 skip (the live Anthropic test, run
+  only with `ANTHROPIC_API_KEY`). Live OpenAI tests run when that key is present.
 
 ## Next up
 
-- Phase 1 is complete. Begin Phase 2 (LLM-layer parity).
-- ROADMAP Phase 2, item 6: **Anthropic provider.** Native, over the Messages API,
-  with its tool-use content-block shape, hand-written on `Net::HTTP`, no client
-  gem. Read pi's `~/repos/pi/packages/ai/src/api/anthropic-messages.ts` first: the
-  request body shape (system prompt as a top-level field, not a message; `messages`
-  with `content` block arrays), the streaming event names (`message_start`,
-  `content_block_start/delta/stop`, `message_delta`, `message_stop`) and how they
-  map onto Truffle's existing `StreamEvent` protocol, the tool-use block format
-  (`type: "tool_use"`, `input` object), and its stop-reason set
-  (`end_turn`/`max_tokens`/`tool_use`/`stop_sequence`) -> `map_stop_reason`. Reuse
-  the offline-seam pattern: a pure `AnthropicStream` accumulator fed parsed event
-  hashes, thin SSE transport in the provider. Keep `Providers::Base` unchanged;
-  add `Providers::Anthropic` alongside `OpenAI`. Price via `Pricing.cost_for` with
-  Anthropic model ids (cache-write 2x split is real here, unlike OpenAI).
+- ROADMAP Phase 2, item 6 has a follow-up: a **streaming Anthropic
+  `#chat_stream`** over the same transforms. Read pi's streaming half in
+  `~/repos/pi/packages/ai/src/api/anthropic-messages.ts`: the event names
+  (`message_start`, `content_block_start/delta/stop`, `message_delta`,
+  `message_stop`) and how they map onto Truffle's `StreamEvent` protocol. Mirror
+  the OpenAI seam: a pure `AnthropicStream` accumulator fed parsed event hashes
+  (reusing `assistant_blocks`/`deserialize_message` shapes), thin SSE transport in
+  the provider. Alternatively, ROADMAP item 7 (Google/Gemini provider) is the next
+  clean new-provider slice if streaming is deferred.
 
 ## Learnings (keep only what still matters)
 

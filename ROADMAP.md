@@ -47,8 +47,9 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 
 ## Phase 2: LLM layer parity (the `ai` package)
 
-6. **Anthropic provider.** Native, over the Messages API, with its tool-use
-   content-block shape. Hand-written, no client gem.
+6. [x] **Anthropic provider.** Native, over the Messages API, with its tool-use
+   content-block shape. Hand-written, no client gem. Non-streaming `#chat` first;
+   a streaming `#chat_stream` over the same transforms is the next slice.
 7. **Google / Gemini provider.** Same seam, native wire format.
 8. **Provider registry + model catalog.** Resolve `model:` strings to the right
    provider the way pi's `ai` package does.
