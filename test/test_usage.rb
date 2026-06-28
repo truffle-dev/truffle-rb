@@ -8,6 +8,7 @@ require "test_helper"
 class TestUsage < Minitest::Test
   def test_parse_basic_tokens
     usage = Truffle::Usage.parse({ "prompt_tokens" => 100, "completion_tokens" => 40 })
+
     assert_equal 100, usage.input
     assert_equal 40, usage.output
     assert_equal 0, usage.cache_read
@@ -28,6 +29,7 @@ class TestUsage < Minitest::Test
         "completion_tokens" => 10,
         "prompt_tokens_details" => { "cached_tokens" => 300 } }
     )
+
     assert_equal 700, usage.input
     assert_equal 300, usage.cache_read
     assert_equal 1010, usage.total_tokens
@@ -35,6 +37,7 @@ class TestUsage < Minitest::Test
 
   def test_cache_read_falls_back_to_prompt_cache_hit_tokens
     usage = Truffle::Usage.parse({ "prompt_tokens" => 500, "prompt_cache_hit_tokens" => 200 })
+
     assert_equal 300, usage.input
     assert_equal 200, usage.cache_read
   end
@@ -44,6 +47,7 @@ class TestUsage < Minitest::Test
       { "completion_tokens" => 50,
         "completion_tokens_details" => { "reasoning_tokens" => 30 } }
     )
+
     assert_equal 50, usage.output
     assert_equal 30, usage.reasoning
   end
@@ -53,6 +57,7 @@ class TestUsage < Minitest::Test
       { "prompt_tokens" => 100,
         "prompt_tokens_details" => { "cached_tokens" => 500 } }
     )
+
     assert_equal 0, usage.input
   end
 
@@ -83,13 +88,16 @@ class TestUsage < Minitest::Test
 
   def test_without_pricing_cost_is_zero
     usage = Truffle::Usage.parse({ "prompt_tokens" => 1_000_000, "completion_tokens" => 1_000_000 })
+
     assert_in_delta 0.0, usage.cost.total, 1e-9
   end
 
   def test_addition_sums_tokens_and_cost
     pricing = Truffle::Pricing.cost_for("gpt-4o")
-    a = Truffle::Usage.parse({ "prompt_tokens" => 100, "completion_tokens" => 20 }, pricing: pricing)
-    b = Truffle::Usage.parse({ "prompt_tokens" => 300, "completion_tokens" => 80 }, pricing: pricing)
+    a = Truffle::Usage.parse({ "prompt_tokens" => 100, "completion_tokens" => 20 },
+                             pricing: pricing)
+    b = Truffle::Usage.parse({ "prompt_tokens" => 300, "completion_tokens" => 80 },
+                             pricing: pricing)
     sum = a + b
 
     assert_equal 400, sum.input
@@ -100,6 +108,7 @@ class TestUsage < Minitest::Test
 
   def test_zero_is_addition_identity
     usage = Truffle::Usage.parse({ "prompt_tokens" => 42, "completion_tokens" => 7 })
+
     assert_equal usage, Truffle::Usage.zero + usage
     assert_equal usage, usage + Truffle::Usage.zero
   end
@@ -119,6 +128,7 @@ class TestUsage < Minitest::Test
       { "prompt_tokens" => 10, "completion_tokens" => 5 },
       pricing: Truffle::Pricing.cost_for("unknown")
     )
+
     assert_equal 15, usage.total_tokens
     assert_in_delta 0.0, usage.cost.total, 1e-9
   end
@@ -126,6 +136,7 @@ class TestUsage < Minitest::Test
   def test_to_h_shape
     usage = Truffle::Usage.parse({ "prompt_tokens" => 3, "completion_tokens" => 1 })
     h = usage.to_h
+
     assert_equal 3, h[:input]
     assert_equal 1, h[:output]
     assert_equal 4, h[:total_tokens]
@@ -149,11 +160,13 @@ class TestAgentUsage < Minitest::Test
       run { |value:| value }
     end
 
-    provider = StubProvider.new([
-      StubProvider.tool_call(id: "1", name: "echo", arguments: { "value" => "hi" },
-                             usage: usage_for(input: 100, output: 10)),
-      StubProvider.text("done", usage: usage_for(input: 200, output: 20))
-    ])
+    provider = StubProvider.new(
+      [
+        StubProvider.tool_call(id: "1", name: "echo", arguments: { "value" => "hi" },
+                               usage: usage_for(input: 100, output: 10)),
+        StubProvider.text("done", usage: usage_for(input: 200, output: 20))
+      ]
+    )
 
     seen = nil
     agent = Truffle.agent(provider: provider, tools: [echo])
@@ -171,9 +184,11 @@ class TestAgentUsage < Minitest::Test
     provider = StubProvider.new([StubProvider.text("ok", usage: usage_for(input: 50, output: 5))])
     agent = Truffle.agent(provider: provider)
     agent.run("hi")
+
     refute_equal 0, agent.usage.total_tokens
 
     agent.reset
+
     assert_equal Truffle::Usage.zero, agent.usage
   end
 end

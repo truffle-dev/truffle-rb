@@ -78,8 +78,8 @@ module Truffle
   end
 
   # Define a tool: Truffle.tool("name", "desc") { param ...; run { ... } }.
-  def tool(name, description, &block)
-    Tool.define(name, description, &block)
+  def tool(name, description, &)
+    Tool.define(name, description, &)
   end
 
   # The model catalog. `Truffle.models` lists every known model;

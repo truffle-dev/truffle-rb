@@ -38,8 +38,9 @@ dependencies; every provider is hand-written.
 4. **Do not hard-code to the tests.** Solve the general problem; the tests check
    it, they do not define it.
 5. **Keep the offline suite offline.** No network in the default `rake test`.
-6. **Run the suite before committing**: `rake test` (or `script/rb rake test`
-   on a host without local Ruby). Do not commit red.
+6. **Run the suite and the linter before committing**: `rake test` and
+   `rubocop` (or `script/rb rake test` / `script/rb bundle exec rubocop` on a
+   host without local Ruby). Do not commit red, and do not leave lint offenses.
 7. **Update docs in the same commit**: `CHANGELOG.md` under "Unreleased," and
    check off the `ROADMAP.md` item you finished.
 8. **Stay provider-agnostic.** New provider-specific code goes under

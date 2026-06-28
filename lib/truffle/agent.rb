@@ -57,6 +57,7 @@ module Truffle
         unless EVENTS.include?(event)
           raise ArgumentError, "unknown event #{event.inspect}, expected one of #{EVENTS.inspect}"
         end
+
         @listeners[event] << block
       end
       self
@@ -86,9 +87,7 @@ module Truffle
         end
 
         turns += 1
-        if turns > max_turns
-          raise Error, "exceeded max_turns (#{max_turns}) without a final answer"
-        end
+        raise Error, "exceeded max_turns (#{max_turns}) without a final answer" if turns > max_turns
 
         emit(:turn_start, turn: turns)
         response = @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)

@@ -27,6 +27,7 @@ class ModelsTest < Minitest::Test
 
   def test_ids_are_unique
     ids = Truffle::Models.all.map(&:id)
+
     assert_equal ids.uniq, ids
   end
 
@@ -44,18 +45,21 @@ class ModelsTest < Minitest::Test
   # exists to prevent), one of these fails loudly.
   def test_current_flagships_are_present_and_priced
     opus = Truffle::Models.find("claude-opus-4-8")
+
     assert_equal "Claude Opus 4.8", opus.name
-    assert_equal 5.0, opus.cost[:input]
-    assert_equal 25.0, opus.cost[:output]
+    assert_in_delta(5.0, opus.cost[:input])
+    assert_in_delta(25.0, opus.cost[:output])
     assert_equal 1_000_000, opus.context_window
-    assert opus.reasoning?
+    assert_predicate opus, :reasoning?
 
     sonnet = Truffle::Models.find("claude-sonnet-4-6")
-    assert_equal 3.0, sonnet.cost[:input]
+
+    assert_in_delta(3.0, sonnet.cost[:input])
     assert_equal 1_000_000, sonnet.context_window
 
     haiku = Truffle::Models.find("claude-haiku-4-5")
-    assert_equal 1.0, haiku.cost[:input]
+
+    assert_in_delta(1.0, haiku.cost[:input])
 
     assert Truffle::Models.find("claude-fable-5")
     assert Truffle::Models.find("gpt-5.5")
@@ -87,22 +91,24 @@ class ModelsTest < Minitest::Test
 
   def test_for_provider_filters_and_accepts_strings
     anthropic = Truffle::Models.for_provider("anthropic")
-    assert anthropic.all? { |m| m.provider == :anthropic }
+
+    assert(anthropic.all? { |m| m.provider == :anthropic })
     assert_empty Truffle::Models.for_provider(:nonesuch)
   end
 
   def test_predicates
-    assert Truffle::Models.find("claude-opus-4-8").reasoning?
-    assert Truffle::Models.find("claude-opus-4-8").vision?
-    refute Truffle::Models.find("gpt-4o").reasoning?
-    assert Truffle::Models.find("claude-opus-4-1").deprecated?
-    refute Truffle::Models.find("claude-opus-4-8").deprecated?
+    assert_predicate Truffle::Models.find("claude-opus-4-8"), :reasoning?
+    assert_predicate Truffle::Models.find("claude-opus-4-8"), :vision?
+    refute_predicate Truffle::Models.find("gpt-4o"), :reasoning?
+    assert_predicate Truffle::Models.find("claude-opus-4-1"), :deprecated?
+    refute_predicate Truffle::Models.find("claude-opus-4-8"), :deprecated?
   end
 
   def test_cost_hash_and_input_list_are_frozen
     m = Truffle::Models.find("gpt-4o")
-    assert m.cost.frozen?
-    assert m.input.frozen?
+
+    assert_predicate m.cost, :frozen?
+    assert_predicate m.input, :frozen?
     assert_raises(FrozenError) { m.cost[:input] = 0 }
   end
 
@@ -113,6 +119,7 @@ class ModelsTest < Minitest::Test
     b = Truffle::Model.new(id: "x", name: "X", provider: :openai,
                            api: :openai_completions, context_window: 1, max_output: 1,
                            cost: { input: 1, output: 1, cache_read: 0, cache_write: 0 })
+
     assert_equal a, b
     assert_equal a.hash, b.hash
   end

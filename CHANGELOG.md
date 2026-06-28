@@ -101,6 +101,9 @@ All notable changes to Truffle are documented here. The format follows
   than a side channel. `Message#text` joins the Text blocks; `#tool_calls` and
   `#tool_calls?` read off the content list. The public API is unchanged for the
   common case.
+- RuboCop linting with a tuned house-style config, plus a best-in-class CI
+  workflow: the offline suite across Ruby 3.1–3.4 (and `head`, allowed to fail),
+  a RuboCop lint job, and a `gem build` packaging check, each a required gate.
 - Published to RubyGems: `gem install truffle`.
 - `docs/RELEASING.md`: versioning, changelog, publish, and upgrade flow.
 - Rewritten `ROADMAP.md` mapping Phases 1–5 to pi's package structure.

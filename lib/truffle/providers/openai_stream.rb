@@ -270,7 +270,11 @@ module Truffle
         when :thinking
           Content::Thinking.new(thinking: block.thinking.dup, signature: block.signature)
         when :toolcall
-          arguments = final ? parse_arguments(block.partial_args) : parse_streaming_json(block.partial_args)
+          arguments = if final
+                        parse_arguments(block.partial_args)
+                      else
+                        parse_streaming_json(block.partial_args)
+                      end
           ToolCall.new(id: block.id, name: block.name, arguments: arguments)
         end
       end
@@ -283,8 +287,8 @@ module Truffle
         @pending << event
       end
 
-      def drain
-        @pending.each { |event| yield event }
+      def drain(&)
+        @pending.each(&)
         @pending.clear
       end
 

@@ -29,10 +29,10 @@ class TestContent < Minitest::Test
     hidden = Truffle::Content::Thinking.new(thinking: "", signature: "sig", redacted: true)
 
     assert_equal :thinking, open.type
-    refute open.redacted?
-    assert hidden.redacted?
+    refute_predicate open, :redacted?
+    assert_predicate hidden, :redacted?
     assert_equal({ type: :thinking, thinking: "reasoning", signature: "sig" }, open.to_h)
-    assert_equal true, hidden.to_h[:redacted]
+    assert hidden.to_h[:redacted]
   end
 
   def test_image_block_to_h
@@ -86,7 +86,7 @@ class TestContent < Minitest::Test
     msg = Truffle::Message.assistant(content: "calling add", tool_calls: [call])
 
     assert_equal 2, msg.content.length
-    assert msg.tool_calls?
+    assert_predicate msg, :tool_calls?
     assert_equal [call], msg.tool_calls
     assert_equal "calling add", msg.text
   end
@@ -106,6 +106,7 @@ class TestContent < Minitest::Test
     msg = Truffle::Message.assistant(content: "hi", tool_calls: [call])
 
     h = msg.to_h
+
     assert_equal :assistant, h[:role]
     assert_equal(
       [{ type: :text, text: "hi" }, { type: :tool_call, id: "c", name: "t", arguments: {} }],

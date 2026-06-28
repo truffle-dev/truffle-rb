@@ -33,11 +33,14 @@ module Truffle
 
       attr_reader :model
 
-      def initialize(api_key: ENV["ANTHROPIC_API_KEY"], model: DEFAULT_MODEL,
+      def initialize(api_key: ENV.fetch("ANTHROPIC_API_KEY", nil), model: DEFAULT_MODEL,
                      base_url: DEFAULT_BASE_URL, max_tokens: DEFAULT_MAX_TOKENS,
                      open_timeout: 15, read_timeout: 120)
         super()
-        raise ArgumentError, "missing Anthropic API key (set ANTHROPIC_API_KEY or pass :api_key)" if api_key.nil? || api_key.empty?
+        if api_key.nil? || api_key.empty?
+          raise ArgumentError,
+                "missing Anthropic API key (set ANTHROPIC_API_KEY or pass :api_key)"
+        end
 
         @api_key = api_key
         @model = model
@@ -54,14 +57,16 @@ module Truffle
       def chat(messages:, tools: [], model: nil, **options)
         request_model = model || @model
         max_tokens = options[:max_tokens] || @max_tokens
-        payload = post("/v1/messages", self.class.build_body(messages, tools, request_model, max_tokens, options))
+        payload = post("/v1/messages",
+                       self.class.build_body(messages, tools, request_model, max_tokens, options))
 
         raw_stop = payload["stop_reason"]
         stop_reason, error_message = self.class.map_stop_reason(raw_stop, payload["stop_details"])
         response_model = payload["model"]
         Response.new(
           message: self.class.deserialize_message(payload["content"]),
-          usage: Usage.from_anthropic(payload["usage"], pricing: Pricing.cost_for(response_model || request_model)),
+          usage: Usage.from_anthropic(payload["usage"],
+                                      pricing: Pricing.cost_for(response_model || request_model)),
           raw: payload,
           model: response_model,
           finish_reason: raw_stop,
@@ -144,7 +149,8 @@ module Truffle
           when :thinking
             blocks.concat(thinking_blocks(block))
           when :tool_call
-            blocks << { type: "tool_use", id: block.id, name: block.name, input: block.arguments || {} }
+            blocks << { type: "tool_use", id: block.id, name: block.name,
+                        input: block.arguments || {} }
           end
         end
         blocks
@@ -185,9 +191,15 @@ module Truffle
         out = []
         texts.each { |t| out << { type: "text", text: t.text } unless t.text.strip.empty? }
         images.each do |img|
-          out << { type: "image", source: { type: "base64", media_type: img.mime_type, data: img.data } }
+          out << { type: "image",
+                   source: { type: "base64", media_type: img.mime_type, data: img.data } }
         end
-        out.unshift({ type: "text", text: "(see attached image)" }) if placeholder && out.none? { |b| b[:type] == "text" }
+        if placeholder && out.none? do |b|
+          b[:type] == "text"
+        end
+          out.unshift({ type: "text",
+                        text: "(see attached image)" })
+        end
         out
       end
 
@@ -223,11 +235,14 @@ module Truffle
           when "text"
             blocks << Content::Text.new(text: item["text"].to_s)
           when "thinking"
-            blocks << Content::Thinking.new(thinking: item["thinking"].to_s, signature: item["signature"])
+            blocks << Content::Thinking.new(thinking: item["thinking"].to_s,
+                                            signature: item["signature"])
           when "redacted_thinking"
-            blocks << Content::Thinking.new(thinking: "[Reasoning redacted]", signature: item["data"], redacted: true)
+            blocks << Content::Thinking.new(thinking: "[Reasoning redacted]",
+                                            signature: item["data"], redacted: true)
           when "tool_use"
-            tool_calls << ToolCall.new(id: item["id"], name: item["name"], arguments: item["input"] || {})
+            tool_calls << ToolCall.new(id: item["id"], name: item["name"],
+                                       arguments: item["input"] || {})
           end
         end
         Message.assistant(content: blocks, tool_calls: tool_calls)

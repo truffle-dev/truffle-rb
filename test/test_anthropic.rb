@@ -30,6 +30,7 @@ class TestAnthropic < Minitest::Test
 
     assert_equal "You are precise.", body[:system]
     roles = body[:messages].map { |m| m[:role] }
+
     refute_includes roles, "system"
     assert_equal %w[user], roles
   end
@@ -41,11 +42,13 @@ class TestAnthropic < Minitest::Test
       Truffle::Message.user("hi")
     ]
     body = Anthropic.build_body(messages, [], "claude-sonnet-4-5", 4096)
+
     assert_equal "One.\nTwo.", body[:system]
   end
 
   def test_no_system_message_omits_the_field
     body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 4096)
+
     refute body.key?(:system)
   end
 
@@ -53,6 +56,7 @@ class TestAnthropic < Minitest::Test
 
   def test_max_tokens_is_always_present
     body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 512)
+
     assert_equal 512, body[:max_tokens]
   end
 
@@ -60,6 +64,7 @@ class TestAnthropic < Minitest::Test
     body = Anthropic.build_body([Truffle::Message.user("hi")], [add_tool.to_schema],
                                 "claude-sonnet-4-5", 4096)
     tool = body[:tools].first
+
     assert_equal "add", tool[:name]
     assert_equal "Add two integers", tool[:description]
     assert_equal "object", tool[:input_schema][:type]
@@ -71,6 +76,7 @@ class TestAnthropic < Minitest::Test
 
   def test_no_tools_omits_tools_and_tool_choice
     body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 4096)
+
     refute body.key?(:tools)
     refute body.key?(:tool_choice)
   end
@@ -78,14 +84,17 @@ class TestAnthropic < Minitest::Test
   def test_string_tool_choice_wraps_into_typed_object
     body = Anthropic.build_body([Truffle::Message.user("hi")], [add_tool.to_schema],
                                 "claude-sonnet-4-5", 4096, { tool_choice: "any" })
+
     assert_equal({ type: "any" }, body[:tool_choice])
   end
 
   def test_temperature_passes_through_when_given
     body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5",
                                 4096, { temperature: 0.2 })
+
     assert_in_delta 0.2, body[:temperature], 1e-9
     body2 = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 4096)
+
     refute body2.key?(:temperature)
   end
 
@@ -95,6 +104,7 @@ class TestAnthropic < Minitest::Test
     body = Anthropic.build_body([Truffle::Message.user("what is 2+2?")], [],
                                 "claude-sonnet-4-5", 4096)
     msg = body[:messages].first
+
     assert_equal "user", msg[:role]
     assert_equal "what is 2+2?", msg[:content]
   end
@@ -102,12 +112,14 @@ class TestAnthropic < Minitest::Test
   def test_assistant_text_and_tool_call_become_blocks
     assistant = Truffle::Message.assistant(
       content: "Let me add those.",
-      tool_calls: [Truffle::ToolCall.new(id: "call_1", name: "add", arguments: { "a" => 2, "b" => 3 })]
+      tool_calls: [Truffle::ToolCall.new(id: "call_1", name: "add",
+                                         arguments: { "a" => 2, "b" => 3 })]
     )
     blocks = Anthropic.assistant_blocks(assistant)
 
     text = blocks.find { |b| b[:type] == "text" }
     tool = blocks.find { |b| b[:type] == "tool_use" }
+
     assert_equal "Let me add those.", text[:text]
     assert_equal "call_1", tool[:id]
     assert_equal "add", tool[:name]
@@ -120,7 +132,8 @@ class TestAnthropic < Minitest::Test
       tool_calls: [Truffle::ToolCall.new(id: "c", name: "add", arguments: {})]
     )
     blocks = Anthropic.assistant_blocks(assistant)
-    assert_equal ["tool_use"], blocks.map { |b| b[:type] }
+
+    assert_equal(["tool_use"], blocks.map { |b| b[:type] })
   end
 
   def test_signed_thinking_block_is_preserved
@@ -128,6 +141,7 @@ class TestAnthropic < Minitest::Test
       content: [Truffle::Content::Thinking.new(thinking: "ponder", signature: "sig-abc")]
     )
     block = Anthropic.assistant_blocks(msg).first
+
     assert_equal "thinking", block[:type]
     assert_equal "ponder", block[:thinking]
     assert_equal "sig-abc", block[:signature]
@@ -140,6 +154,7 @@ class TestAnthropic < Minitest::Test
       content: [Truffle::Content::Thinking.new(thinking: "ponder", signature: nil)]
     )
     block = Anthropic.assistant_blocks(msg).first
+
     assert_equal "text", block[:type]
     assert_equal "ponder", block[:text]
   end
@@ -149,6 +164,7 @@ class TestAnthropic < Minitest::Test
       content: [Truffle::Content::Thinking.new(thinking: "x", signature: "opaque", redacted: true)]
     )
     block = Anthropic.assistant_blocks(msg).first
+
     assert_equal "redacted_thinking", block[:type]
     assert_equal "opaque", block[:data]
   end
@@ -159,15 +175,18 @@ class TestAnthropic < Minitest::Test
     messages = [
       Truffle::Message.user("add 2 and 3"),
       Truffle::Message.assistant(
-        tool_calls: [Truffle::ToolCall.new(id: "call_1", name: "add", arguments: { "a" => 2, "b" => 3 })]
+        tool_calls: [Truffle::ToolCall.new(id: "call_1", name: "add",
+                                           arguments: { "a" => 2, "b" => 3 })]
       ),
       Truffle::Message.tool(content: "5", tool_call_id: "call_1", name: "add")
     ]
     body = Anthropic.build_body(messages, [], "claude-sonnet-4-5", 4096)
 
     result_msg = body[:messages].last
+
     assert_equal "user", result_msg[:role]
     block = result_msg[:content].first
+
     assert_equal "tool_result", block[:type]
     assert_equal "call_1", block[:tool_use_id]
     assert_equal "5", block[:content]
@@ -189,8 +208,10 @@ class TestAnthropic < Minitest::Test
     # Two tool results fold into a single user message with two tool_result
     # blocks, not two separate user messages.
     user_messages = body[:messages].select { |m| m[:role] == "user" }
+
     assert_equal 1, user_messages.length
     ids = user_messages.first[:content].map { |b| b[:tool_use_id] }
+
     assert_equal %w[c1 c2], ids
   end
 
@@ -202,9 +223,11 @@ class TestAnthropic < Minitest::Test
     body = Anthropic.build_body([msg], [], "claude-sonnet-4-5", 4096)
 
     content = body[:messages].first[:content]
+
     assert_kind_of Array, content
     text = content.find { |b| b[:type] == "text" }
     img = content.find { |b| b[:type] == "image" }
+
     assert_equal "look", text[:text]
     assert_equal "base64", img[:source][:type]
     assert_equal "image/png", img[:source][:media_type]
@@ -216,6 +239,7 @@ class TestAnthropic < Minitest::Test
     msg = Truffle::Message.tool(content: [image], tool_call_id: "c1")
     block = Anthropic.tool_result_block(msg)
     types = block[:content].map { |b| b[:type] }
+
     assert_equal %w[text image], types
     assert_equal "(see attached image)", block[:content].first[:text]
   end
@@ -228,8 +252,10 @@ class TestAnthropic < Minitest::Test
       { "type" => "tool_use", "id" => "call_9", "name" => "add", "input" => { "a" => 1, "b" => 2 } }
     ]
     message = Anthropic.deserialize_message(content)
+
     assert_equal "Here you go.", message.text
     call = message.tool_calls.first
+
     assert_equal "call_9", call.id
     assert_equal "add", call.name
     assert_equal({ "a" => 1, "b" => 2 }, call.arguments)
@@ -241,17 +267,19 @@ class TestAnthropic < Minitest::Test
       { "type" => "redacted_thinking", "data" => "opaque" }
     ]
     message = Anthropic.deserialize_message(content)
-    thinking = message.content.select { |b| b.is_a?(Truffle::Content::Thinking) }
+    thinking = message.content.grep(Truffle::Content::Thinking)
+
     assert_equal 2, thinking.length
     assert_equal "reasoned", thinking[0].thinking
     assert_equal "sig", thinking[0].signature
-    assert thinking[1].redacted?
+    assert_predicate thinking[1], :redacted?
     assert_equal "opaque", thinking[1].signature
   end
 
   def test_deserialize_tool_use_with_missing_input_defaults_to_empty_hash
     content = [{ "type" => "tool_use", "id" => "c", "name" => "noop" }]
     call = Anthropic.deserialize_message(content).tool_calls.first
+
     assert_equal({}, call.arguments)
   end
 
@@ -260,6 +288,7 @@ class TestAnthropic < Minitest::Test
   def test_map_stop_reason_clean_stops
     %w[end_turn stop_sequence pause_turn].each do |reason|
       stop, err = Anthropic.map_stop_reason(reason)
+
       assert_equal Truffle::StopReason::STOP, stop, "expected #{reason} -> stop"
       assert_nil err
     end
@@ -272,18 +301,21 @@ class TestAnthropic < Minitest::Test
 
   def test_map_stop_reason_refusal_carries_explanation
     stop, err = Anthropic.map_stop_reason("refusal", { "explanation" => "not allowed" })
+
     assert_equal Truffle::StopReason::ERROR, stop
     assert_equal "not allowed", err
   end
 
   def test_map_stop_reason_refusal_without_details_has_default_message
     stop, err = Anthropic.map_stop_reason("refusal")
+
     assert_equal Truffle::StopReason::ERROR, stop
     assert_equal "The model refused to complete the request", err
   end
 
   def test_map_stop_reason_sensitive_is_an_error
     stop, err = Anthropic.map_stop_reason("sensitive")
+
     assert_equal Truffle::StopReason::ERROR, stop
     refute_nil err
   end
@@ -292,6 +324,7 @@ class TestAnthropic < Minitest::Test
     # pi throws on an unknown reason; we fold it into an error carrying the raw
     # reason, the same net behavior (an error) without crashing the loop.
     stop, err = Anthropic.map_stop_reason("brand_new_reason")
+
     assert_equal Truffle::StopReason::ERROR, stop
     assert_includes err, "brand_new_reason"
   end
@@ -304,6 +337,7 @@ class TestAnthropic < Minitest::Test
     raw = { "input_tokens" => 100, "output_tokens" => 20,
             "cache_read_input_tokens" => 40, "cache_creation_input_tokens" => 10 }
     usage = Truffle::Usage.from_anthropic(raw)
+
     assert_equal 100, usage.input
     assert_equal 20, usage.output
     assert_equal 40, usage.cache_read
@@ -319,6 +353,7 @@ class TestAnthropic < Minitest::Test
       "output_tokens_details" => { "thinking_tokens" => 7 }
     }
     usage = Truffle::Usage.from_anthropic(raw)
+
     assert_equal 30, usage.cache_write_1h
     assert_equal 7, usage.reasoning
   end
@@ -351,6 +386,7 @@ class TestAnthropic < Minitest::Test
   def test_pricing_strips_dated_snapshot_for_anthropic_ids
     base = Truffle::Pricing.cost_for("claude-sonnet-4-5")
     dated = Truffle::Pricing.cost_for("claude-sonnet-4-5-20250929")
+
     assert_equal base, dated
   end
 
@@ -362,6 +398,7 @@ class TestAnthropic < Minitest::Test
 
   def test_anthropic_registered_as_a_provider
     provider = Truffle.provider(:anthropic, api_key: "test-key")
+
     assert_kind_of Truffle::Providers::Anthropic, provider
     assert_equal "anthropic", provider.name
   end

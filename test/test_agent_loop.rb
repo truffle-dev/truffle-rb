@@ -14,9 +14,10 @@ class TestAgentLoop < Minitest::Test
   # The model asks for a tool, gets the result, then answers in plain text.
   def test_runs_tool_then_returns_final_text
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "call_1", name: "add", arguments: { "a" => 2, "b" => 3 }),
-      StubProvider.text("The answer is 5.")
-    ])
+                                  StubProvider.tool_call(id: "call_1", name: "add",
+                                                         arguments: { "a" => 2, "b" => 3 }),
+                                  StubProvider.text("The answer is 5.")
+                                ])
     agent = Truffle::Agent.new(provider: provider, system_prompt: "calc", tools: [@add])
 
     result = agent.run("What is 2 + 3?")
@@ -28,13 +29,15 @@ class TestAgentLoop < Minitest::Test
 
   def test_history_contains_tool_result_linked_by_id
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "call_9", name: "add", arguments: { "a" => 4, "b" => 6 }),
-      StubProvider.text("10")
-    ])
+                                  StubProvider.tool_call(id: "call_9", name: "add",
+                                                         arguments: { "a" => 4, "b" => 6 }),
+                                  StubProvider.text("10")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [@add])
     agent.run("4 + 6?")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
+
     refute_nil tool_msg
     assert_equal "call_9", tool_msg.tool_call_id
     assert_equal "10", tool_msg.text
@@ -42,9 +45,10 @@ class TestAgentLoop < Minitest::Test
 
   def test_emits_events_in_order
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 1, "b" => 1 }),
-      StubProvider.text("2")
-    ])
+                                  StubProvider.tool_call(id: "c1", name: "add",
+                                                         arguments: { "a" => 1, "b" => 1 }),
+                                  StubProvider.text("2")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [@add])
 
     seen = []
@@ -56,14 +60,15 @@ class TestAgentLoop < Minitest::Test
     assert_includes seen, :tool_call
     assert_includes seen, :tool_result
     # tool_call must come before its tool_result
-    assert seen.index(:tool_call) < seen.index(:tool_result)
+    assert_operator seen.index(:tool_call), :<, seen.index(:tool_result)
   end
 
   def test_scoped_event_listener_receives_payload
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 7, "b" => 8 }),
-      StubProvider.text("15")
-    ])
+                                  StubProvider.tool_call(id: "c1", name: "add",
+                                                         arguments: { "a" => 7, "b" => 8 }),
+                                  StubProvider.text("15")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [@add])
 
     captured = nil
@@ -76,13 +81,14 @@ class TestAgentLoop < Minitest::Test
 
   def test_unknown_tool_is_reported_not_raised
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "c1", name: "nope", arguments: {}),
-      StubProvider.text("sorry")
-    ])
+                                  StubProvider.tool_call(id: "c1", name: "nope", arguments: {}),
+                                  StubProvider.text("sorry")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [@add])
     agent.run("do the thing")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
+
     assert_includes tool_msg.text, "unknown tool 'nope'"
   end
 
@@ -91,13 +97,14 @@ class TestAgentLoop < Minitest::Test
       run { raise "kaboom" }
     end
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "c1", name: "boom", arguments: {}),
-      StubProvider.text("handled")
-    ])
+                                  StubProvider.tool_call(id: "c1", name: "boom", arguments: {}),
+                                  StubProvider.text("handled")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [boom])
     result = agent.run("go")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
+
     assert_includes tool_msg.text, "kaboom"
     assert_equal "handled", result
   end
@@ -117,9 +124,10 @@ class TestAgentLoop < Minitest::Test
 
   def test_agent_end_surfaces_stop_reason
     provider = StubProvider.new([
-      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 1, "b" => 1 }),
-      StubProvider.text("2")
-    ])
+                                  StubProvider.tool_call(id: "c1", name: "add",
+                                                         arguments: { "a" => 1, "b" => 1 }),
+                                  StubProvider.text("2")
+                                ])
     agent = Truffle::Agent.new(provider: provider, tools: [@add])
 
     ended = nil
@@ -146,9 +154,11 @@ class TestAgentLoop < Minitest::Test
     provider = StubProvider.new([StubProvider.text("hi")])
     agent = Truffle::Agent.new(provider: provider, system_prompt: "be nice")
     agent.run("hello")
-    assert agent.messages.length > 1
+
+    assert_operator agent.messages.length, :>, 1
 
     agent.reset
+
     assert_equal 1, agent.messages.length
     assert_equal :system, agent.messages.first.role
   end

@@ -1,0 +1,73 @@
+plugins:
+  - rubocop-minitest
+  - rubocop-rake
+
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: enable
+  Exclude:
+    - "vendor/**/*"
+    - "pkg/**/*"
+    - "tmp/**/*"
+
+# House style is double-quoted strings throughout.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# Documentation lives in prose comments and the README, not a mandated
+# top-of-class comment.
+Style/Documentation:
+  Enabled: false
+
+# Endless methods read well for one-line readers and predicates, used widely.
+Style/EndlessMethod:
+  EnforcedStyle: allow_single_line
+
+# Value objects (Model, Message) legitimately take many keyword args; keyword
+# arguments are self-documenting and should not count against the limit.
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+
+Metrics/MethodLength:
+  Max: 40
+  CountAsOne: ["array", "hash", "heredoc"]
+
+# Value-object aggregation (Usage#+) legitimately touches every field.
+Metrics/AbcSize:
+  Max: 48
+
+Metrics/ClassLength:
+  Max: 250
+  Exclude:
+    - "test/**/*.rb"
+
+Metrics/ModuleLength:
+  Max: 250
+  CountAsOne: ["array", "hash"]
+
+Metrics/CyclomaticComplexity:
+  Max: 12
+
+Metrics/PerceivedComplexity:
+  Max: 12
+
+Layout/LineLength:
+  Max: 100
+
+# Tests group related assertions about one behavior into a single, well-named
+# case on purpose; that reads better than splintering one fact across cases.
+Minitest/MultipleAssertions:
+  Enabled: false
+
+# A provider seam method names its full keyword interface even when a given
+# stub or override ignores some of it; the signature is the contract.
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+
+Metrics/BlockLength:
+  Exclude:
+    - "test/**/*.rb"
+    - "*.gemspec"

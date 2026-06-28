@@ -55,17 +55,17 @@ module Truffle
     # The tool calls the model requested this turn, lifted out of the content
     # blocks so the agent loop can dispatch them.
     def tool_calls
-      @content.select { |block| block.is_a?(ToolCall) }
+      @content.grep(ToolCall)
     end
 
     def tool_calls?
-      @content.any? { |block| block.is_a?(ToolCall) }
+      @content.any?(ToolCall)
     end
 
     # The plain text of the message: every Text block joined, or nil when the
     # turn carried no text (a pure tool call, for example).
     def text
-      texts = @content.select { |block| block.is_a?(Content::Text) }
+      texts = @content.grep(Content::Text)
       return nil if texts.empty?
 
       texts.map(&:text).join

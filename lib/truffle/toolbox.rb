@@ -20,8 +20,8 @@ module Truffle
       @tools[name.to_s]
     end
 
-    def each(&block)
-      @tools.values.each(&block)
+    def each(&)
+      @tools.values.each(&)
     end
 
     def empty?

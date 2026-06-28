@@ -102,7 +102,8 @@ module Truffle
         input: per_million(rates[:input], input),
         output: per_million(rates[:output], output),
         cache_read: per_million(rates[:cache_read], cache_read),
-        cache_write: (rates[:cache_write] * short_write + rates[:input] * 2 * long_write) / 1_000_000.0,
+        cache_write: ((rates[:cache_write] * short_write) +
+                      (rates[:input] * 2 * long_write)) / 1_000_000.0,
         total: 0.0
       )
       computed.total = computed.input + computed.output + computed.cache_read + computed.cache_write

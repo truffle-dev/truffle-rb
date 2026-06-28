@@ -28,11 +28,16 @@ end
 agent = Truffle.agent(
   provider: :openai,
   model: ENV.fetch("TRUFFLE_MODEL", "gpt-4o-mini"),
-  system_prompt: "You are a precise calculator. Use the tools for every arithmetic step. Show the final result clearly.",
+  system_prompt: "You are a precise calculator. Use the tools for every " \
+                 "arithmetic step. Show the final result clearly.",
   tools: [add, multiply]
 )
 
-agent.on(:tool_call)   { |e| puts "  -> calling #{e[:call].name}(#{e[:call].arguments.map { |k, v| "#{k}=#{v}" }.join(', ')})" }
+agent.on(:tool_call) do |e|
+  puts "  -> calling #{e[:call].name}(#{e[:call].arguments.map do |k, v|
+    "#{k}=#{v}"
+  end.join(", ")})"
+end
 agent.on(:tool_result) { |e| puts "  <- #{e[:call].name} returned #{e[:result]}" }
 
 question = ARGV.join(" ")

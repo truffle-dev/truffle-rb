@@ -13,6 +13,7 @@ class TestTool < Minitest::Test
 
   def test_schema_shape
     schema = @add.to_schema
+
     assert_equal "add", schema[:name]
     assert_equal "Add two integers", schema[:description]
     assert_equal "object", schema[:parameters][:type]
@@ -28,16 +29,18 @@ class TestTool < Minitest::Test
 
   def test_call_returns_string
     result = @add.call("a" => 10, "b" => 20)
+
     assert_kind_of String, result
     assert_equal "30", result
   end
 
   def test_toolbox_lookup_and_schema
     box = Truffle::Toolbox.new([@add])
+
     assert_equal @add, box["add"]
     assert_equal ["add"], box.names
     assert_equal 1, box.to_schema.length
-    refute box.empty?
+    refute_empty box
   end
 
   def test_optional_param_with_default
@@ -46,6 +49,7 @@ class TestTool < Minitest::Test
       param :loud, :boolean
       run { |name:, loud: false| loud ? "HELLO #{name.upcase}" : "hello #{name}" }
     end
+
     assert_equal "hello sam", greet.call("name" => "sam")
     assert_equal "HELLO SAM", greet.call("name" => "sam", "loud" => true)
     refute_includes greet.to_schema[:parameters][:required], "loud"

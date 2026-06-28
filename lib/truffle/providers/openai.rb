@@ -18,10 +18,13 @@ module Truffle
 
       attr_reader :model
 
-      def initialize(api_key: ENV["OPENAI_API_KEY"], model: DEFAULT_MODEL,
+      def initialize(api_key: ENV.fetch("OPENAI_API_KEY", nil), model: DEFAULT_MODEL,
                      base_url: DEFAULT_BASE_URL, open_timeout: 15, read_timeout: 120)
         super()
-        raise ArgumentError, "missing OpenAI API key (set OPENAI_API_KEY or pass :api_key)" if api_key.nil? || api_key.empty?
+        if api_key.nil? || api_key.empty?
+          raise ArgumentError,
+                "missing OpenAI API key (set OPENAI_API_KEY or pass :api_key)"
+        end
 
         @api_key = api_key
         @model = model
@@ -42,7 +45,8 @@ module Truffle
         response_model = payload["model"]
         Response.new(
           message: deserialize_message(choice.fetch("message")),
-          usage: Usage.parse(payload["usage"], pricing: Pricing.cost_for(response_model || model || @model)),
+          usage: Usage.parse(payload["usage"],
+                             pricing: Pricing.cost_for(response_model || model || @model)),
           raw: payload,
           model: response_model,
           finish_reason: finish_reason,
@@ -204,7 +208,7 @@ module Truffle
       # :aborted so the caller can fold a clean cancellation into the stream.
       # Otherwise returns nil. The check is cooperative (between fragments), not
       # a forced socket close, so a stalled read still waits up to read_timeout.
-      def stream_post(path, body, signal: nil)
+      def stream_post(path, body, signal: nil, &block)
         uri = URI("#{@base_url}#{path}")
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme == "https"
@@ -232,10 +236,10 @@ module Truffle
             buffer << fragment
             while (newline = buffer.index("\n"))
               line = buffer.slice!(0, newline + 1)
-              handle_sse_line(line.chomp) { |chunk| yield chunk }
+              handle_sse_line(line.chomp, &block)
             end
           end
-          handle_sse_line(buffer.chomp) { |chunk| yield chunk } unless aborted || buffer.empty?
+          handle_sse_line(buffer.chomp, &block) unless aborted || buffer.empty?
         end
         aborted ? :aborted : nil
       end

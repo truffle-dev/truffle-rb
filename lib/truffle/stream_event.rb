@@ -44,7 +44,8 @@ module Truffle
                    partial: nil)
       type = type.to_sym
       unless TYPES.include?(type)
-        raise ArgumentError, "unknown stream event #{type.inspect}, expected one of #{TYPES.inspect}"
+        raise ArgumentError,
+              "unknown stream event #{type.inspect}, expected one of #{TYPES.inspect}"
       end
 
       @type = type

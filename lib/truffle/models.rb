@@ -117,7 +117,7 @@ module Truffle
 
     ALL = (ANTHROPIC + OPENAI).freeze
 
-    BY_ID = ALL.each_with_object({}) { |m, h| h[m.id] = m }.freeze
+    BY_ID = ALL.to_h { |m| [m.id, m] }.freeze
 
     module_function
 

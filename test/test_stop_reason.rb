@@ -14,6 +14,7 @@ class TestStopReason < Minitest::Test
   # The finish_reason -> StopReason mapping, a faithful port of pi's mapStopReason.
   def test_maps_clean_stops
     map = Truffle::Providers::OpenAI.method(:map_stop_reason)
+
     assert_equal [:stop, nil], map.call(nil)
     assert_equal [:stop, nil], map.call("stop")
     assert_equal [:stop, nil], map.call("end")
@@ -30,16 +31,19 @@ class TestStopReason < Minitest::Test
 
   def test_maps_known_failures_with_message
     reason, message = Truffle::Providers::OpenAI.map_stop_reason("content_filter")
+
     assert_equal :error, reason
     assert_equal "Provider finish_reason: content_filter", message
 
     reason, message = Truffle::Providers::OpenAI.map_stop_reason("network_error")
+
     assert_equal :error, reason
     assert_equal "Provider finish_reason: network_error", message
   end
 
   def test_maps_unknown_reason_to_error_carrying_the_raw_reason
     reason, message = Truffle::Providers::OpenAI.map_stop_reason("something_new")
+
     assert_equal :error, reason
     assert_equal "Provider finish_reason: something_new", message
   end
@@ -51,6 +55,7 @@ class TestStopReason < Minitest::Test
       stop_reason: :error,
       error_message: "Provider finish_reason: content_filter"
     )
+
     assert_equal :error, response.stop_reason
     assert_equal "Provider finish_reason: content_filter", response.error_message
     assert_equal "content_filter", response.finish_reason
@@ -58,6 +63,7 @@ class TestStopReason < Minitest::Test
 
   def test_response_stop_reason_defaults_to_nil
     response = Truffle::Response.new(message: Truffle::Message.assistant(content: "hi"))
+
     assert_nil response.stop_reason
     assert_nil response.error_message
   end

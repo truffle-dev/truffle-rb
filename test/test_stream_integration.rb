@@ -19,10 +19,12 @@ class TestStreamIntegration < Minitest::Test
     response = provider.chat_stream(messages: messages) { |event| events << event }
 
     assert_equal :start, events.first.type
-    assert events.last.terminal?, "stream must end on a terminal event"
-    refute events.last.error?, "expected a clean stop, got: #{events.last.error_message}"
+    assert_predicate events.last, :terminal?, "stream must end on a terminal event"
+    refute_predicate events.last, :error?,
+                     "expected a clean stop, got: #{events.last.error_message}"
 
     streamed_text = events.select { |e| e.type == :text_delta }.map(&:delta).join
+
     assert_equal response.message.text, streamed_text
     assert_includes response.message.text.downcase, "pong"
     assert_equal Truffle::StopReason::STOP, response.stop_reason
