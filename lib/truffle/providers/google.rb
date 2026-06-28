@@ -19,12 +19,13 @@ module Truffle
     # a parametersJsonSchema, and finish reasons and usage map onto Truffle's
     # normalized shapes.
     #
-    # This is the non-streaming half of pi's Google surface. pi only streams (over
-    # streamGenerateContent SSE); Truffle's agent loop drives #chat, so a single
-    # buffered request is the focused first slice. A streaming #chat_stream over
-    # the same transforms (a GoogleStream accumulator on the shared Providers::SSE
-    # mixin) is the next slice and reuses every transform here.
+    # Both halves of pi's Google surface are here: the non-streaming #chat does a
+    # single buffered generateContent request, and #chat_stream drives the
+    # streamGenerateContent SSE endpoint through a GoogleStream accumulator over
+    # the shared Providers::SSE transport, reusing every wire transform below.
     class Google < Base
+      include SSE
+
       DEFAULT_MODEL = "gemini-2.5-flash"
       DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -76,6 +77,30 @@ module Truffle
           stop_reason: stop_reason,
           error_message: error_message
         )
+      end
+
+      # Streaming counterpart to #chat. Opens an SSE request to
+      # streamGenerateContent (with ?alt=sse so the server emits Server-Sent
+      # Events rather than a JSON array), decodes each chunk through a GoogleStream
+      # accumulator, and yields the ordered StreamEvents as content arrives.
+      # Returns the final Truffle::Response once the stream closes, so a caller
+      # that ignores the block still gets the whole turn. A transport or parse
+      # failure folds into the stream as an :error event (via the accumulator's
+      # #fail) rather than raised, and the returned Response carries
+      # StopReason::ERROR.
+      #
+      # Pass signal: a Truffle::AbortSignal to cancel mid-stream. It is checked
+      # between socket reads; on abort the reader stops and the turn folds into a
+      # clean :done terminal with StopReason::ABORTED, carrying whatever content
+      # arrived before the cancel. Reuses every wire transform from #chat: only the
+      # endpoint and the chunk-by-chunk decode differ.
+      def chat_stream(messages:, tools: [], model: nil, signal: nil, **options, &block)
+        request_model = model || @model
+        body = self.class.build_body(messages, tools, options)
+        path = "/models/#{request_model}:streamGenerateContent?alt=sse"
+
+        acc = GoogleStream.new(pricing_model: request_model)
+        drive_stream(path, body, acc, signal: signal, &block)
       end
 
       # Build the generateContent request body. The system prompt is lifted out of
@@ -322,6 +347,16 @@ module Truffle
       def truncate(str, limit = 500)
         s = str.to_s
         s.length > limit ? "#{s[0, limit]}..." : s
+      end
+
+      # Auth header for the shared SSE transport (Providers::SSE#stream_post).
+      def stream_request_headers
+        { "x-goog-api-key" => @api_key }
+      end
+
+      # Label the shared SSE transport puts on a non-success streaming response.
+      def provider_label
+        "Google"
       end
     end
   end

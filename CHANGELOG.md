@@ -31,8 +31,27 @@ All notable changes to Truffle are documented here. The format follows
   `cachedContentTokenCount` and folding `thoughtsTokenCount` into output while
   recording it as reasoning. The model catalog gains the Gemini lineup
   (3.5 Flash, 3.1 Pro Preview, 3.1 Flash-Lite, and the 2.5 Pro/Flash/Flash-Lite
-  family) with current per-million pricing. Streaming over
-  `streamGenerateContent` on the shared `Providers::SSE` mixin is the next slice.
+  family) with current per-million pricing.
+- A streaming Google provider (`Providers::Google#chat_stream`), the streaming
+  counterpart to `#chat`. It opens an SSE request to `streamGenerateContent`
+  (with `?alt=sse`) over the shared `Providers::SSE` transport and yields the
+  same ordered `Truffle::StreamEvent` protocol the other providers do: one
+  `:start`, a `*_start`/`*_delta`/`*_end` trio per block (text, thinking, or tool
+  call), and a terminal `:done` or `:error` carrying the final message and
+  StopReason. Unlike Anthropic's indexed block events, each Gemini chunk is a
+  whole response whose candidate carries the parts produced since the last chunk,
+  so the decode keeps one open text-or-thinking block and appends to it, closing
+  it and opening a fresh one when the part kind flips (text to thought or back)
+  or a `functionCall` arrives. A `functionCall` emits a complete
+  `start`/`delta`/`end` trio at once, and the stop reason is overridden to
+  `tool_use` when the turn produced a call (Gemini reports a plain `STOP` even
+  then). A missing or duplicate call id is replaced with a deterministic
+  name-and-counter id; the latest non-empty thought signature is retained; the
+  cumulative `usageMetadata` is taken from the last chunk that carries it. The
+  decode lives in a pure `Providers::GoogleStream` accumulator fed already-parsed
+  chunk hashes, tested fully offline, and reuses every wire transform from
+  `#chat`. A `SAFETY`/`RECITATION` finish folds into a terminal `:error`, and an
+  `AbortSignal` folds into a clean `:done` with `StopReason::ABORTED`.
 - A streaming Anthropic Messages provider (`Providers::Anthropic#chat_stream`),
   the streaming counterpart to `#chat`. It opens an SSE request and yields the
   same ordered `Truffle::StreamEvent` protocol the OpenAI provider does: one
