@@ -1,20 +1,21 @@
-# Pith
+# Truffle
 
-A small, provider-agnostic **agent harness for Ruby**. Pith gives you the loop
-that turns a language model into an agent: it sends a prompt, lets the model
+A complete **agent harness for Ruby**, built from scratch. Truffle gives you the
+loop that turns a language model into an agent: it sends a prompt, lets the model
 ask for tools, runs those tools, feeds the results back, and repeats until the
-model answers. No framework, no service, no heavy dependency tree. Plain Ruby
-and the standard library.
+model answers. It is a faithful port of
+[pi](https://github.com/earendil-works/pi) to idiomatic Ruby. No framework, no
+service, no runtime gem dependencies. Plain Ruby and the standard library.
 
 ```ruby
-require "pith"
+require "truffle"
 
-weather = Pith.tool("get_weather", "Look up the weather for a city") do
+weather = Truffle.tool("get_weather", "Look up the weather for a city") do
   param :city, :string, "city name", required: true
   run { |city:| "It is 22C and sunny in #{city}." }
 end
 
-agent = Pith.agent(
+agent = Truffle.agent(
   provider: :openai,
   model: "gpt-4o-mini",
   system_prompt: "You are a concise assistant. Use tools when they help.",
@@ -25,34 +26,33 @@ puts agent.run("What's the weather in Lisbon?")
 # => "It's 22C and sunny in Lisbon right now."
 ```
 
-The model decided to call `get_weather(city: "Lisbon")`, Pith ran your Ruby
+The model decided to call `get_weather(city: "Lisbon")`, Truffle ran your Ruby
 block, handed the result back, and the model wrote the final answer. That whole
-round trip is the agent loop, and it is the thing Pith exists to give you.
+round trip is the agent loop, and it is the thing Truffle exists to give you.
 
-![Pith test suite and a live three-tool agent run](docs/screenshot-tests.png)
+![Truffle test suite and a live three-tool agent run](docs/screenshot-tests.png)
 
 *The full suite (unit tests plus one live OpenAI round-trip) passing, and the
 calculator example chaining three real tool calls to reach 240.*
 
-## Why Pith
+## Why Truffle
 
-Ruby already has an excellent LLM client layer in
-[ruby_llm](https://github.com/crmne/ruby_llm): one consistent API across many
-providers. What Ruby has been missing is a tiny, readable **agent runtime** on
-top of that seam, the part that owns the turn loop, the tool dispatch, the
-message history, and the events a UI hangs off.
+Ruby has been missing a tiny, readable **agent runtime**: the part that owns the
+turn loop, the tool dispatch, the message history, and the events a UI hangs off.
+Truffle is that runtime, written from scratch.
 
-Pith is a Ruby port of the agent-core ideas in
-[pi](https://github.com/earendil-works/pi). It keeps the runtime and drops
-everything else, so you can read the whole loop in one sitting (`lib/pith/agent.rb`)
-and understand exactly what your agent does.
+It is a faithful port of [pi](https://github.com/earendil-works/pi), the
+self-extensible coding agent harness. The aim is a byte-for-byte-faithful Ruby
+port of pi's agent core, growing into a full harness with skills, commands,
+sessions, and memory. You can read the whole loop in one sitting
+(`lib/truffle/agent.rb`) and understand exactly what your agent does.
 
-- **Provider-agnostic.** The agent talks to a single `chat` seam. A provider is
-  any object that answers `chat(messages:, tools:, model:)`. An OpenAI provider
-  ships in the box; a `ruby_llm` adapter is on the roadmap, which unlocks every
-  provider ruby_llm already supports.
+- **Provider-agnostic, built from scratch.** The agent talks to a single `chat`
+  seam. A provider is any object that answers `chat(messages:, tools:, model:)`.
+  An OpenAI provider ships in the box, written against the wire API directly with
+  no client gem. Anthropic and other providers follow the same hand-written path.
 - **Tools are plain blocks.** Define a tool with a name, a description, typed
-  params, and a Ruby block. Pith generates the JSON Schema the model needs and
+  params, and a Ruby block. Truffle generates the JSON Schema the model needs and
   symbolizes the model's arguments back into keyword args for you.
 - **Observable.** Subscribe to `agent_start`, `tool_call`, `tool_result`,
   `agent_end`, and more. Build a TUI, a log stream, or a web view without the
@@ -65,7 +65,7 @@ and understand exactly what your agent does.
 
 ```ruby
 # Gemfile
-gem "pith"
+gem "truffle"
 ```
 
 ```sh
@@ -75,11 +75,11 @@ bundle install
 Or from a checkout:
 
 ```sh
-gem build pith.gemspec
-gem install ./pith-0.1.0.gem
+gem build truffle.gemspec
+gem install ./truffle-0.1.0.gem
 ```
 
-Pith targets Ruby >= 3.1.
+Truffle targets Ruby >= 3.1.
 
 ## Quick start
 
@@ -109,7 +109,7 @@ A: The final result is 240.
 ### Tools
 
 ```ruby
-add = Pith.tool("add", "Add two integers") do
+add = Truffle.tool("add", "Add two integers") do
   param :a, :integer, "first addend", required: true
   param :b, :integer, "second addend", required: true
   run { |a:, b:| a + b }
@@ -118,7 +118,7 @@ end
 
 - `param name, type, description, required:` declares an input. Types map to
   JSON Schema (`:string`, `:integer`, `:number`, `:boolean`, ...).
-- `run { |a:, b:| ... }` is your handler. The model emits string keys; Pith
+- `run { |a:, b:| ... }` is your handler. The model emits string keys; Truffle
   symbolizes them into keyword args. Return any value; it is stringified before
   it goes back to the model.
 - Raising inside a handler does not crash the loop. The error is caught and fed
@@ -127,7 +127,7 @@ end
 ### Agents
 
 ```ruby
-agent = Pith.agent(
+agent = Truffle.agent(
   provider: :openai,
   model: "gpt-4o-mini",
   system_prompt: "You are a precise calculator.",
@@ -141,7 +141,7 @@ agent.reset   # clears history, keeps the system prompt and tools
 
 `run` drives the loop to completion and returns the final assistant text.
 `max_turns` guards against a model that never settles; exceeding it raises
-`Pith::Error`.
+`Truffle::Error`.
 
 ### Events
 
@@ -161,14 +161,14 @@ A provider is anything that implements:
 
 ```ruby
 def chat(messages:, tools:, model: nil, **options)
-  # -> Pith::Response
+  # -> Truffle::Response
 end
 ```
 
-The bundled `Pith::Providers::OpenAI` talks to the Chat Completions API over
-`Net::HTTP`. To target another backend today, subclass
-`Pith::Providers::Base` and implement `chat`. The roadmap adds a first-class
-`ruby_llm` adapter so you get every provider it supports for free.
+The bundled `Truffle::Providers::OpenAI` talks to the Chat Completions API over
+`Net::HTTP`. To target another backend, subclass `Truffle::Providers::Base` and
+implement `chat`. The roadmap adds first-class Anthropic and other providers,
+each hand-written against the seam.
 
 ## Testing
 
@@ -180,7 +180,7 @@ The default suite is hermetic and offline: it drives the agent loop with a stub
 provider, so you can run it anywhere without a key. One additional test
 (`test/test_openai_integration.rb`) performs a real OpenAI round trip and is
 **skipped unless `OPENAI_API_KEY` is set**. With a key present it verifies the
-full path: prompt -> model requests a tool -> Pith runs it -> model answers
+full path: prompt -> model requests a tool -> Truffle runs it -> model answers
 with the tool's result.
 
 No local Ruby? The repo ships `script/rb`, a thin wrapper that runs any command
@@ -190,25 +190,24 @@ with only Docker.
 ## Project layout
 
 ```
-lib/pith.rb                  # top-level API: Pith.agent, Pith.tool, Pith.provider
-lib/pith/agent.rb            # the agent loop (the heart of the port)
-lib/pith/tool.rb             # tool DSL + JSON Schema generation
-lib/pith/toolbox.rb          # a named collection of tools
-lib/pith/message.rb          # message + tool-call value objects
-lib/pith/response.rb         # a provider's reply
-lib/pith/providers/base.rb   # the provider seam
-lib/pith/providers/openai.rb # OpenAI Chat Completions provider
+lib/truffle.rb                  # top-level API: Truffle.agent, Truffle.tool, Truffle.provider
+lib/truffle/agent.rb            # the agent loop (the heart of the port)
+lib/truffle/tool.rb             # tool DSL + JSON Schema generation
+lib/truffle/toolbox.rb          # a named collection of tools
+lib/truffle/message.rb          # message + tool-call value objects
+lib/truffle/response.rb         # a provider's reply
+lib/truffle/providers/base.rb   # the provider seam
+lib/truffle/providers/openai.rb # OpenAI Chat Completions provider
 examples/calculator.rb       # runnable multi-tool demo
 test/                        # minitest suite (offline + one live test)
 ```
 
 ## Credits
 
-Pith is a Ruby port of the agent-core runtime in
-[pi](https://github.com/earendil-works/pi) by Mario Zechner (MIT). The
-provider-agnostic ambition and the end-to-end ergonomics are inspired by
-[ruby_llm](https://github.com/crmne/ruby_llm) by Carmine Paolino (MIT). Thanks
-to both projects.
+Truffle is a from-scratch Ruby port of
+[pi](https://github.com/earendil-works/pi) by Mario Zechner (MIT). pi is the
+blueprint; the Ruby implementation is written from the ground up. Thanks to the
+pi project for the design.
 
 ## License
 

@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-module Pith
+module Truffle
   # A single message in an agent conversation.
   #
-  # Pith works with one flat message type across every provider. The provider
+  # Truffle works with one flat message type across every provider. The provider
   # layer is responsible for translating these into whatever wire shape a given
-  # API expects (see Pith::Providers::Base#serialize_messages). Keeping a single
+  # API expects (see Truffle::Providers::Base#serialize_messages). Keeping a single
   # in-memory representation is what lets the agent loop stay provider-agnostic.
   #
   # Roles:

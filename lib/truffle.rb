@@ -1,38 +1,39 @@
 # frozen_string_literal: true
 
-require_relative "pith/version"
-require_relative "pith/message"
-require_relative "pith/response"
-require_relative "pith/tool"
-require_relative "pith/toolbox"
-require_relative "pith/providers/base"
-require_relative "pith/providers/openai"
-require_relative "pith/agent"
+require_relative "truffle/version"
+require_relative "truffle/message"
+require_relative "truffle/response"
+require_relative "truffle/tool"
+require_relative "truffle/toolbox"
+require_relative "truffle/providers/base"
+require_relative "truffle/providers/openai"
+require_relative "truffle/agent"
 
-# Pith is a small, provider-agnostic agent harness for Ruby.
+# Truffle is a complete agent harness for Ruby, built from scratch.
 #
-# It ports the moat of earendil-works/pi (the agent-core runtime: tool calling,
-# state, and an event model) to idiomatic Ruby. The provider seam is inspired by
-# crmne/ruby_llm: one interface, every model behind it.
+# It is a faithful port of earendil-works/pi to idiomatic Ruby: the agent-core
+# runtime (tool calling, state, and an event-streaming protocol), with a
+# provider-agnostic LLM seam written from the ground up and no runtime gem
+# dependencies.
 #
 # Quick start:
 #
-#   require "pith"
+#   require "truffle"
 #
-#   add = Pith::Tool.define("add", "Add two integers") do
+#   add = Truffle::Tool.define("add", "Add two integers") do
 #     param :a, :integer, required: true
 #     param :b, :integer, required: true
 #     run { |a:, b:| a + b }
 #   end
 #
-#   agent = Pith.agent(
+#   agent = Truffle.agent(
 #     provider: :openai,
 #     system_prompt: "You are a precise calculator. Use tools for arithmetic.",
 #     tools: [add]
 #   )
 #   puts agent.run("What is 21 plus 21?")
-module Pith
-  # Generic Pith error type; provider HTTP errors are Pith::Providers::Error.
+module Truffle
+  # Generic Truffle error type; provider HTTP errors are Truffle::Providers::Error.
   class Error < StandardError; end
 
   PROVIDERS = {
@@ -51,7 +52,7 @@ module Pith
     klass.new(**options)
   end
 
-  # Convenience constructor: Pith.agent(provider: :openai, tools: [...], ...).
+  # Convenience constructor: Truffle.agent(provider: :openai, tools: [...], ...).
   # `provider:` may be a symbol, an options-less default, or a provider instance.
   def agent(provider:, system_prompt: nil, tools: [], model: nil,
             max_turns: Agent::DEFAULT_MAX_TURNS, **provider_options)
@@ -65,7 +66,7 @@ module Pith
     )
   end
 
-  # Define a tool: Pith.tool("name", "desc") { param ...; run { ... } }.
+  # Define a tool: Truffle.tool("name", "desc") { param ...; run { ... } }.
   def tool(name, description, &block)
     Tool.define(name, description, &block)
   end

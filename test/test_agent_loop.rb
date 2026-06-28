@@ -4,7 +4,7 @@ require "test_helper"
 
 class TestAgentLoop < Minitest::Test
   def setup
-    @add = Pith::Tool.define("add", "Add two integers") do
+    @add = Truffle::Tool.define("add", "Add two integers") do
       param :a, :integer, required: true
       param :b, :integer, required: true
       run { |a:, b:| a + b }
@@ -17,7 +17,7 @@ class TestAgentLoop < Minitest::Test
       StubProvider.tool_call(id: "call_1", name: "add", arguments: { "a" => 2, "b" => 3 }),
       StubProvider.text("The answer is 5.")
     ])
-    agent = Pith::Agent.new(provider: provider, system_prompt: "calc", tools: [@add])
+    agent = Truffle::Agent.new(provider: provider, system_prompt: "calc", tools: [@add])
 
     result = agent.run("What is 2 + 3?")
 
@@ -31,7 +31,7 @@ class TestAgentLoop < Minitest::Test
       StubProvider.tool_call(id: "call_9", name: "add", arguments: { "a" => 4, "b" => 6 }),
       StubProvider.text("10")
     ])
-    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
     agent.run("4 + 6?")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
@@ -45,7 +45,7 @@ class TestAgentLoop < Minitest::Test
       StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 1, "b" => 1 }),
       StubProvider.text("2")
     ])
-    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
 
     seen = []
     agent.on { |type, _payload| seen << type }
@@ -64,7 +64,7 @@ class TestAgentLoop < Minitest::Test
       StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 7, "b" => 8 }),
       StubProvider.text("15")
     ])
-    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
 
     captured = nil
     agent.on(:tool_result) { |payload| captured = payload }
@@ -79,7 +79,7 @@ class TestAgentLoop < Minitest::Test
       StubProvider.tool_call(id: "c1", name: "nope", arguments: {}),
       StubProvider.text("sorry")
     ])
-    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
     agent.run("do the thing")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
@@ -87,14 +87,14 @@ class TestAgentLoop < Minitest::Test
   end
 
   def test_tool_exception_is_caught_and_fed_back
-    boom = Pith::Tool.define("boom", "always raises") do
+    boom = Truffle::Tool.define("boom", "always raises") do
       run { raise "kaboom" }
     end
     provider = StubProvider.new([
       StubProvider.tool_call(id: "c1", name: "boom", arguments: {}),
       StubProvider.text("handled")
     ])
-    agent = Pith::Agent.new(provider: provider, tools: [boom])
+    agent = Truffle::Agent.new(provider: provider, tools: [boom])
     result = agent.run("go")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
@@ -104,20 +104,20 @@ class TestAgentLoop < Minitest::Test
 
   def test_max_turns_guard_raises
     # Provider always asks for a tool, never settles -> must hit the guard.
-    infinite = Class.new(Pith::Providers::Base) do
+    infinite = Class.new(Truffle::Providers::Base) do
       def chat(messages:, tools: [], model: nil, **_)
         StubProvider.tool_call(id: "x", name: "add", arguments: { "a" => 1, "b" => 1 })
       end
     end.new
-    agent = Pith::Agent.new(provider: infinite, tools: [@add], max_turns: 3)
+    agent = Truffle::Agent.new(provider: infinite, tools: [@add], max_turns: 3)
 
-    err = assert_raises(Pith::Error) { agent.run("loop forever") }
+    err = assert_raises(Truffle::Error) { agent.run("loop forever") }
     assert_includes err.message, "max_turns"
   end
 
   def test_reset_clears_history_but_keeps_system_prompt
     provider = StubProvider.new([StubProvider.text("hi")])
-    agent = Pith::Agent.new(provider: provider, system_prompt: "be nice")
+    agent = Truffle::Agent.new(provider: provider, system_prompt: "be nice")
     agent.run("hello")
     assert agent.messages.length > 1
 

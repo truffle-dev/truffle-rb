@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
-module Pith
+module Truffle
   # A tool the agent can call.
   #
   # A tool is a name, a human-readable description (the model reads this to
   # decide when to call it), a JSON-Schema parameter spec, and a callable that
   # actually runs. Build one with the block DSL:
   #
-  #   weather = Pith::Tool.define("get_weather", "Look up the weather for a city") do
+  #   weather = Truffle::Tool.define("get_weather", "Look up the weather for a city") do
   #     param :city, :string, "City name, e.g. 'Berlin'", required: true
   #     param :units, :string, "celsius or fahrenheit"
   #     run { |city:, units: "celsius"| WeatherApi.fetch(city, units) }

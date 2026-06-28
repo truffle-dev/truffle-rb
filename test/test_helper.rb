@@ -3,12 +3,12 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "minitest/autorun"
-require "pith"
+require "truffle"
 
 # A deterministic provider for unit tests. You hand it a script of responses
 # (one per chat call); it returns them in order. This lets us exercise the agent
 # loop, tool execution, and event emission with zero network calls.
-class StubProvider < Pith::Providers::Base
+class StubProvider < Truffle::Providers::Base
   attr_reader :calls
 
   def initialize(script)
@@ -30,9 +30,9 @@ class StubProvider < Pith::Providers::Base
 
   # Helper to build a tool-call response.
   def self.tool_call(id:, name:, arguments:)
-    Pith::Response.new(
-      message: Pith::Message.assistant(
-        tool_calls: [Pith::ToolCall.new(id: id, name: name, arguments: arguments)]
+    Truffle::Response.new(
+      message: Truffle::Message.assistant(
+        tool_calls: [Truffle::ToolCall.new(id: id, name: name, arguments: arguments)]
       ),
       finish_reason: "tool_calls"
     )
@@ -40,8 +40,8 @@ class StubProvider < Pith::Providers::Base
 
   # Helper to build a plain text response.
   def self.text(content)
-    Pith::Response.new(
-      message: Pith::Message.assistant(content: content),
+    Truffle::Response.new(
+      message: Truffle::Message.assistant(content: content),
       finish_reason: "stop"
     )
   end

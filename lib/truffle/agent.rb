@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Pith
+module Truffle
   # A stateful agent: a provider, a system prompt, a running message history,
   # and a toolbox. Calling #run drives the agent loop to completion.
   #

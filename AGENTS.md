@@ -4,30 +4,32 @@ Conventions for an automated contributor (or a human using one) working in this
 repository. This file is the working agreement; the design intent lives in
 `ROADMAP.md` and the API in `README.md`.
 
-## What Pith is
+## What Truffle is
 
-A small, provider-agnostic agent harness for Ruby: the loop that turns a
-language model into a tool-using agent. It is a port of the agent-core runtime
-in [pi](https://github.com/earendil-works/pi), and it draws on
-[ruby_llm](https://github.com/crmne/ruby_llm) for the provider-agnostic
-ambition. It is **not** an LLM client library and not a service.
+A complete agent harness for Ruby, built from scratch: the loop that turns a
+language model into a tool-using agent, growing toward skills, commands,
+sessions, and memory. It is a faithful, from-scratch port of
+[pi](https://github.com/earendil-works/pi). The North Star is
+[NORTH_STAR.md](NORTH_STAR.md). There are no runtime gem dependencies; every
+provider is hand-written.
 
 ## Layout
 
-- `lib/pith.rb` — top-level API (`Pith.agent`, `Pith.tool`, `Pith.provider`).
-- `lib/pith/agent.rb` — the agent loop. The heart of the project. Keep it
+- `lib/truffle.rb` — top-level API (`Truffle.agent`, `Truffle.tool`, `Truffle.provider`).
+- `lib/truffle/agent.rb` — the agent loop. The heart of the project. Keep it
   readable.
-- `lib/pith/tool.rb`, `toolbox.rb` — the tool DSL and a named tool collection.
-- `lib/pith/message.rb`, `response.rb` — value objects.
-- `lib/pith/providers/` — the provider seam and concrete providers. Everything
+- `lib/truffle/tool.rb`, `toolbox.rb` — the tool DSL and a named tool collection.
+- `lib/truffle/message.rb`, `response.rb` — value objects.
+- `lib/truffle/providers/` — the provider seam and concrete providers. Everything
   outside this directory must stay provider-agnostic.
 - `test/` — minitest. The default suite is offline; one test hits OpenAI and
   skips without `OPENAI_API_KEY`.
 
 ## Working agreement
 
-1. **Pick one roadmap item.** Open `ROADMAP.md`, take the next unchecked item
-   under "Next up," and do only that. Do not bundle.
+1. **Pick one roadmap item.** Open `ROADMAP.md`, take the next unchecked item,
+   and do only that. Read pi's real source for that slice before you write Ruby.
+   Do not bundle items.
 2. **Make incremental progress and keep it shippable.** A green, smaller change
    beats a large, half-finished one. Commit at a working checkpoint.
 3. **Write tests first where practical**, and never weaken existing tests to get
@@ -40,7 +42,7 @@ ambition. It is **not** an LLM client library and not a service.
 7. **Update docs in the same commit**: `CHANGELOG.md` under "Unreleased," and
    check off the `ROADMAP.md` item you finished.
 8. **Stay provider-agnostic.** New provider-specific code goes under
-   `lib/pith/providers/`. The agent must never assume a provider.
+   `lib/truffle/providers/`. The agent must never assume a provider.
 9. **Dependency discipline.** A new runtime dependency needs a real reason. The
    core stays buildable on the standard library.
 

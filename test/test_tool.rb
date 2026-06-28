@@ -4,7 +4,7 @@ require "test_helper"
 
 class TestTool < Minitest::Test
   def setup
-    @add = Pith::Tool.define("add", "Add two integers") do
+    @add = Truffle::Tool.define("add", "Add two integers") do
       param :a, :integer, "first addend", required: true
       param :b, :integer, "second addend", required: true
       run { |a:, b:| a + b }
@@ -33,7 +33,7 @@ class TestTool < Minitest::Test
   end
 
   def test_toolbox_lookup_and_schema
-    box = Pith::Toolbox.new([@add])
+    box = Truffle::Toolbox.new([@add])
     assert_equal @add, box["add"]
     assert_equal ["add"], box.names
     assert_equal 1, box.to_schema.length
@@ -41,7 +41,7 @@ class TestTool < Minitest::Test
   end
 
   def test_optional_param_with_default
-    greet = Pith::Tool.define("greet", "Greet someone") do
+    greet = Truffle::Tool.define("greet", "Greet someone") do
       param :name, :string, required: true
       param :loud, :boolean
       run { |name:, loud: false| loud ? "HELLO #{name.upcase}" : "hello #{name}" }

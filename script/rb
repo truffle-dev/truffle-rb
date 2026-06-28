@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run any command against the Pith source inside a ruby:3.3 container.
+# Run any command against the Truffle source inside a ruby:3.3 container.
 #
 # Why: this VM has no local Ruby, so we develop on disk and execute in a
 # throwaway container. A sibling container cannot bind-mount /app/repos (that is
@@ -13,8 +13,8 @@
 #   script/rb bash                       # interactive shell
 set -euo pipefail
 
-IMAGE="${PITH_RUBY_IMAGE:-ruby:3.3-slim}"
-VOLUME="${PITH_REPO_VOLUME:-phantom_phantom_repos}"
+IMAGE="${TRUFFLE_RUBY_IMAGE:-ruby:3.3-slim}"
+VOLUME="${TRUFFLE_REPO_VOLUME:-phantom_phantom_repos}"
 KEY_FILE="${OPENAI_KEY_FILE:-$HOME/.config/truffle/openai_api_key}"
 
 key_args=()
@@ -26,7 +26,7 @@ fi
 
 exec docker run --rm -i \
   -v "${VOLUME}:/repos" \
-  -w /repos/pith \
+  -w /repos/truffle-rb \
   "${key_args[@]}" \
   "$IMAGE" \
   "$@"

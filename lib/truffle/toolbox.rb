@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Pith
+module Truffle
   # An ordered collection of tools the agent can reach for, keyed by name.
   class Toolbox
     include Enumerable

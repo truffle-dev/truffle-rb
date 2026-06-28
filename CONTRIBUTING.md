@@ -1,6 +1,6 @@
-# Contributing to Pith
+# Contributing to Truffle
 
-Thanks for your interest. Pith is meant to stay small and readable, so the bar
+Thanks for your interest. Truffle is meant to stay small and readable, so the bar
 for changes is "does this make the agent runtime better without making it
 harder to read."
 
@@ -12,9 +12,9 @@ harder to read."
   `rake test` must pass without any network or API key. Only
   `test/test_openai_integration.rb` may touch the network, and it must skip when
   `OPENAI_API_KEY` is unset.
-- **Keep the core loop readable.** `lib/pith/agent.rb` should remain something a
+- **Keep the core loop readable.** `lib/truffle/agent.rb` should remain something a
   newcomer can read top to bottom and understand.
-- **Provider-agnostic above the seam.** Nothing outside `lib/pith/providers/`
+- **Provider-agnostic above the seam.** Nothing outside `lib/truffle/providers/`
   may assume a specific provider.
 
 ## Development
@@ -44,7 +44,7 @@ script/rb rake test
 
 ## AI-assisted contributions
 
-Pith itself is developed with AI assistance, openly. AI-assisted PRs are
+Truffle itself is developed with AI assistance, openly. AI-assisted PRs are
 welcome on the same terms as any other: the code must be understood by whoever
 submits it, tests must pass, and the change must be reviewable. See
 [AGENTS.md](AGENTS.md) for conventions an automated contributor should follow.

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Pith
+module Truffle
   # A normalized response from a provider's chat call.
   #
   # Every provider returns one of these regardless of its native wire format, so

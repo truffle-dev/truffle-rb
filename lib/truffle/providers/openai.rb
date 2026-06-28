@@ -4,13 +4,13 @@ require "net/http"
 require "json"
 require "uri"
 
-module Pith
+module Truffle
   module Providers
     # OpenAI Chat Completions provider with tool calling.
     #
     # Deliberately dependency-free: it speaks the HTTP API directly with
-    # Net::HTTP and the stdlib JSON, so a fresh Ruby can run Pith with nothing
-    # but `gem install pith`. It also works against any OpenAI-compatible
+    # Net::HTTP and the stdlib JSON, so a fresh Ruby can run Truffle with nothing
+    # but `gem install truffle`. It also works against any OpenAI-compatible
     # endpoint (Ollama, vLLM, Together, OpenRouter, ...) by passing :base_url.
     class OpenAI < Base
       DEFAULT_MODEL = "gpt-4o-mini"

@@ -5,7 +5,7 @@ require "test_helper"
 # End-to-end test against the real OpenAI API. Skipped unless OPENAI_API_KEY is
 # set, so the default `rake test` stays hermetic and offline. Run it with a key
 # present (the script/rb helper injects one) to verify the full round-trip:
-# prompt -> model requests a tool -> Pith runs it -> model answers with the
+# prompt -> model requests a tool -> Truffle runs it -> model answers with the
 # tool's result.
 class TestOpenAIIntegration < Minitest::Test
   def setup
@@ -14,7 +14,7 @@ class TestOpenAIIntegration < Minitest::Test
 
   def test_tool_round_trip_with_real_model
     calls = []
-    multiply = Pith::Tool.define("multiply", "Multiply two integers together") do
+    multiply = Truffle::Tool.define("multiply", "Multiply two integers together") do
       param :a, :integer, "first factor", required: true
       param :b, :integer, "second factor", required: true
       run do |a:, b:|
@@ -23,7 +23,7 @@ class TestOpenAIIntegration < Minitest::Test
       end
     end
 
-    agent = Pith.agent(
+    agent = Truffle.agent(
       provider: :openai,
       model: "gpt-4o-mini",
       system_prompt: "You are a precise assistant. Always use the multiply tool for any multiplication. Answer with the final number.",
