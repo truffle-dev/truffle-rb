@@ -14,6 +14,13 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Typed content blocks (`Truffle::Content::Text`, `::Thinking`, `::Image`),
+  ported from pi's content model. A `Message`'s content is now a list of these
+  blocks instead of a single string; a bare String is wrapped as one Text block,
+  and the model's tool calls live in the same list as `ToolCall` blocks rather
+  than a side channel. `Message#text` joins the Text blocks; `#tool_calls` and
+  `#tool_calls?` read off the content list. The public API is unchanged for the
+  common case.
 - Published to RubyGems: `gem install truffle`.
 - `docs/RELEASING.md`: versioning, changelog, publish, and upgrade flow.
 - `NORTH_STAR.md`: the project's fixed destination.

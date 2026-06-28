@@ -18,7 +18,7 @@ module Truffle
 
     # The text content of the assistant turn (may be nil on a pure tool call).
     def text
-      message.content
+      message.text
     end
 
     def tool_calls

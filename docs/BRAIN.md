@@ -49,30 +49,37 @@ is the bridge between them and today.
 <!-- MUTABLE -->
 ## Current state (compact every run)
 
-- **Published:** v0.1.0 is live on RubyGems (`gem install truffle`), installed
-  and verified from a clean container. Release/upgrade flow documented in
-  `docs/RELEASING.md`.
-- **Repo identity migrated** from "Pith" to "Truffle" / `truffle-rb`: all code,
-  docs, gemspec, `script/rb`, and examples renamed; ruby_llm framing removed;
-  reframed as a from-scratch pi port. Tests green (14 runs / 46 assertions incl.
-  live OpenAI round-trip).
-- **Shipped this turn:** NORTH_STAR.md, this brain file, a rewritten ROADMAP
-  (Phases 1–5 mapped to pi's package structure).
+- **Published:** v0.1.0 is live on RubyGems (`gem install truffle`), verified
+  from a clean container. Release/upgrade flow in `docs/RELEASING.md`.
+- **Phase 1 item 1 shipped (content blocks).** `lib/truffle/content.rb` holds
+  `Content::Text`, `::Thinking`, `::Image`; `Message#content` is now a list of
+  typed blocks, with `ToolCall` carried in the same list (not a side channel).
+  `Message#text` joins Text blocks; `#tool_calls`/`#tool_calls?` read off the
+  list; `to_h` emits block hashes. A bare String still wraps to one Text block,
+  so the public API is unchanged for the common case. `Response#text` and the
+  OpenAI provider read through `Message#text`. Tests green (25 runs / 77 assertions
+  incl. live OpenAI round-trip).
+- README now shows two real freeze-rendered terminal screenshots; the
+  `truffle-build-advance` cron runs every 2 hours and the house voice (no AI
+  jargon, no em-dashes, concise comments) is baked into `docs/CRON_PROMPT.md`.
 
 ## Next up
 
-- ROADMAP Phase 1, item 1: **content blocks**: port pi's typed content
-  model (text / thinking / image / tool-call / tool-result) so a message is a
-  list of typed blocks, not a single string. Read `~/repos/pi/packages/ai/src/types.ts`
-  first.
+- ROADMAP Phase 1, item 2: **stop reasons.** Port pi's `StopReason`
+  (`stop` / `length` / `toolUse` / `error` / `aborted`) and surface it on
+  `Response` and on `agent_end`. Read `~/repos/pi/packages/ai/src/types.ts` and
+  how `packages/agent` maps a provider finish reason onto it before porting.
 
 ## Learnings (keep only what still matters)
 
 - `script/rb` runs in `/repos/truffle-rb` inside the container (volume map
-  `/app/repos` = `phantom_phantom_repos`). A sibling container cannot bind-mount
-  `/app/repos` directly.
-- Test invocation that works:
-  `./script/rb ruby -Ilib -Itest -e 'Dir["test/test_*.rb"].sort.each { |f| require File.expand_path(f) }'`.
+  `/app/repos` = `phantom_phantom_repos`); a sibling cannot bind-mount `/app/repos`.
+- `./script/rb rake test` is the suite. The live OpenAI test runs when the key
+  is present in the container, so a mutation that breaks tool calls shows up as
+  integration-test red too, not just unit red.
+- Content normalization lives in `Message#coerce_block`: anything answering
+  `#type` is kept as a block; everything else becomes a Text block via `to_s`.
+  `ToolCall` answers `#type` (`:tool_call`), so it passes through untouched.
 - pi root version is 0.0.3; pi's `ai` package is the type-system source of truth.
-- pi coding-agent core dirs to mine later: `tools/`, `compaction/`, `skills.ts`,
+- pi coding-agent dirs to mine later: `tools/`, `compaction/`, `skills.ts`,
   `slash-commands.ts`, `session-manager.ts`, `migrations.ts`, `extensions/`.

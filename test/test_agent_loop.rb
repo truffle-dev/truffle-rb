@@ -37,7 +37,7 @@ class TestAgentLoop < Minitest::Test
     tool_msg = agent.messages.find { |m| m.role == :tool }
     refute_nil tool_msg
     assert_equal "call_9", tool_msg.tool_call_id
-    assert_equal "10", tool_msg.content
+    assert_equal "10", tool_msg.text
   end
 
   def test_emits_events_in_order
@@ -83,7 +83,7 @@ class TestAgentLoop < Minitest::Test
     agent.run("do the thing")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
-    assert_includes tool_msg.content, "unknown tool 'nope'"
+    assert_includes tool_msg.text, "unknown tool 'nope'"
   end
 
   def test_tool_exception_is_caught_and_fed_back
@@ -98,7 +98,7 @@ class TestAgentLoop < Minitest::Test
     result = agent.run("go")
 
     tool_msg = agent.messages.find { |m| m.role == :tool }
-    assert_includes tool_msg.content, "kaboom"
+    assert_includes tool_msg.text, "kaboom"
     assert_equal "handled", result
   end
 

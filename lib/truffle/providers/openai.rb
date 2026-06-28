@@ -63,7 +63,7 @@ module Truffle
         messages.map do |m|
           case m.role
           when :assistant
-            h = { role: "assistant", content: m.content }
+            h = { role: "assistant", content: m.text }
             unless m.tool_calls.empty?
               h[:tool_calls] = m.tool_calls.map do |tc|
                 {
@@ -75,9 +75,9 @@ module Truffle
             end
             h
           when :tool
-            { role: "tool", tool_call_id: m.tool_call_id, content: m.content.to_s }
+            { role: "tool", tool_call_id: m.tool_call_id, content: m.text.to_s }
           else
-            { role: m.role.to_s, content: m.content.to_s }
+            { role: m.role.to_s, content: m.text.to_s }
           end
         end
       end

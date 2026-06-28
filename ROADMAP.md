@@ -31,7 +31,7 @@ appears, add it; the goal is faithfulness to pi, then reach beyond it.
 
 Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 
-1. **Content blocks.** Port pi's content model: text, thinking, image, and
+1. [x] **Content blocks.** Port pi's content model: text, thinking, image, and
    tool-call blocks on assistant messages; text/image/tool-result on user
    messages. A message is a list of typed blocks, not a single string.
 2. **Stop reasons.** Port `StopReason` (`stop` / `length` / `toolUse` / `error`

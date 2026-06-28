@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "truffle/version"
+require_relative "truffle/content"
 require_relative "truffle/message"
 require_relative "truffle/response"
 require_relative "truffle/tool"

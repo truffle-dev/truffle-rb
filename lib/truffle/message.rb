@@ -4,19 +4,24 @@ module Truffle
   # A single message in an agent conversation.
   #
   # Truffle works with one flat message type across every provider. The provider
-  # layer is responsible for translating these into whatever wire shape a given
-  # API expects (see Truffle::Providers::Base#serialize_messages). Keeping a single
-  # in-memory representation is what lets the agent loop stay provider-agnostic.
+  # layer translates these into whatever wire shape a given API expects (see
+  # Truffle::Providers::Base#serialize_messages). One in-memory representation is
+  # what lets the agent loop stay provider-agnostic.
+  #
+  # A message's content is a list of typed blocks (Truffle::Content::Text,
+  # ::Thinking, ::Image, and ToolCall), the way pi models content. A bare String
+  # is wrapped as one Text block, so the common case stays a one-liner, and the
+  # model's tool calls live in the same list rather than in a side channel.
   #
   # Roles:
   #   :system    - instructions that steer the assistant
   #   :user      - input from the human (or upstream caller)
-  #   :assistant - a model turn; may carry tool_calls instead of (or with) text
+  #   :assistant - a model turn; may carry text, thinking, and tool-call blocks
   #   :tool      - the result of running a tool, linked by tool_call_id
   class Message
     ROLES = %i[system user assistant tool].freeze
 
-    attr_reader :role, :content, :tool_calls, :tool_call_id, :name
+    attr_reader :role, :content, :tool_call_id, :name
 
     def initialize(role:, content: nil, tool_calls: [], tool_call_id: nil, name: nil)
       role = role.to_sym
@@ -25,8 +30,7 @@ module Truffle
       end
 
       @role = role
-      @content = content
-      @tool_calls = tool_calls || []
+      @content = normalize_content(content) + Array(tool_calls)
       @tool_call_id = tool_call_id
       @name = name
     end
@@ -48,27 +52,65 @@ module Truffle
       new(role: :tool, content: content, tool_call_id: tool_call_id, name: name)
     end
 
+    # The tool calls the model requested this turn, lifted out of the content
+    # blocks so the agent loop can dispatch them.
+    def tool_calls
+      @content.select { |block| block.is_a?(ToolCall) }
+    end
+
     def tool_calls?
-      !@tool_calls.empty?
+      @content.any? { |block| block.is_a?(ToolCall) }
+    end
+
+    # The plain text of the message: every Text block joined, or nil when the
+    # turn carried no text (a pure tool call, for example).
+    def text
+      texts = @content.select { |block| block.is_a?(Content::Text) }
+      return nil if texts.empty?
+
+      texts.map(&:text).join
     end
 
     def to_h
       {
         role: role,
-        content: content,
-        tool_calls: tool_calls.map(&:to_h),
+        content: @content.map(&:to_h),
         tool_call_id: tool_call_id,
         name: name
       }.compact
     end
+
+    private
+
+    # Accepts a typed block, a bare String (wrapped as one Text block), an Array
+    # mixing the two, or nil (no content). Anything else becomes a Text block via
+    # to_s, so the loop never holds a content value it cannot render.
+    def normalize_content(content)
+      case content
+      when nil then []
+      when Array then content.map { |block| coerce_block(block) }
+      else [coerce_block(content)]
+      end
+    end
+
+    def coerce_block(block)
+      return block if block.respond_to?(:type)
+
+      Content::Text.new(text: block.to_s)
+    end
   end
 
-  # A single tool invocation requested by the model.
+  # A single tool invocation requested by the model. It is a content block, so it
+  # answers #type and #to_h alongside the others in Truffle::Content.
   ToolCall = Struct.new(:id, :name, :arguments, keyword_init: true) do
     # arguments is always a parsed Hash with string keys, mirroring the JSON the
     # model emitted. The agent symbolizes keys before handing them to the tool.
+    def type
+      :tool_call
+    end
+
     def to_h
-      { id: id, name: name, arguments: arguments }
+      { type: :tool_call, id: id, name: name, arguments: arguments }
     end
   end
 end
