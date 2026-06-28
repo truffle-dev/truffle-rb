@@ -1,0 +1,128 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class TestAgentLoop < Minitest::Test
+  def setup
+    @add = Pith::Tool.define("add", "Add two integers") do
+      param :a, :integer, required: true
+      param :b, :integer, required: true
+      run { |a:, b:| a + b }
+    end
+  end
+
+  # The model asks for a tool, gets the result, then answers in plain text.
+  def test_runs_tool_then_returns_final_text
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "call_1", name: "add", arguments: { "a" => 2, "b" => 3 }),
+      StubProvider.text("The answer is 5.")
+    ])
+    agent = Pith::Agent.new(provider: provider, system_prompt: "calc", tools: [@add])
+
+    result = agent.run("What is 2 + 3?")
+
+    assert_equal "The answer is 5.", result
+    # Two chat calls: one that requested the tool, one that answered.
+    assert_equal 2, provider.calls.length
+  end
+
+  def test_history_contains_tool_result_linked_by_id
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "call_9", name: "add", arguments: { "a" => 4, "b" => 6 }),
+      StubProvider.text("10")
+    ])
+    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent.run("4 + 6?")
+
+    tool_msg = agent.messages.find { |m| m.role == :tool }
+    refute_nil tool_msg
+    assert_equal "call_9", tool_msg.tool_call_id
+    assert_equal "10", tool_msg.content
+  end
+
+  def test_emits_events_in_order
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 1, "b" => 1 }),
+      StubProvider.text("2")
+    ])
+    agent = Pith::Agent.new(provider: provider, tools: [@add])
+
+    seen = []
+    agent.on { |type, _payload| seen << type }
+    agent.run("1 + 1?")
+
+    assert_equal :agent_start, seen.first
+    assert_equal :agent_end, seen.last
+    assert_includes seen, :tool_call
+    assert_includes seen, :tool_result
+    # tool_call must come before its tool_result
+    assert seen.index(:tool_call) < seen.index(:tool_result)
+  end
+
+  def test_scoped_event_listener_receives_payload
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 7, "b" => 8 }),
+      StubProvider.text("15")
+    ])
+    agent = Pith::Agent.new(provider: provider, tools: [@add])
+
+    captured = nil
+    agent.on(:tool_result) { |payload| captured = payload }
+    agent.run("7 + 8?")
+
+    assert_equal "add", captured[:call].name
+    assert_equal "15", captured[:result]
+  end
+
+  def test_unknown_tool_is_reported_not_raised
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "c1", name: "nope", arguments: {}),
+      StubProvider.text("sorry")
+    ])
+    agent = Pith::Agent.new(provider: provider, tools: [@add])
+    agent.run("do the thing")
+
+    tool_msg = agent.messages.find { |m| m.role == :tool }
+    assert_includes tool_msg.content, "unknown tool 'nope'"
+  end
+
+  def test_tool_exception_is_caught_and_fed_back
+    boom = Pith::Tool.define("boom", "always raises") do
+      run { raise "kaboom" }
+    end
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "c1", name: "boom", arguments: {}),
+      StubProvider.text("handled")
+    ])
+    agent = Pith::Agent.new(provider: provider, tools: [boom])
+    result = agent.run("go")
+
+    tool_msg = agent.messages.find { |m| m.role == :tool }
+    assert_includes tool_msg.content, "kaboom"
+    assert_equal "handled", result
+  end
+
+  def test_max_turns_guard_raises
+    # Provider always asks for a tool, never settles -> must hit the guard.
+    infinite = Class.new(Pith::Providers::Base) do
+      def chat(messages:, tools: [], model: nil, **_)
+        StubProvider.tool_call(id: "x", name: "add", arguments: { "a" => 1, "b" => 1 })
+      end
+    end.new
+    agent = Pith::Agent.new(provider: infinite, tools: [@add], max_turns: 3)
+
+    err = assert_raises(Pith::Error) { agent.run("loop forever") }
+    assert_includes err.message, "max_turns"
+  end
+
+  def test_reset_clears_history_but_keeps_system_prompt
+    provider = StubProvider.new([StubProvider.text("hi")])
+    agent = Pith::Agent.new(provider: provider, system_prompt: "be nice")
+    agent.run("hello")
+    assert agent.messages.length > 1
+
+    agent.reset
+    assert_equal 1, agent.messages.length
+    assert_equal :system, agent.messages.first.role
+  end
+end

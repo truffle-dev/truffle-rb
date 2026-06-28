@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Run any command against the Pith source inside a ruby:3.3 container.
+#
+# Why: this VM has no local Ruby, so we develop on disk and execute in a
+# throwaway container. A sibling container cannot bind-mount /app/repos (that is
+# a host path it can't see), so we mount the named Docker volume by name. The
+# OpenAI key is read from the operator's config file and injected as an env var
+# only for the lifetime of the command; it is never printed or committed.
+#
+# Usage:
+#   script/rb rake test                  # unit tests
+#   script/rb ruby examples/calculator.rb
+#   script/rb bash                       # interactive shell
+set -euo pipefail
+
+IMAGE="${PITH_RUBY_IMAGE:-ruby:3.3-slim}"
+VOLUME="${PITH_REPO_VOLUME:-phantom_phantom_repos}"
+KEY_FILE="${OPENAI_KEY_FILE:-$HOME/.config/truffle/openai_api_key}"
+
+key_args=()
+if [[ -f "$KEY_FILE" ]]; then
+  key_args=(-e "OPENAI_API_KEY=$(tr -d '\n' < "$KEY_FILE")")
+elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
+  key_args=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
+fi
+
+exec docker run --rm -i \
+  -v "${VOLUME}:/repos" \
+  -w /repos/pith \
+  "${key_args[@]}" \
+  "$IMAGE" \
+  "$@"
