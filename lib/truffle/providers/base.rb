@@ -19,6 +19,17 @@ module Truffle
         raise NotImplementedError, "#{self.class} must implement #chat"
       end
 
+      # Streaming counterpart to #chat. Yields Truffle::StreamEvent objects in
+      # order as the turn arrives and returns the final Truffle::Response. A
+      # provider that has no native streaming may leave this unimplemented; the
+      # agent loop uses #chat unless a caller opts into streaming explicitly.
+      #
+      # @yieldparam event [Truffle::StreamEvent]
+      # @return [Truffle::Response]
+      def chat_stream(messages:, tools: [], model: nil, **options)
+        raise NotImplementedError, "#{self.class} must implement #chat_stream"
+      end
+
       # Human-readable provider id, used in events and errors.
       def name
         self.class.name.split("::").last.downcase

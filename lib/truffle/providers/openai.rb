@@ -35,18 +35,7 @@ module Truffle
       end
 
       def chat(messages:, tools: [], model: nil, **options)
-        body = {
-          model: model || @model,
-          messages: serialize_messages(messages)
-        }
-        unless tools.empty?
-          body[:tools] = tools.map { |t| { type: "function", function: t } }
-          body[:tool_choice] = options.fetch(:tool_choice, "auto")
-        end
-        body[:temperature] = options[:temperature] if options.key?(:temperature)
-        body[:max_tokens] = options[:max_tokens] if options.key?(:max_tokens)
-
-        payload = post("/chat/completions", body)
+        payload = post("/chat/completions", build_chat_body(messages, tools, model, options))
         choice = payload.fetch("choices").first
         finish_reason = choice["finish_reason"]
         stop_reason, error_message = self.class.map_stop_reason(finish_reason)
@@ -59,6 +48,30 @@ module Truffle
           stop_reason: stop_reason,
           error_message: error_message
         )
+      end
+
+      # Streaming counterpart to #chat. Opens an SSE request, decodes each chunk
+      # through an OpenAIStream accumulator, and yields the ordered StreamEvents
+      # as content arrives. Returns the final Truffle::Response once the stream
+      # closes, so a caller that ignores the block still gets the whole turn.
+      # A transport or parse failure is folded into the stream as an :error event
+      # (via the accumulator's #fail) rather than raised, mirroring pi's catch
+      # path; the returned Response then carries StopReason::ERROR.
+      def chat_stream(messages:, tools: [], model: nil, **options)
+        body = build_chat_body(messages, tools, model, options)
+        body[:stream] = true
+        body[:stream_options] = { include_usage: true }
+
+        acc = OpenAIStream.new
+        begin
+          stream_post("/chat/completions", body) do |chunk|
+            acc.feed(chunk) { |event| yield event if block_given? }
+          end
+          acc.finish { |event| yield event if block_given? }
+        rescue StandardError => e
+          acc.fail(e) { |event| yield event if block_given? }
+        end
+        acc.response
       end
 
       # Map an OpenAI Chat Completions finish_reason onto a Truffle::StopReason,
@@ -80,6 +93,22 @@ module Truffle
       end
 
       private
+
+      # Build the shared Chat Completions request body for both #chat and
+      # #chat_stream. The streaming path adds :stream and :stream_options on top.
+      def build_chat_body(messages, tools, model, options)
+        body = {
+          model: model || @model,
+          messages: serialize_messages(messages)
+        }
+        unless tools.empty?
+          body[:tools] = tools.map { |t| { type: "function", function: t } }
+          body[:tool_choice] = options.fetch(:tool_choice, "auto")
+        end
+        body[:temperature] = options[:temperature] if options.key?(:temperature)
+        body[:max_tokens] = options[:max_tokens] if options.key?(:max_tokens)
+        body
+      end
 
       def serialize_messages(messages)
         messages.map do |m|
@@ -146,6 +175,60 @@ module Truffle
         JSON.parse(response.body)
       rescue JSON::ParserError => e
         raise Error, "could not parse OpenAI response: #{e.message}"
+      end
+
+      # Open a streaming POST and yield each decoded chunk hash as it arrives.
+      # The server speaks Server-Sent Events: newline-delimited records whose
+      # data lines carry one JSON chunk each, terminated by a literal
+      # "data: [DONE]". We read the body in fragments off the socket, buffer a
+      # partial trailing line across reads, and parse each complete data line.
+      # A non-success status is raised as Error before any chunk is yielded.
+      def stream_post(path, body)
+        uri = URI("#{@base_url}#{path}")
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = uri.scheme == "https"
+        http.open_timeout = @open_timeout
+        http.read_timeout = @read_timeout
+
+        request = Net::HTTP::Post.new(uri)
+        request["Authorization"] = "Bearer #{@api_key}"
+        request["Content-Type"] = "application/json"
+        request["Accept"] = "text/event-stream"
+        request.body = JSON.generate(body)
+
+        http.request(request) do |response|
+          unless response.is_a?(Net::HTTPSuccess)
+            raise Error, "OpenAI #{response.code}: #{truncate(response.read_body)}"
+          end
+
+          buffer = +""
+          response.read_body do |fragment|
+            buffer << fragment
+            while (newline = buffer.index("\n"))
+              line = buffer.slice!(0, newline + 1)
+              handle_sse_line(line.chomp) { |chunk| yield chunk }
+            end
+          end
+          handle_sse_line(buffer.chomp) { |chunk| yield chunk } unless buffer.empty?
+        end
+      end
+
+      # Decode one SSE line. Only "data:" records carry payload; the stream's
+      # terminal sentinel is "data: [DONE]", which we drop. Comment lines (":"),
+      # blank separators, and any "event:"/"id:" fields are ignored. A chunk that
+      # fails to parse is skipped rather than aborting the whole stream, matching
+      # the tolerance pi inherits from its SSE client.
+      def handle_sse_line(line)
+        return if line.empty?
+        return unless line.start_with?("data:")
+
+        data = line.delete_prefix("data:").strip
+        return if data.empty? || data == "[DONE]"
+
+        chunk = JSON.parse(data)
+        yield chunk if chunk.is_a?(Hash)
+      rescue JSON::ParserError
+        nil
       end
 
       def truncate(str, limit = 500)

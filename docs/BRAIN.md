@@ -51,41 +51,51 @@ is the bridge between them and today.
 
 - **Published:** v0.1.0 is live on RubyGems (`gem install truffle`). Release flow
   in `docs/RELEASING.md`. Unreleased changes accrue under CHANGELOG `[Unreleased]`.
-- **Phase 1 done so far:** item 1 (content blocks) and item 2 (stop reasons).
+- **Phase 1 done so far:** items 1 (content blocks), 2 (stop reasons), 3
+  (streaming + event protocol).
   - Content: `Message#content` is a list of typed blocks (`Content::Text`,
     `::Thinking`, `::Image`, with `ToolCall` in the same list). `#text` joins
-    Text blocks; `#tool_calls?`/`#tool_calls` read off the list. A bare String
-    still wraps to one Text block, so the common-case API is unchanged.
+    Text blocks. A bare String still wraps to one Text block.
   - Stop reasons: `Truffle::StopReason` holds the canonical symbol set
-    (`:stop :length :tool_use :error :aborted`, pi's `toolUse` -> `:tool_use`).
-    `Providers::OpenAI.map_stop_reason(finish_reason)` is the faithful port of
-    pi's `mapStopReason`; it returns `[reason, error_message]`. `Response` now
-    carries `stop_reason` + `error_message` (raw string still on `finish_reason`).
-    The agent emits both on `agent_end` from the loop-terminating response.
-- Tests green: 35 runs / 101 assertions, incl. one live OpenAI round-trip (runs
-  only when the key is present in the container).
+    (`:stop :length :tool_use :error :aborted`). `OpenAI.map_stop_reason` ports
+    pi's `mapStopReason`, returning `[reason, error_message]`. `Response` carries
+    `stop_reason`/`error_message`; agent emits both on `agent_end`.
+  - Streaming: `Providers::OpenAI#chat_stream` opens SSE and yields ordered
+    `StreamEvent`s (`:start`, `*_start/*_delta/*_end` per block, terminal
+    `:done`/`:error`), returning the final `Response`. Decode logic is in
+    `Providers::OpenAIStream`, an accumulator fed parsed chunk hashes (tested
+    fully offline via `feed`/`finish`/`fail`); HTTP+SSE transport (`stream_post`,
+    `handle_sse_line`) is separate. Non-terminal events carry a `partial` message
+    snapshot; strings are duped so an early snapshot is not mutated by later
+    deltas. Transport/parse failure folds into the stream as `:error` (pi's catch
+    path), not a raise. `#chat` and the agent loop are unchanged.
+- Tests green: 51 offline runs / 145 assertions, plus two live OpenAI tests
+  (round-trip + streaming) that run only when the key is present.
 
 ## Next up
 
-- ROADMAP Phase 1, item 3: **streaming + the event protocol.** Port pi's
-  `AssistantMessageEvent` stream (`start`, `text_start/delta/end`, `thinking_*`,
-  `toolcall_*`, `done`, `error`) as a `chat_stream` path on the provider seam;
-  non-streaming `run` must keep working unchanged. Read
-  `~/repos/pi/packages/ai/src/api/openai-completions.ts` (the SSE parse and the
-  `stream.push({type: ...})` calls around lines 330-470) and the event-type union
-  in `packages/ai/src/types.ts` first. The `done`/`error` events already carry a
-  `reason` drawn from the StopReason set shipped this run.
+- ROADMAP Phase 1, item 4: **usage + cost.** Aggregate `Usage` across turns,
+  expose it on `agent_end`, and add per-provider/model cost estimation. Read
+  pi's usage shape first: `parseChunkUsage` and the `Usage` type in
+  `~/repos/pi/packages/ai/src` (grep `parseChunkUsage`, and the cost/pricing
+  table pi keeps per model). The streaming path already captures raw `usage` on
+  `Response#usage` from the final chunk (and from `choice.usage` for compatible
+  endpoints), so this slice is about a typed `Usage` value object, cross-turn
+  aggregation in the agent, and a pricing lookup, not new wire parsing.
 
 ## Learnings (keep only what still matters)
 
 - `script/rb` runs in `/repos/truffle-rb` inside the container (volume map
   `/app/repos` = `phantom_phantom_repos`); a sibling cannot bind-mount `/app/repos`.
-- `./script/rb rake test` is the suite. The live OpenAI test runs when the key is
-  present, so a mutation that breaks tool calls shows up as integration red too.
-- Provider wire-format mapping (like `map_stop_reason`) is a module method
-  (`self.`) so it unit-tests offline with no network call. Keep canonical value
-  sets in their own module (`StopReason`) and the mapping in the provider,
-  matching pi: the type lives in `ai/types.ts`, `mapStopReason` in the provider.
+- `./script/rb rake test` is the suite. Live OpenAI tests run when the key is
+  present, so a mutation that breaks the wire path shows up as integration red too.
+- Offline-testable seam pattern: keep pure logic (wire-format mapping like
+  `map_stop_reason`, stream decode like `OpenAIStream`) free of `Net::HTTP`, feed
+  it parsed hashes, and keep the socket code in a thin transport method. Matches
+  pi: types in `ai/types.ts`, decode in the provider.
+- Ruby `String#to_s` returns self, so building a value object from a mutable
+  scratch string aliases it. Dup strings when snapshotting accumulator state, or
+  later in-place `<<` deltas rewrite past snapshots.
 - pi root version is 0.0.3; pi's `ai` package is the type-system source of truth.
 - pi coding-agent dirs to mine later: `tools/`, `compaction/`, `skills.ts`,
   `slash-commands.ts`, `session-manager.ts`, `migrations.ts`, `extensions/`.

@@ -5,10 +5,12 @@ require_relative "truffle/content"
 require_relative "truffle/stop_reason"
 require_relative "truffle/message"
 require_relative "truffle/response"
+require_relative "truffle/stream_event"
 require_relative "truffle/tool"
 require_relative "truffle/toolbox"
 require_relative "truffle/providers/base"
 require_relative "truffle/providers/openai"
+require_relative "truffle/providers/openai_stream"
 require_relative "truffle/agent"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.

@@ -14,6 +14,17 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Streaming and the event protocol, ported from pi's `AssistantMessageEvent`
+  stream. `Providers::OpenAI#chat_stream` opens an SSE request and yields ordered
+  `Truffle::StreamEvent` objects as a turn arrives: one `:start`, then a
+  `*_start`/`*_delta`/`*_end` trio per content block (text, thinking, or tool
+  call), and a terminal `:done` or `:error` carrying the final message and
+  StopReason. Each non-terminal event also carries a `partial` snapshot of the
+  message so far. The decode logic lives in `Providers::OpenAIStream`, an
+  accumulator fed parsed chunk hashes so it is tested fully offline; the HTTP and
+  SSE transport stays in `#chat_stream`. A transport or parse failure folds into
+  the stream as an `:error` event rather than raising, mirroring pi. The
+  non-streaming `#chat` path and the agent loop are unchanged.
 - Stop reasons, ported from pi's `StopReason` union
   (`stop`/`length`/`toolUse`/`error`/`aborted`). `Truffle::StopReason` holds the
   canonical set as symbols (`:stop`, `:length`, `:tool_use`, `:error`,

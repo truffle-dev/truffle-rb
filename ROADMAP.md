@@ -36,8 +36,8 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    messages. A message is a list of typed blocks, not a single string.
 2. [x] **Stop reasons.** Port `StopReason` (`stop` / `length` / `toolUse` /
    `error` / `aborted`) and surface it on the response and on `agent_end`.
-3. **Streaming + the event protocol.** Port pi's `AssistantMessageEvent` stream
-   (`start`, `text_start/delta/end`, `thinking_*`, `toolcall_*`, `done`,
+3. [x] **Streaming + the event protocol.** Port pi's `AssistantMessageEvent`
+   stream (`start`, `text_start/delta/end`, `thinking_*`, `toolcall_*`, `done`,
    `error`). A `chat_stream` path on the provider seam drives it; non-streaming
    `run` keeps working unchanged.
 4. **Usage + cost.** Aggregate `Usage` across turns; expose it on `agent_end`;
