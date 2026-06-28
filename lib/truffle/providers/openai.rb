@@ -13,6 +13,8 @@ module Truffle
     # but `gem install truffle`. It also works against any OpenAI-compatible
     # endpoint (Ollama, vLLM, Together, OpenRouter, ...) by passing :base_url.
     class OpenAI < Base
+      include SSE
+
       DEFAULT_MODEL = "gpt-4o-mini"
       DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
@@ -67,31 +69,13 @@ module Truffle
       # between socket reads; on abort the reader stops and the turn folds into a
       # clean :done terminal with StopReason::ABORTED (not an :error), carrying
       # whatever content arrived before the cancel.
-      def chat_stream(messages:, tools: [], model: nil, signal: nil, **options)
+      def chat_stream(messages:, tools: [], model: nil, signal: nil, **options, &block)
         body = build_chat_body(messages, tools, model, options)
         body[:stream] = true
         body[:stream_options] = { include_usage: true }
 
         acc = OpenAIStream.new(pricing_model: model || @model)
-        begin
-          if signal&.aborted?
-            acc.abort { |event| yield event if block_given? }
-            return acc.response
-          end
-
-          stopped = stream_post("/chat/completions", body, signal: signal) do |chunk|
-            acc.feed(chunk) { |event| yield event if block_given? }
-          end
-
-          if stopped == :aborted
-            acc.abort { |event| yield event if block_given? }
-          else
-            acc.finish { |event| yield event if block_given? }
-          end
-        rescue StandardError => e
-          acc.fail(e) { |event| yield event if block_given? }
-        end
-        acc.response
+        drive_stream("/chat/completions", body, acc, signal: signal, &block)
       end
 
       # Map an OpenAI Chat Completions finish_reason onto a Truffle::StopReason,
@@ -197,74 +181,14 @@ module Truffle
         raise Error, "could not parse OpenAI response: #{e.message}"
       end
 
-      # Open a streaming POST and yield each decoded chunk hash as it arrives.
-      # The server speaks Server-Sent Events: newline-delimited records whose
-      # data lines carry one JSON chunk each, terminated by a literal
-      # "data: [DONE]". We read the body in fragments off the socket, buffer a
-      # partial trailing line across reads, and parse each complete data line.
-      # A non-success status is raised as Error before any chunk is yielded.
-      #
-      # If signal aborts, stop reading at the next fragment boundary and return
-      # :aborted so the caller can fold a clean cancellation into the stream.
-      # Otherwise returns nil. The check is cooperative (between fragments), not
-      # a forced socket close, so a stalled read still waits up to read_timeout.
-      def stream_post(path, body, signal: nil, &block)
-        uri = URI("#{@base_url}#{path}")
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = uri.scheme == "https"
-        http.open_timeout = @open_timeout
-        http.read_timeout = @read_timeout
-
-        request = Net::HTTP::Post.new(uri)
-        request["Authorization"] = "Bearer #{@api_key}"
-        request["Content-Type"] = "application/json"
-        request["Accept"] = "text/event-stream"
-        request.body = JSON.generate(body)
-
-        aborted = false
-        http.request(request) do |response|
-          unless response.is_a?(Net::HTTPSuccess)
-            raise Error, "OpenAI #{response.code}: #{truncate(response.read_body)}"
-          end
-
-          buffer = +""
-          response.read_body do |fragment|
-            if signal&.aborted?
-              aborted = true
-              break
-            end
-            buffer << fragment
-            while (newline = buffer.index("\n"))
-              line = buffer.slice!(0, newline + 1)
-              handle_sse_line(line.chomp, &block)
-            end
-          end
-          handle_sse_line(buffer.chomp, &block) unless aborted || buffer.empty?
-        end
-        aborted ? :aborted : nil
+      # Auth header for the shared SSE transport (Providers::SSE#stream_post).
+      def stream_request_headers
+        { "Authorization" => "Bearer #{@api_key}" }
       end
 
-      # Decode one SSE line. Only "data:" records carry payload; the stream's
-      # terminal sentinel is "data: [DONE]", which we drop. Comment lines (":"),
-      # blank separators, and any "event:"/"id:" fields are ignored. A chunk that
-      # fails to parse is skipped rather than aborting the whole stream, matching
-      # the tolerance pi inherits from its SSE client.
-      def handle_sse_line(line)
-        return if line.empty?
-        return unless line.start_with?("data:")
-
-        data = line.delete_prefix("data:").strip
-        return if data.empty? || data == "[DONE]"
-
-        chunk = JSON.parse(data)
-        yield chunk if chunk.is_a?(Hash)
-      rescue JSON::ParserError
-        nil
-      end
-
-      def truncate(str, limit = 500)
-        s = str.to_s
-        s.length > limit ? "#{s[0, limit]}..." : s
+      # Label the shared SSE transport puts on a non-success streaming response.
+      def provider_label
+        "OpenAI"
       end
     end
   end

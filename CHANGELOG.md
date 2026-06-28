@@ -14,6 +14,26 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A streaming Anthropic Messages provider (`Providers::Anthropic#chat_stream`),
+  the streaming counterpart to `#chat`. It opens an SSE request and yields the
+  same ordered `Truffle::StreamEvent` protocol the OpenAI provider does: one
+  `:start`, a `*_start`/`*_delta`/`*_end` trio per content block (text, thinking,
+  redacted thinking, or tool call), and a terminal `:done` or `:error` carrying
+  the final message and StopReason. The decode lives in a pure
+  `Providers::AnthropicStream` accumulator fed already-parsed event hashes, so it
+  is tested fully offline: `message_start` seeds the response id and usage, each
+  `content_block_start`/`delta`/`stop` drives one block keyed by its wire index,
+  and `message_delta` carries the stop reason and final usage. Input tokens read
+  at `message_start` survive a `message_delta` that omits them, while the delta's
+  `output_tokens` wins. `tool_use` arguments assemble from `input_json_delta`
+  fragments and parse once the block stops; a malformed buffer surfaces under a
+  `_raw` key rather than crashing. A mid-stream `error` event, a `refusal`, or a
+  stream that ends before `message_stop` all fold into a terminal `:error`, and
+  an `AbortSignal` folds into a clean `:done` with `StopReason::ABORTED` carrying
+  whatever content arrived. The SSE transport shared by both providers is
+  factored into a `Providers::SSE` mixin (`#stream_post`, `#drive_stream`, line
+  buffering, and tolerant data-line decode); each provider supplies only its auth
+  headers and error label, so the two streaming paths cannot drift.
 - A structured model catalog (`Truffle::Models`, `Truffle::Model`), the single
   source of truth for every model Truffle can address. Each `Model` carries its
   id, name, provider, api, context window, max output, input modalities,
@@ -48,8 +68,8 @@ All notable changes to Truffle are documented here. The format follows
   OpenAI's residual), and the 1h cache write is billed at twice base input.
   `Pricing` gains the Anthropic per-million-token table, and `base_model` now
   strips both date-snapshot forms (OpenAI's dashed `-2024-08-06` and Anthropic's
-  compact `-20250929`). This is the non-streaming `#chat` half; a streaming
-  `#chat_stream` over the same transforms is the next slice.
+  compact `-20250929`). This is the non-streaming `#chat` half; the streaming
+  `#chat_stream` over the same transforms is its own entry above.
 - Cooperative cancellation, ported from pi's `AbortSignal` threading through the
   agent loop and the streaming reader. `Truffle::AbortSignal` is a thread-safe
   token (`#abort`, `#aborted?`, `#reason`, and an `AbortSignal.aborted`
@@ -101,9 +121,9 @@ All notable changes to Truffle are documented here. The format follows
   than a side channel. `Message#text` joins the Text blocks; `#tool_calls` and
   `#tool_calls?` read off the content list. The public API is unchanged for the
   common case.
-- RuboCop linting with a tuned house-style config, plus a best-in-class CI
-  workflow: the offline suite across Ruby 3.1–3.4 (and `head`, allowed to fail),
-  a RuboCop lint job, and a `gem build` packaging check, each a required gate.
+- RuboCop linting with a tuned house-style config, plus a CI workflow that runs
+  the offline suite across Ruby 3.1–3.4 (and `head`, allowed to fail), a RuboCop
+  lint job, and a `gem build` packaging check, each a required gate.
 - Published to RubyGems: `gem install truffle`.
 - `docs/RELEASING.md`: versioning, changelog, publish, and upgrade flow.
 - Rewritten `ROADMAP.md` mapping Phases 1–5 to pi's package structure.

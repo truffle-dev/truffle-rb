@@ -14,9 +14,11 @@ require_relative "truffle/stream_event"
 require_relative "truffle/tool"
 require_relative "truffle/toolbox"
 require_relative "truffle/providers/base"
+require_relative "truffle/providers/sse"
 require_relative "truffle/providers/openai"
 require_relative "truffle/providers/openai_stream"
 require_relative "truffle/providers/anthropic"
+require_relative "truffle/providers/anthropic_stream"
 require_relative "truffle/agent"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.

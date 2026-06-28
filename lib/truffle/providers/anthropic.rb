@@ -24,6 +24,8 @@ module Truffle
     # (an AnthropicStream accumulator fed the message_start/content_block_*/
     # message_delta events) is the next slice and reuses every transform here.
     class Anthropic < Base
+      include SSE
+
       DEFAULT_MODEL = "claude-sonnet-4-5"
       DEFAULT_BASE_URL = "https://api.anthropic.com"
       DEFAULT_MAX_TOKENS = 4096
@@ -73,6 +75,29 @@ module Truffle
           stop_reason: stop_reason,
           error_message: error_message
         )
+      end
+
+      # Streaming counterpart to #chat. Opens an SSE request, decodes each
+      # Messages stream event through an AnthropicStream accumulator, and yields
+      # the ordered StreamEvents as content arrives. Returns the final
+      # Truffle::Response once the stream closes, so a caller that ignores the
+      # block still gets the whole turn. A transport or parse failure is folded
+      # into the stream as an :error event (via the accumulator's #fail) rather
+      # than raised, and the returned Response carries StopReason::ERROR.
+      #
+      # Pass signal: a Truffle::AbortSignal to cancel mid-stream. It is checked
+      # between socket reads; on abort the reader stops and the turn folds into a
+      # clean :done terminal with StopReason::ABORTED, carrying whatever content
+      # arrived before the cancel. Reuses every wire transform from #chat: only
+      # stream: true is added to the body and the decode runs event by event.
+      def chat_stream(messages:, tools: [], model: nil, signal: nil, **options, &block)
+        request_model = model || @model
+        max_tokens = options[:max_tokens] || @max_tokens
+        body = self.class.build_body(messages, tools, request_model, max_tokens, options)
+        body[:stream] = true
+
+        acc = AnthropicStream.new(pricing_model: request_model)
+        drive_stream("/v1/messages", body, acc, signal: signal, &block)
       end
 
       # Build the Messages API request body. The system prompt is lifted out of
@@ -294,9 +319,14 @@ module Truffle
         raise Error, "could not parse Anthropic response: #{e.message}"
       end
 
-      def truncate(str, limit = 500)
-        s = str.to_s
-        s.length > limit ? "#{s[0, limit]}..." : s
+      # Auth headers for the shared SSE transport (Providers::SSE#stream_post).
+      def stream_request_headers
+        { "x-api-key" => @api_key, "anthropic-version" => API_VERSION }
+      end
+
+      # Label the shared SSE transport puts on a non-success streaming response.
+      def provider_label
+        "Anthropic"
       end
     end
   end
