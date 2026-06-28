@@ -73,6 +73,22 @@ module Truffle
         drain { |event| yield event if block_given? }
       end
 
+      # Cancel the stream cooperatively: close out any open blocks and emit a
+      # clean terminal carrying the partial message, with StopReason::ABORTED.
+      # An abort is not a failure, so this is a :done event (no error_message),
+      # unlike #fail. The missing finish_reason is expected here and is not
+      # treated as the "stream ended without finish_reason" error.
+      def abort
+        ensure_started
+        emit_block_ends
+        @stop_reason = StopReason::ABORTED
+        @error_message = nil
+        @message = snapshot(final: true)
+        @response = build_response
+        push(StreamEvent.new(type: :done, reason: @stop_reason, message: @message))
+        drain { |event| yield event if block_given? }
+      end
+
       private
 
       def ensure_started
@@ -184,19 +200,7 @@ module Truffle
       end
 
       def finalize
-        @blocks.each do |block|
-          index = index_of(block)
-          case block.kind
-          when :text
-            push(event(:text_end, content_index: index, content: block.text.dup))
-          when :thinking
-            push(event(:thinking_end, content_index: index, content: block.thinking.dup))
-          when :toolcall
-            tool_call = ToolCall.new(id: block.id, name: block.name,
-                                     arguments: parse_arguments(block.partial_args))
-            push(event(:toolcall_end, content_index: index, tool_call: tool_call))
-          end
-        end
+        emit_block_ends
 
         unless @has_finish_reason
           @stop_reason = StopReason::ERROR
@@ -211,6 +215,25 @@ module Truffle
                                message: @message, error_message: @error_message))
         else
           push(StreamEvent.new(type: :done, reason: @stop_reason, message: @message))
+        end
+      end
+
+      # Close every open block with its *_end event. Shared by the normal finish
+      # and by #abort, which both need the partial blocks sealed before the
+      # terminal.
+      def emit_block_ends
+        @blocks.each do |block|
+          index = index_of(block)
+          case block.kind
+          when :text
+            push(event(:text_end, content_index: index, content: block.text.dup))
+          when :thinking
+            push(event(:thinking_end, content_index: index, content: block.thinking.dup))
+          when :toolcall
+            tool_call = ToolCall.new(id: block.id, name: block.name,
+                                     arguments: parse_arguments(block.partial_args))
+            push(event(:toolcall_end, content_index: index, tool_call: tool_call))
+          end
         end
       end
 

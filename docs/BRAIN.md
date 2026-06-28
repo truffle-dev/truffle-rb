@@ -51,8 +51,8 @@ is the bridge between them and today.
 
 - **Published:** v0.1.0 is live on RubyGems (`gem install truffle`). Release flow
   in `docs/RELEASING.md`. Unreleased changes accrue under CHANGELOG `[Unreleased]`.
-- **Phase 1 done so far:** items 1 (content blocks), 2 (stop reasons), 3
-  (streaming + event protocol), 4 (usage + cost).
+- **Phase 1 complete:** items 1 (content blocks), 2 (stop reasons), 3
+  (streaming + event protocol), 4 (usage + cost), 5 (abort).
   - Content: `Message#content` is a list of typed blocks (`Content::Text`,
     `::Thinking`, `::Image`, with `ToolCall` in the same list). `#text` joins
     Text blocks. A bare String still wraps to one Text block.
@@ -80,20 +80,35 @@ is the bridge between them and today.
     `Usage` (defaults to `Usage.zero`); `OpenAIStream` takes `pricing_model:` to
     price when chunks omit a model. Agent sums `@usage` across all turns/runs,
     emits it on `agent_end`, clears it on `#reset`.
-- Tests green: 71 offline runs / 201 assertions, plus two live OpenAI tests
+  - Abort: `Truffle::AbortSignal` is a Monitor-guarded latched flag (`#abort`,
+    `#aborted?`, `#reason`, class method `AbortSignal.aborted`), trippable from any
+    thread. `Agent#run` takes `signal:` and checks it at the top of the loop (covers
+    both before-first-turn and after-tool-calls, since the loop returns to the top),
+    ending with a `StopReason::ABORTED` terminal and no `error_message`.
+    `OpenAI#chat_stream` takes `signal:`; `stream_post` checks it between SSE
+    fragments and returns `:aborted`, which folds into `OpenAIStream#abort`: open
+    blocks get their `*_end`, then a clean `:done` terminal carrying ABORTED and the
+    partial message (NOT `:error`, since a cancel is not a failure). Cooperative: an
+    in-flight provider call or stalled read finishes/times out, never force-killed.
+- Tests green: 83 offline runs / 233 assertions, plus two live OpenAI tests
   (round-trip + streaming) that run only when the key is present.
 
 ## Next up
 
-- ROADMAP Phase 1, item 5: **abort.** A cancellation signal that stops the loop
-  mid-flight and yields an `:aborted` stop reason cleanly. Read pi's abort path
-  first in `~/repos/pi/packages/agent` and `packages/ai` (grep `abort`,
-  `AbortSignal`, `aborted`): how the signal threads from the run call into the
-  provider request and how the partial turn is finalized. `StopReason::ABORTED`
-  already exists. The slice is a cooperative cancel (an `abort`/`aborted?` on the
-  agent or a token passed to `run`) checked at turn boundaries and surfaced as an
-  `:aborted` terminal, plus folding an in-flight `chat_stream` abort into the
-  stream as a clean terminal rather than an error.
+- Phase 1 is complete. Begin Phase 2 (LLM-layer parity).
+- ROADMAP Phase 2, item 6: **Anthropic provider.** Native, over the Messages API,
+  with its tool-use content-block shape, hand-written on `Net::HTTP`, no client
+  gem. Read pi's `~/repos/pi/packages/ai/src/api/anthropic-messages.ts` first: the
+  request body shape (system prompt as a top-level field, not a message; `messages`
+  with `content` block arrays), the streaming event names (`message_start`,
+  `content_block_start/delta/stop`, `message_delta`, `message_stop`) and how they
+  map onto Truffle's existing `StreamEvent` protocol, the tool-use block format
+  (`type: "tool_use"`, `input` object), and its stop-reason set
+  (`end_turn`/`max_tokens`/`tool_use`/`stop_sequence`) -> `map_stop_reason`. Reuse
+  the offline-seam pattern: a pure `AnthropicStream` accumulator fed parsed event
+  hashes, thin SSE transport in the provider. Keep `Providers::Base` unchanged;
+  add `Providers::Anthropic` alongside `OpenAI`. Price via `Pricing.cost_for` with
+  Anthropic model ids (cache-write 2x split is real here, unlike OpenAI).
 
 ## Learnings (keep only what still matters)
 

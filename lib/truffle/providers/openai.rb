@@ -58,17 +58,32 @@ module Truffle
       # A transport or parse failure is folded into the stream as an :error event
       # (via the accumulator's #fail) rather than raised, mirroring pi's catch
       # path; the returned Response then carries StopReason::ERROR.
-      def chat_stream(messages:, tools: [], model: nil, **options)
+      #
+      # Pass signal: a Truffle::AbortSignal to cancel mid-stream. It is checked
+      # between socket reads; on abort the reader stops and the turn folds into a
+      # clean :done terminal with StopReason::ABORTED (not an :error), carrying
+      # whatever content arrived before the cancel.
+      def chat_stream(messages:, tools: [], model: nil, signal: nil, **options)
         body = build_chat_body(messages, tools, model, options)
         body[:stream] = true
         body[:stream_options] = { include_usage: true }
 
         acc = OpenAIStream.new(pricing_model: model || @model)
         begin
-          stream_post("/chat/completions", body) do |chunk|
+          if signal&.aborted?
+            acc.abort { |event| yield event if block_given? }
+            return acc.response
+          end
+
+          stopped = stream_post("/chat/completions", body, signal: signal) do |chunk|
             acc.feed(chunk) { |event| yield event if block_given? }
           end
-          acc.finish { |event| yield event if block_given? }
+
+          if stopped == :aborted
+            acc.abort { |event| yield event if block_given? }
+          else
+            acc.finish { |event| yield event if block_given? }
+          end
         rescue StandardError => e
           acc.fail(e) { |event| yield event if block_given? }
         end
@@ -184,7 +199,12 @@ module Truffle
       # "data: [DONE]". We read the body in fragments off the socket, buffer a
       # partial trailing line across reads, and parse each complete data line.
       # A non-success status is raised as Error before any chunk is yielded.
-      def stream_post(path, body)
+      #
+      # If signal aborts, stop reading at the next fragment boundary and return
+      # :aborted so the caller can fold a clean cancellation into the stream.
+      # Otherwise returns nil. The check is cooperative (between fragments), not
+      # a forced socket close, so a stalled read still waits up to read_timeout.
+      def stream_post(path, body, signal: nil)
         uri = URI("#{@base_url}#{path}")
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme == "https"
@@ -197,6 +217,7 @@ module Truffle
         request["Accept"] = "text/event-stream"
         request.body = JSON.generate(body)
 
+        aborted = false
         http.request(request) do |response|
           unless response.is_a?(Net::HTTPSuccess)
             raise Error, "OpenAI #{response.code}: #{truncate(response.read_body)}"
@@ -204,14 +225,19 @@ module Truffle
 
           buffer = +""
           response.read_body do |fragment|
+            if signal&.aborted?
+              aborted = true
+              break
+            end
             buffer << fragment
             while (newline = buffer.index("\n"))
               line = buffer.slice!(0, newline + 1)
               handle_sse_line(line.chomp) { |chunk| yield chunk }
             end
           end
-          handle_sse_line(buffer.chomp) { |chunk| yield chunk } unless buffer.empty?
+          handle_sse_line(buffer.chomp) { |chunk| yield chunk } unless aborted || buffer.empty?
         end
+        aborted ? :aborted : nil
       end
 
       # Decode one SSE line. Only "data:" records carry payload; the stream's

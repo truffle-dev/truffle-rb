@@ -158,6 +158,47 @@ class TestStream < Minitest::Test
     assert_equal Truffle::StopReason::ERROR, acc.response.stop_reason
   end
 
+  def test_abort_folds_into_a_clean_done_terminal_with_partial_content
+    acc = Truffle::Providers::OpenAIStream.new
+    events = []
+    acc.feed(text_chunk("partial ans")) { |e| events << e }
+    acc.abort { |e| events << e }
+
+    terminal = events.last
+    # An abort is a clean cancellation, not a failure: a :done event, no error.
+    assert terminal.done?
+    assert_equal Truffle::StopReason::ABORTED, terminal.reason
+    assert_nil terminal.error_message
+    assert_equal "partial ans", terminal.message.text
+    assert_equal Truffle::StopReason::ABORTED, acc.response.stop_reason
+  end
+
+  def test_abort_seals_open_blocks_before_the_terminal
+    acc = Truffle::Providers::OpenAIStream.new
+    events = []
+    acc.feed(text_chunk("half")) { |e| events << e }
+    acc.abort { |e| events << e }
+
+    # The open text block gets its text_end before the done terminal, so a
+    # consumer sees a well-formed block sequence even on cancel.
+    assert_equal %i[start text_start text_delta text_end done], types(events)
+    text_end = events.find { |e| e.type == :text_end }
+    assert_equal "half", text_end.content
+  end
+
+  def test_abort_with_no_content_still_terminates_cleanly
+    acc = Truffle::Providers::OpenAIStream.new
+    events = []
+    acc.abort { |e| events << e }
+
+    assert_equal %i[start done], types(events)
+    assert_equal Truffle::StopReason::ABORTED, events.last.reason
+    # No content blocks arrived, so the message has no text (the empty-message
+    # contract), and the terminal still carries a real Message.
+    assert_nil acc.response.message.text
+    assert_empty acc.response.message.content
+  end
+
   def test_usage_captured_from_chunk
     events, acc = collect([
       text_chunk("hi"),

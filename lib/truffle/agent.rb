@@ -64,15 +64,27 @@ module Truffle
 
     # Send a user message and run the loop until the model answers without
     # requesting a tool. Returns the final assistant text.
-    def run(user_input)
+    #
+    # Pass signal: a Truffle::AbortSignal to cancel a long run. It is checked at
+    # turn boundaries (before each provider call, which is also the point reached
+    # after a batch of tool calls), so an abort stops the loop mid-flight and
+    # ends with a StopReason::ABORTED terminal rather than starting another turn.
+    # Cancellation is cooperative: an in-progress provider call still finishes.
+    def run(user_input, signal: nil)
       emit(:agent_start, input: user_input)
       @messages << Message.user(user_input)
 
       final_text = nil
       final_response = nil
+      aborted = false
       turns = 0
 
       loop do
+        if signal&.aborted?
+          aborted = true
+          break
+        end
+
         turns += 1
         if turns > max_turns
           raise Error, "exceeded max_turns (#{max_turns}) without a final answer"
@@ -95,11 +107,15 @@ module Truffle
         emit(:turn_end, turn: turns, tool_results: tool_results)
       end
 
-      # final_response is the turn that ended the loop: the model answered without
-      # asking for a tool, so its stop reason (:stop, :length, ...) is the run's.
+      # On a clean finish, final_response is the turn that ended the loop (the
+      # model answered without asking for a tool), so its stop reason carries.
+      # On an abort there is no clean final answer, so the run's reason is
+      # :aborted and any partial output stays available on `messages`.
+      stop_reason = aborted ? StopReason::ABORTED : final_response&.stop_reason
+      error_message = aborted ? nil : final_response&.error_message
       emit(:agent_end, output: final_text, messages: @messages,
-                       stop_reason: final_response&.stop_reason,
-                       error_message: final_response&.error_message,
+                       stop_reason: stop_reason,
+                       error_message: error_message,
                        usage: @usage)
       final_text
     end

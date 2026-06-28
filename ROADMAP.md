@@ -42,8 +42,8 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    `run` keeps working unchanged.
 4. [x] **Usage + cost.** Aggregate `Usage` across turns; expose it on
    `agent_end`; add per-provider/model cost estimation.
-5. **Abort.** A cancellation signal that stops the loop mid-flight and yields a
-   `aborted` stop reason cleanly.
+5. [x] **Abort.** A cancellation signal that stops the loop mid-flight and yields
+   an `aborted` stop reason cleanly.
 
 ## Phase 2: LLM layer parity (the `ai` package)
 

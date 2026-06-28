@@ -14,6 +14,18 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Cooperative cancellation, ported from pi's `AbortSignal` threading through the
+  agent loop and the streaming reader. `Truffle::AbortSignal` is a thread-safe
+  token (`#abort`, `#aborted?`, `#reason`, and an `AbortSignal.aborted`
+  constructor) that the owner of a run can trip from any thread. `Agent#run`
+  takes `signal:` and checks it at turn boundaries, the point reached before each
+  provider call and again after a batch of tool calls, so an abort stops the loop
+  mid-flight and ends with a `StopReason::ABORTED` terminal instead of starting
+  another turn. `Providers::OpenAI#chat_stream` takes `signal:` and checks it
+  between socket reads; on cancel it stops reading and folds the turn into a clean
+  `:done` terminal carrying `StopReason::ABORTED` and whatever content arrived,
+  not an `:error`. Cancellation is cooperative: an in-progress provider call or a
+  stalled socket read finishes or times out rather than being force-killed.
 - Token usage and cost accounting, ported from pi's `Usage` type plus its
   `parseChunkUsage` and `calculateCost` helpers. `Truffle::Usage` is a value
   object carrying `input`, `output`, `cache_read`, `cache_write`, `reasoning`,
