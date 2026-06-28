@@ -52,7 +52,14 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    non-streaming `#chat` and streaming `#chat_stream` over the same transforms,
    the latter decoding through an `AnthropicStream` accumulator and sharing the
    SSE transport with OpenAI via the `Providers::SSE` mixin.
-7. **Google / Gemini provider.** Same seam, native wire format.
+7. [x] **Google / Gemini provider.** Native, over the Generative Language API's
+   `generateContent` endpoint, hand-written, no client gem. The non-streaming
+   `#chat` half landed: `systemInstruction` extraction, `Content` role mapping,
+   `functionCall`/`functionResponse` parts with single-user-turn coalescing,
+   `parametersJsonSchema` tools, thought-signature handling, the `STOP`-to-
+   `tool_use` override, `Usage.from_google`, and the Gemini catalog lineup.
+   Streaming `#chat_stream` over `streamGenerateContent` on the `Providers::SSE`
+   mixin is the next slice.
 8. **Model catalog + provider registry.**
    - [x] **Model catalog.** A structured registry (`Truffle::Models`,
      `Truffle::Model`) of every model Truffle can address: id, provider, api,

@@ -14,6 +14,25 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A Google Gemini provider (`Providers::Google`, `provider: :google`) over the
+  Generative Language API's `generateContent` endpoint, hand-written on
+  `Net::HTTP` with no client gem. This is the non-streaming `#chat` half, a port
+  of pi's `google-shared.ts`/`google-generative-ai.ts` wire shapes: the system
+  prompt is lifted to a top-level `systemInstruction`, messages become Gemini
+  `Content` with role `user`/`model`, tool calls are `functionCall` parts, tool
+  results coalesce into one `user` turn of `functionResponse` parts, tools carry
+  a `parametersJsonSchema`, and `tool_choice` maps to a `functionCallingConfig`
+  mode. A thinking block is replayed as a `thought` part only when its signature
+  is valid base64 (Gemini's TYPE_BYTES requirement), otherwise downgraded to
+  plain text the way pi handles a cross-model replay. Gemini reports a plain
+  `STOP` finish even when the turn is a tool call, so the stop reason is
+  overridden to `tool_use` when the model asked for one. `Usage.from_google`
+  parses `usageMetadata`, taking `input` as the residual after
+  `cachedContentTokenCount` and folding `thoughtsTokenCount` into output while
+  recording it as reasoning. The model catalog gains the Gemini lineup
+  (3.5 Flash, 3.1 Pro Preview, 3.1 Flash-Lite, and the 2.5 Pro/Flash/Flash-Lite
+  family) with current per-million pricing. Streaming over
+  `streamGenerateContent` on the shared `Providers::SSE` mixin is the next slice.
 - A streaming Anthropic Messages provider (`Providers::Anthropic#chat_stream`),
   the streaming counterpart to `#chat`. It opens an SSE request and yields the
   same ordered `Truffle::StreamEvent` protocol the OpenAI provider does: one

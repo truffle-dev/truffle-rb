@@ -7,9 +7,10 @@ require_relative "test_helper"
 # silently going stale (a missing current flagship or a malformed entry fails
 # here rather than at a user's call site).
 class ModelsTest < Minitest::Test
-  def test_catalog_is_non_empty_for_both_providers
+  def test_catalog_is_non_empty_for_every_provider
     refute_empty Truffle::Models.for_provider(:anthropic)
     refute_empty Truffle::Models.for_provider(:openai)
+    refute_empty Truffle::Models.for_provider(:google)
   end
 
   def test_every_entry_is_well_formed
@@ -38,6 +39,9 @@ class ModelsTest < Minitest::Test
     Truffle::Models.for_provider(:openai).each do |m|
       assert m.id.start_with?("gpt-"), "#{m.id} is not a gpt id"
     end
+    Truffle::Models.for_provider(:google).each do |m|
+      assert m.id.start_with?("gemini-"), "#{m.id} is not a gemini id"
+    end
   end
 
   # Freshness guard. These are the current flagships as published; if the
@@ -63,6 +67,18 @@ class ModelsTest < Minitest::Test
 
     assert Truffle::Models.find("claude-fable-5")
     assert Truffle::Models.find("gpt-5.5")
+
+    flash = Truffle::Models.find("gemini-3.5-flash")
+
+    assert_equal "Gemini 3.5 Flash", flash.name
+    assert_in_delta(1.5, flash.cost[:input])
+    assert_in_delta(9.0, flash.cost[:output])
+    assert_predicate flash, :reasoning?
+
+    pro = Truffle::Models.find("gemini-2.5-pro")
+
+    assert_in_delta(1.25, pro.cost[:input])
+    assert_equal 1_048_576, pro.context_window
   end
 
   def test_one_million_context_models_carry_the_full_window

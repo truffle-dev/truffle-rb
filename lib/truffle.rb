@@ -19,6 +19,7 @@ require_relative "truffle/providers/openai"
 require_relative "truffle/providers/openai_stream"
 require_relative "truffle/providers/anthropic"
 require_relative "truffle/providers/anthropic_stream"
+require_relative "truffle/providers/google"
 require_relative "truffle/agent"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.
@@ -50,7 +51,8 @@ module Truffle
 
   PROVIDERS = {
     openai: Providers::OpenAI,
-    anthropic: Providers::Anthropic
+    anthropic: Providers::Anthropic,
+    google: Providers::Google
   }.freeze
 
   module_function

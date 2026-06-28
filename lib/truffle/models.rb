@@ -115,7 +115,45 @@ module Truffle
                 cost: { input: 0.15, output: 0.6, cache_read: 0.075, cache_write: 0.0 })
     ].freeze
 
-    ALL = (ANTHROPIC + OPENAI).freeze
+    # Google Gemini Generative Language API. Source: Google's Gemini API model
+    # and pricing pages (Gemini 3.5 Flash, 3.1 Pro Preview, 3.1 Flash-Lite, and
+    # the 2.5 Pro/Flash/Flash-Lite family). Only first-party callable text models
+    # are listed; the image, audio, TTS, video, embedding, and specialized
+    # endpoints are out of scope, and the retired 2.0 family (shut down
+    # 2026-06-01) and Gemma open models are dropped. Costs are the text/image/
+    # video input rate and the standard (<=200K-token) tier where a model charges
+    # a long-context premium above it. Gemini's generateContent endpoint bills
+    # context-cache reads but exposes no separate cache-write counter, so
+    # cache_write is 0. The 1M context window and 64K max output are the published
+    # figures for the 2.5 and 3.x text tiers.
+    GOOGLE = [
+      Model.new(id: "gemini-3.5-flash", name: "Gemini 3.5 Flash",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 1.5, output: 9.0, cache_read: 0.15, cache_write: 0.0 }),
+      Model.new(id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 2.0, output: 12.0, cache_read: 0.2, cache_write: 0.0 }),
+      Model.new(id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash-Lite",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 0.25, output: 1.5, cache_read: 0.025, cache_write: 0.0 }),
+      Model.new(id: "gemini-2.5-pro", name: "Gemini 2.5 Pro",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 1.25, output: 10.0, cache_read: 0.125, cache_write: 0.0 }),
+      Model.new(id: "gemini-2.5-flash", name: "Gemini 2.5 Flash",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 0.3, output: 2.5, cache_read: 0.03, cache_write: 0.0 }),
+      Model.new(id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite",
+                provider: :google, api: :google_generative_ai, reasoning: true,
+                context_window: 1_048_576, max_output: 65_536,
+                cost: { input: 0.1, output: 0.4, cache_read: 0.01, cache_write: 0.0 })
+    ].freeze
+
+    ALL = (ANTHROPIC + OPENAI + GOOGLE).freeze
 
     BY_ID = ALL.to_h { |m| [m.id, m] }.freeze
 

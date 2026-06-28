@@ -91,6 +91,30 @@ module Truffle
       pricing ? usage.with_cost(pricing) : usage
     end
 
+    # Build a Usage from Gemini's generateContent usageMetadata hash. Gemini
+    # reports promptTokenCount inclusive of any cached tokens, so input is the
+    # residual after cachedContentTokenCount (matching the OpenAI residual rule,
+    # not Anthropic's net-of-cache input). candidatesTokenCount is the visible
+    # completion; thoughtsTokenCount is the reasoning slice billed at the output
+    # rate, so output carries both and reasoning records the thinking subset.
+    # Gemini exposes no cache-write counter on this endpoint, so cache_write is 0.
+    def self.from_google(raw, pricing: nil)
+      raw ||= {}
+      prompt = (raw["promptTokenCount"] || 0).to_i
+      cache_read = (raw["cachedContentTokenCount"] || 0).to_i
+      candidates = (raw["candidatesTokenCount"] || 0).to_i
+      reasoning = (raw["thoughtsTokenCount"] || 0).to_i
+
+      usage = new(
+        input: [0, prompt - cache_read].max,
+        output: candidates + reasoning,
+        cache_read: cache_read,
+        cache_write: 0,
+        reasoning: reasoning
+      )
+      pricing ? usage.with_cost(pricing) : usage
+    end
+
     # Return a copy of this usage with cost computed from a per-million rate hash.
     # Port of pi's calculateCost: Anthropic bills 1h cache writes at 2x base input,
     # so the 1h slice is split out; OpenAI never sets it, leaving short = cache_write.
