@@ -34,8 +34,8 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 1. [x] **Content blocks.** Port pi's content model: text, thinking, image, and
    tool-call blocks on assistant messages; text/image/tool-result on user
    messages. A message is a list of typed blocks, not a single string.
-2. **Stop reasons.** Port `StopReason` (`stop` / `length` / `toolUse` / `error`
-   / `aborted`) and surface it on the response and on `agent_end`.
+2. [x] **Stop reasons.** Port `StopReason` (`stop` / `length` / `toolUse` /
+   `error` / `aborted`) and surface it on the response and on `agent_end`.
 3. **Streaming + the event protocol.** Port pi's `AssistantMessageEvent` stream
    (`start`, `text_start/delta/end`, `thinking_*`, `toolcall_*`, `done`,
    `error`). A `chat_stream` path on the provider seam drives it; non-streaming

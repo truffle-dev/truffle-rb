@@ -34,15 +34,20 @@ class StubProvider < Truffle::Providers::Base
       message: Truffle::Message.assistant(
         tool_calls: [Truffle::ToolCall.new(id: id, name: name, arguments: arguments)]
       ),
-      finish_reason: "tool_calls"
+      finish_reason: "tool_calls",
+      stop_reason: Truffle::StopReason::TOOL_USE
     )
   end
 
-  # Helper to build a plain text response.
-  def self.text(content)
+  # Helper to build a plain text response. Pass finish_reason: "length" (or any
+  # other raw reason) to drive the stop-reason mapping in a test.
+  def self.text(content, finish_reason: "stop")
+    stop_reason, error_message = Truffle::Providers::OpenAI.map_stop_reason(finish_reason)
     Truffle::Response.new(
       message: Truffle::Message.assistant(content: content),
-      finish_reason: "stop"
+      finish_reason: finish_reason,
+      stop_reason: stop_reason,
+      error_message: error_message
     )
   end
 end

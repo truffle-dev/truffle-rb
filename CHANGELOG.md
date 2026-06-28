@@ -14,6 +14,15 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Stop reasons, ported from pi's `StopReason` union
+  (`stop`/`length`/`toolUse`/`error`/`aborted`). `Truffle::StopReason` holds the
+  canonical set as symbols (`:stop`, `:length`, `:tool_use`, `:error`,
+  `:aborted`); `Truffle::Providers::OpenAI.map_stop_reason` maps a Chat
+  Completions `finish_reason` onto one (a faithful port of pi's `mapStopReason`),
+  returning an error message for failure reasons. `Response#stop_reason` and
+  `#error_message` carry the result, and the agent emits both on `agent_end`, so
+  a caller can tell a clean finish from a length truncation or a content-filter
+  error. The raw provider string stays available on `Response#finish_reason`.
 - Typed content blocks (`Truffle::Content::Text`, `::Thinking`, `::Image`),
   ported from pi's content model. A `Message`'s content is now a list of these
   blocks instead of a single string; a bare String is wrapped as one Text block,

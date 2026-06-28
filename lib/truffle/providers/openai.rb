@@ -48,13 +48,35 @@ module Truffle
 
         payload = post("/chat/completions", body)
         choice = payload.fetch("choices").first
+        finish_reason = choice["finish_reason"]
+        stop_reason, error_message = self.class.map_stop_reason(finish_reason)
         Response.new(
           message: deserialize_message(choice.fetch("message")),
           usage: payload["usage"] || {},
           raw: payload,
           model: payload["model"],
-          finish_reason: choice["finish_reason"]
+          finish_reason: finish_reason,
+          stop_reason: stop_reason,
+          error_message: error_message
         )
+      end
+
+      # Map an OpenAI Chat Completions finish_reason onto a Truffle::StopReason,
+      # plus an error message when the reason signals a failure. A faithful port
+      # of pi's mapStopReason in packages/ai/src/api/openai-completions.ts: a null
+      # reason means a clean stop, "end" is an alias for "stop", both the legacy
+      # "function_call" and current "tool_calls" mean a tool pause, and anything
+      # else is treated as an error carrying the raw reason. Returns
+      # [stop_reason, error_message]; error_message is nil unless it is an error.
+      def self.map_stop_reason(reason)
+        case reason
+        when nil, "stop", "end" then [StopReason::STOP, nil]
+        when "length" then [StopReason::LENGTH, nil]
+        when "function_call", "tool_calls" then [StopReason::TOOL_USE, nil]
+        when "content_filter" then [StopReason::ERROR, "Provider finish_reason: content_filter"]
+        when "network_error" then [StopReason::ERROR, "Provider finish_reason: network_error"]
+        else [StopReason::ERROR, "Provider finish_reason: #{reason}"]
+        end
       end
 
       private

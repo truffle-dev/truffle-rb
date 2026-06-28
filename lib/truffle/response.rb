@@ -6,14 +6,19 @@ module Truffle
   # Every provider returns one of these regardless of its native wire format, so
   # the agent loop never has to branch on which model it is talking to.
   class Response
-    attr_reader :message, :usage, :raw, :model, :finish_reason
+    attr_reader :message, :usage, :raw, :model, :finish_reason, :stop_reason, :error_message
 
-    def initialize(message:, usage: {}, raw: nil, model: nil, finish_reason: nil)
+    def initialize(message:, usage: {}, raw: nil, model: nil, finish_reason: nil,
+                   stop_reason: nil, error_message: nil)
       @message = message
       @usage = usage || {}
       @raw = raw
       @model = model
+      # finish_reason is the provider's raw string (kept for debugging); stop_reason
+      # is the normalized Truffle::StopReason the provider mapped it to.
       @finish_reason = finish_reason
+      @stop_reason = stop_reason
+      @error_message = error_message
     end
 
     # The text content of the assistant turn (may be nil on a pure tool call).

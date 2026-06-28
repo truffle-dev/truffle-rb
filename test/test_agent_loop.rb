@@ -115,6 +115,33 @@ class TestAgentLoop < Minitest::Test
     assert_includes err.message, "max_turns"
   end
 
+  def test_agent_end_surfaces_stop_reason
+    provider = StubProvider.new([
+      StubProvider.tool_call(id: "c1", name: "add", arguments: { "a" => 1, "b" => 1 }),
+      StubProvider.text("2")
+    ])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
+
+    ended = nil
+    agent.on(:agent_end) { |payload| ended = payload }
+    agent.run("1 + 1?")
+
+    # The terminating turn answered without a tool, so its reason is the run's.
+    assert_equal :stop, ended[:stop_reason]
+    assert_nil ended[:error_message]
+  end
+
+  def test_agent_end_reports_length_when_the_model_is_truncated
+    provider = StubProvider.new([StubProvider.text("cut o", finish_reason: "length")])
+    agent = Truffle::Agent.new(provider: provider)
+
+    ended = nil
+    agent.on(:agent_end) { |payload| ended = payload }
+    agent.run("write a long essay")
+
+    assert_equal :length, ended[:stop_reason]
+  end
+
   def test_reset_clears_history_but_keeps_system_prompt
     provider = StubProvider.new([StubProvider.text("hi")])
     agent = Truffle::Agent.new(provider: provider, system_prompt: "be nice")

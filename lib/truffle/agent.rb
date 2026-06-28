@@ -66,6 +66,7 @@ module Truffle
       @messages << Message.user(user_input)
 
       final_text = nil
+      final_response = nil
       turns = 0
 
       loop do
@@ -76,6 +77,7 @@ module Truffle
 
         emit(:turn_start, turn: turns)
         response = @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
+        final_response = response
         @messages << response.message
         emit(:message, message: response.message, usage: response.usage)
 
@@ -89,7 +91,11 @@ module Truffle
         emit(:turn_end, turn: turns, tool_results: tool_results)
       end
 
-      emit(:agent_end, output: final_text, messages: @messages)
+      # final_response is the turn that ended the loop: the model answered without
+      # asking for a tool, so its stop reason (:stop, :length, ...) is the run's.
+      emit(:agent_end, output: final_text, messages: @messages,
+                       stop_reason: final_response&.stop_reason,
+                       error_message: final_response&.error_message)
       final_text
     end
 
