@@ -14,6 +14,8 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Published to RubyGems: `gem install truffle`.
+- `docs/RELEASING.md`: versioning, changelog, publish, and upgrade flow.
 - `NORTH_STAR.md`: the project's fixed destination.
 - `docs/BRAIN.md`: the self-updating continuity file (locked invariants plus a
   compacted mutable state) read and updated on every build run.

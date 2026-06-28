@@ -49,8 +49,9 @@ is the bridge between them and today.
 <!-- MUTABLE -->
 ## Current state (compact every run)
 
-- **Released:** v0.1.0 (commit `f127451`), the original v0.1 core. Not yet
-  published to RubyGems.
+- **Published:** v0.1.0 is live on RubyGems (`gem install truffle`), installed
+  and verified from a clean container. Release/upgrade flow documented in
+  `docs/RELEASING.md`.
 - **Repo identity migrated** from "Pith" to "Truffle" / `truffle-rb`: all code,
   docs, gemspec, `script/rb`, and examples renamed; ruby_llm framing removed;
   reframed as a from-scratch pi port. Tests green (14 runs / 46 assertions incl.
@@ -60,8 +61,7 @@ is the bridge between them and today.
 
 ## Next up
 
-- Publish v0.1.0 (renamed) to RubyGems and prove the install path.
-- Then ROADMAP Phase 1, item 1: **content blocks** — port pi's typed content
+- ROADMAP Phase 1, item 1: **content blocks** — port pi's typed content
   model (text / thinking / image / tool-call / tool-result) so a message is a
   list of typed blocks, not a single string. Read `~/repos/pi/packages/ai/src/types.ts`
   first.

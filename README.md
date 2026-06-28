@@ -1,5 +1,7 @@
 # Truffle
 
+[![Gem Version](https://img.shields.io/gem/v/truffle)](https://rubygems.org/gems/truffle)
+
 A complete **agent harness for Ruby**, built from scratch. Truffle gives you the
 loop that turns a language model into an agent: it sends a prompt, lets the model
 ask for tools, runs those tools, feeds the results back, and repeats until the
