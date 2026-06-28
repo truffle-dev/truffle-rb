@@ -3,6 +3,8 @@
 require_relative "truffle/version"
 require_relative "truffle/content"
 require_relative "truffle/stop_reason"
+require_relative "truffle/pricing"
+require_relative "truffle/usage"
 require_relative "truffle/message"
 require_relative "truffle/response"
 require_relative "truffle/stream_event"

@@ -14,6 +14,18 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Token usage and cost accounting, ported from pi's `Usage` type plus its
+  `parseChunkUsage` and `calculateCost` helpers. `Truffle::Usage` is a value
+  object carrying `input`, `output`, `cache_read`, `cache_write`, `reasoning`,
+  and `total_tokens`, with a `cost` sub-struct in dollars. `Usage.parse` reads a
+  provider's raw usage hash the way pi does: cache reads come from
+  `prompt_tokens_details.cached_tokens` (falling back to `prompt_cache_hit_tokens`),
+  and `input` is the residual so a cached prompt token is billed once as a read,
+  not also as fresh input. `Truffle::Pricing.cost_for` looks up per-million-token
+  rates by model id (stripping a date snapshot suffix; unknown models price at
+  zero but still count tokens). `Response#usage` is now a `Usage`, and the agent
+  sums usage across every turn of every run, exposing the running total on
+  `agent_end` and clearing it on `#reset`.
 - Streaming and the event protocol, ported from pi's `AssistantMessageEvent`
   stream. `Providers::OpenAI#chat_stream` opens an SSE request and yields ordered
   `Truffle::StreamEvent` objects as a turn arrives: one `:start`, then a

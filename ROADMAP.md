@@ -40,8 +40,8 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    stream (`start`, `text_start/delta/end`, `thinking_*`, `toolcall_*`, `done`,
    `error`). A `chat_stream` path on the provider seam drives it; non-streaming
    `run` keeps working unchanged.
-4. **Usage + cost.** Aggregate `Usage` across turns; expose it on `agent_end`;
-   add per-provider/model cost estimation.
+4. [x] **Usage + cost.** Aggregate `Usage` across turns; expose it on
+   `agent_end`; add per-provider/model cost estimation.
 5. **Abort.** A cancellation signal that stops the loop mid-flight and yields a
    `aborted` stop reason cleanly.
 

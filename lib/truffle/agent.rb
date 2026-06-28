@@ -27,7 +27,7 @@ module Truffle
 
     EVENTS = %i[agent_start turn_start message tool_call tool_result turn_end agent_end].freeze
 
-    attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns
+    attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns, :usage
 
     def initialize(provider:, system_prompt: nil, tools: [], model: nil,
                    max_turns: DEFAULT_MAX_TURNS)
@@ -40,6 +40,9 @@ module Truffle
 
       @messages = []
       @messages << Message.system(system_prompt) if system_prompt
+      # Token usage and cost accumulated across every turn of every run on this
+      # agent, the way pi tallies a session. #reset clears it.
+      @usage = Usage.zero
     end
 
     # Register a listener. `on(:tool_call) { |payload| ... }` for one event, or
@@ -79,6 +82,7 @@ module Truffle
         response = @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
         final_response = response
         @messages << response.message
+        @usage += response.usage
         emit(:message, message: response.message, usage: response.usage)
 
         unless response.tool_calls?
@@ -95,14 +99,17 @@ module Truffle
       # asking for a tool, so its stop reason (:stop, :length, ...) is the run's.
       emit(:agent_end, output: final_text, messages: @messages,
                        stop_reason: final_response&.stop_reason,
-                       error_message: final_response&.error_message)
+                       error_message: final_response&.error_message,
+                       usage: @usage)
       final_text
     end
 
-    # Reset history back to just the system prompt (keeps tools + listeners).
+    # Reset history back to just the system prompt (keeps tools + listeners) and
+    # clear the accumulated usage.
     def reset
       @messages = []
       @messages << Message.system(@system_prompt) if @system_prompt
+      @usage = Usage.zero
       self
     end
 

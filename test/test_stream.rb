@@ -164,9 +164,35 @@ class TestStream < Minitest::Test
       { "choices" => [{ "delta" => {}, "finish_reason" => "stop" }],
         "usage" => { "prompt_tokens" => 5, "completion_tokens" => 2 } }
     ])
-    assert_equal 5, acc.response.usage["prompt_tokens"]
-    assert_equal 2, acc.response.usage["completion_tokens"]
+    usage = acc.response.usage
+    assert_equal 5, usage.input
+    assert_equal 2, usage.output
+    assert_equal 7, usage.total_tokens
     refute_empty events
+  end
+
+  def test_usage_priced_from_model_in_chunk
+    _events, acc = collect([
+      { "model" => "gpt-4o-mini", "choices" => [{ "delta" => { "content" => "x" } }] },
+      { "choices" => [{ "delta" => {}, "finish_reason" => "stop" }],
+        "usage" => { "prompt_tokens" => 1_000_000, "completion_tokens" => 1_000_000 } }
+    ])
+    cost = acc.response.usage.cost
+    # gpt-4o-mini: $0.15/M input, $0.60/M output.
+    assert_in_delta 0.15, cost.input, 1e-9
+    assert_in_delta 0.6, cost.output, 1e-9
+    assert_in_delta 0.75, cost.total, 1e-9
+  end
+
+  def test_usage_priced_from_requested_model_when_chunks_omit_it
+    acc = Truffle::Providers::OpenAIStream.new(pricing_model: "gpt-4o-mini")
+    [text_chunk("x"),
+     { "choices" => [{ "delta" => {}, "finish_reason" => "stop" }],
+       "usage" => { "prompt_tokens" => 1_000_000, "completion_tokens" => 0 } }].each do |c|
+      acc.feed(c) { |_| }
+    end
+    acc.finish { |_| }
+    assert_in_delta 0.15, acc.response.usage.cost.total, 1e-9
   end
 
   def test_model_captured_from_chunk

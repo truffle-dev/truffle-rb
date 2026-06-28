@@ -28,23 +28,26 @@ class StubProvider < Truffle::Providers::Base
     @script.shift
   end
 
-  # Helper to build a tool-call response.
-  def self.tool_call(id:, name:, arguments:)
+  # Helper to build a tool-call response. Pass usage: to exercise aggregation.
+  def self.tool_call(id:, name:, arguments:, usage: nil)
     Truffle::Response.new(
       message: Truffle::Message.assistant(
         tool_calls: [Truffle::ToolCall.new(id: id, name: name, arguments: arguments)]
       ),
+      usage: usage,
       finish_reason: "tool_calls",
       stop_reason: Truffle::StopReason::TOOL_USE
     )
   end
 
   # Helper to build a plain text response. Pass finish_reason: "length" (or any
-  # other raw reason) to drive the stop-reason mapping in a test.
-  def self.text(content, finish_reason: "stop")
+  # other raw reason) to drive the stop-reason mapping in a test, or usage: a
+  # Truffle::Usage to drive cross-turn cost aggregation.
+  def self.text(content, finish_reason: "stop", usage: nil)
     stop_reason, error_message = Truffle::Providers::OpenAI.map_stop_reason(finish_reason)
     Truffle::Response.new(
       message: Truffle::Message.assistant(content: content),
+      usage: usage,
       finish_reason: finish_reason,
       stop_reason: stop_reason,
       error_message: error_message

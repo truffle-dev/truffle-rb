@@ -52,7 +52,7 @@ is the bridge between them and today.
 - **Published:** v0.1.0 is live on RubyGems (`gem install truffle`). Release flow
   in `docs/RELEASING.md`. Unreleased changes accrue under CHANGELOG `[Unreleased]`.
 - **Phase 1 done so far:** items 1 (content blocks), 2 (stop reasons), 3
-  (streaming + event protocol).
+  (streaming + event protocol), 4 (usage + cost).
   - Content: `Message#content` is a list of typed blocks (`Content::Text`,
     `::Thinking`, `::Image`, with `ToolCall` in the same list). `#text` joins
     Text blocks. A bare String still wraps to one Text block.
@@ -69,19 +69,31 @@ is the bridge between them and today.
     snapshot; strings are duped so an early snapshot is not mutated by later
     deltas. Transport/parse failure folds into the stream as `:error` (pi's catch
     path), not a raise. `#chat` and the agent loop are unchanged.
-- Tests green: 51 offline runs / 145 assertions, plus two live OpenAI tests
+  - Usage + cost: `Truffle::Usage` value object (`input output cache_read
+    cache_write reasoning total_tokens` + a `cost` Struct in dollars). `Usage.parse`
+    ports pi's `parseChunkUsage`: cache reads from `prompt_tokens_details.cached_tokens`
+    (fallback `prompt_cache_hit_tokens`), `input` is the residual so a cached token
+    is not double-billed. `with_cost` ports `calculateCost` including the 1h
+    cache-write 2x-base split (always 0 for OpenAI). `Truffle::Pricing.cost_for`
+    is the $/M-token table by model id (strips a `-YYYY-MM-DD` suffix; unknown
+    model -> nil -> zero cost, tokens still counted). `Response#usage` is now a
+    `Usage` (defaults to `Usage.zero`); `OpenAIStream` takes `pricing_model:` to
+    price when chunks omit a model. Agent sums `@usage` across all turns/runs,
+    emits it on `agent_end`, clears it on `#reset`.
+- Tests green: 71 offline runs / 201 assertions, plus two live OpenAI tests
   (round-trip + streaming) that run only when the key is present.
 
 ## Next up
 
-- ROADMAP Phase 1, item 4: **usage + cost.** Aggregate `Usage` across turns,
-  expose it on `agent_end`, and add per-provider/model cost estimation. Read
-  pi's usage shape first: `parseChunkUsage` and the `Usage` type in
-  `~/repos/pi/packages/ai/src` (grep `parseChunkUsage`, and the cost/pricing
-  table pi keeps per model). The streaming path already captures raw `usage` on
-  `Response#usage` from the final chunk (and from `choice.usage` for compatible
-  endpoints), so this slice is about a typed `Usage` value object, cross-turn
-  aggregation in the agent, and a pricing lookup, not new wire parsing.
+- ROADMAP Phase 1, item 5: **abort.** A cancellation signal that stops the loop
+  mid-flight and yields an `:aborted` stop reason cleanly. Read pi's abort path
+  first in `~/repos/pi/packages/agent` and `packages/ai` (grep `abort`,
+  `AbortSignal`, `aborted`): how the signal threads from the run call into the
+  provider request and how the partial turn is finalized. `StopReason::ABORTED`
+  already exists. The slice is a cooperative cancel (an `abort`/`aborted?` on the
+  agent or a token passed to `run`) checked at turn boundaries and surfaced as an
+  `:aborted` terminal, plus folding an in-flight `chat_stream` abort into the
+  stream as a clean terminal rather than an error.
 
 ## Learnings (keep only what still matters)
 
@@ -96,6 +108,10 @@ is the bridge between them and today.
 - Ruby `String#to_s` returns self, so building a value object from a mutable
   scratch string aliases it. Dup strings when snapshotting accumulator state, or
   later in-place `<<` deltas rewrite past snapshots.
+- A method with a keyword param (`def parse(raw, pricing: nil)`) swallows a
+  brace-less literal hash at the call site (`parse("k" => 1)`) as keywords, so
+  `raw` goes empty. Real callers pass a hash variable and are fine; wrap literal
+  hashes in braces in tests.
 - pi root version is 0.0.3; pi's `ai` package is the type-system source of truth.
 - pi coding-agent dirs to mine later: `tools/`, `compaction/`, `skills.ts`,
   `slash-commands.ts`, `session-manager.ts`, `migrations.ts`, `extensions/`.

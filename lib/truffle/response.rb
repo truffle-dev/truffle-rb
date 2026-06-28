@@ -8,10 +8,12 @@ module Truffle
   class Response
     attr_reader :message, :usage, :raw, :model, :finish_reason, :stop_reason, :error_message
 
-    def initialize(message:, usage: {}, raw: nil, model: nil, finish_reason: nil,
+    def initialize(message:, usage: nil, raw: nil, model: nil, finish_reason: nil,
                    stop_reason: nil, error_message: nil)
       @message = message
-      @usage = usage || {}
+      # usage is a Truffle::Usage (token counts plus dollar cost). An empty turn
+      # gets a zero usage so callers can always read .usage.total_tokens.
+      @usage = usage || Usage.zero
       @raw = raw
       @model = model
       # finish_reason is the provider's raw string (kept for debugging); stop_reason

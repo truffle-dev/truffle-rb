@@ -39,11 +39,12 @@ module Truffle
         choice = payload.fetch("choices").first
         finish_reason = choice["finish_reason"]
         stop_reason, error_message = self.class.map_stop_reason(finish_reason)
+        response_model = payload["model"]
         Response.new(
           message: deserialize_message(choice.fetch("message")),
-          usage: payload["usage"] || {},
+          usage: Usage.parse(payload["usage"], pricing: Pricing.cost_for(response_model || model || @model)),
           raw: payload,
-          model: payload["model"],
+          model: response_model,
           finish_reason: finish_reason,
           stop_reason: stop_reason,
           error_message: error_message
@@ -62,7 +63,7 @@ module Truffle
         body[:stream] = true
         body[:stream_options] = { include_usage: true }
 
-        acc = OpenAIStream.new
+        acc = OpenAIStream.new(pricing_model: model || @model)
         begin
           stream_post("/chat/completions", body) do |chunk|
             acc.feed(chunk) { |event| yield event if block_given? }

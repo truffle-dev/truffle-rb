@@ -24,7 +24,10 @@ module Truffle
 
       attr_reader :response
 
-      def initialize
+      # pricing_model is the model id the caller requested, used to price the
+      # final usage when the chunks do not carry a model of their own.
+      def initialize(pricing_model: nil)
+        @pricing_model = pricing_model
         @blocks = []
         @text_block = nil
         @thinking_block = nil
@@ -212,9 +215,10 @@ module Truffle
       end
 
       def build_response
+        pricing = Pricing.cost_for(@model || @pricing_model)
         Response.new(
           message: @message,
-          usage: @usage || {},
+          usage: Usage.parse(@usage, pricing: pricing),
           model: @model,
           finish_reason: @raw_finish_reason,
           stop_reason: @stop_reason,
