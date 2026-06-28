@@ -9,17 +9,18 @@ repository. This file is the working agreement; the design intent lives in
 A complete agent harness for Ruby, built from scratch: the loop that turns a
 language model into a tool-using agent, growing toward skills, commands,
 sessions, and memory. It is a faithful, from-scratch port of
-[pi](https://github.com/earendil-works/pi). The North Star is
-[NORTH_STAR.md](NORTH_STAR.md). There are no runtime gem dependencies; every
-provider is hand-written.
+[pi](https://github.com/earendil-works/pi). There are no runtime gem
+dependencies; every provider is hand-written.
 
 ## Layout
 
-- `lib/truffle.rb`: top-level API (`Truffle.agent`, `Truffle.tool`, `Truffle.provider`).
+- `lib/truffle.rb`: top-level API (`Truffle.agent`, `Truffle.tool`, `Truffle.model`).
 - `lib/truffle/agent.rb`: the agent loop. The heart of the project. Keep it
   readable.
 - `lib/truffle/tool.rb`, `toolbox.rb`: the tool DSL and a named tool collection.
 - `lib/truffle/message.rb`, `response.rb`: value objects.
+- `lib/truffle/model.rb`, `models.rb`, `pricing.rb`: the model catalog (the
+  single source of truth for ids, capabilities, and pricing) and its facade.
 - `lib/truffle/providers/`: the provider seam and concrete providers. Everything
   outside this directory must stay provider-agnostic.
 - `test/`: minitest. The default suite is offline; one test hits OpenAI and

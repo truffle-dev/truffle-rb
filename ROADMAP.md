@@ -1,9 +1,9 @@
 # Roadmap
 
-The North Star is in [NORTH_STAR.md](NORTH_STAR.md): a byte-for-byte-faithful
-Ruby port of [pi](https://github.com/earendil-works/pi), grown into a complete
-agent harness with skills, commands, sessions, and memory. Everything is written
-from scratch in plain Ruby with no runtime gem dependencies.
+Truffle is a byte-for-byte-faithful Ruby port of
+[pi](https://github.com/earendil-works/pi), grown into a complete agent harness
+with skills, commands, sessions, and memory. Everything is written from scratch
+in plain Ruby with no runtime gem dependencies.
 
 Truffle grows slowly and steadily: one focused, tested increment at a time. Each
 item below is a self-contained slice. When you pick one up, ship it with tests
@@ -51,8 +51,16 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    content-block shape. Hand-written, no client gem. Non-streaming `#chat` first;
    a streaming `#chat_stream` over the same transforms is the next slice.
 7. **Google / Gemini provider.** Same seam, native wire format.
-8. **Provider registry + model catalog.** Resolve `model:` strings to the right
-   provider the way pi's `ai` package does.
+8. **Model catalog + provider registry.**
+   - [x] **Model catalog.** A structured registry (`Truffle::Models`,
+     `Truffle::Model`) of every model Truffle can address: id, provider, api,
+     context window, max output, modalities, reasoning, deprecation, and a
+     per-token cost hash, mirroring pi's generated `*.models.ts` tables and kept
+     current to each provider's published docs. `Pricing` reads its rates; a
+     freshness test guards against the lineup going stale.
+   - [ ] **Provider resolution.** Resolve a bare `model:` string to the right
+     provider automatically the way pi's `ai` package does, so the caller need
+     not also name the provider.
 9. **Structured tool results.** A tool may return a hash/array, serialized as
    JSON for the model; plain strings keep working.
 

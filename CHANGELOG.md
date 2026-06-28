@@ -14,6 +14,20 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A structured model catalog (`Truffle::Models`, `Truffle::Model`), the single
+  source of truth for every model Truffle can address. Each `Model` carries its
+  id, name, provider, api, context window, max output, input modalities,
+  reasoning support, a deprecation flag, and a per-million-token cost hash
+  (`:input`, `:output`, `:cache_read`, `:cache_write`), mirroring the fields pi
+  keeps in its generated `*.models.ts` tables. The Anthropic and OpenAI lineups
+  are transcribed from each provider's published model and pricing docs and kept
+  current (Claude Fable 5, Opus 4.8 through 4.5, Sonnet 4.6/4.5, Haiku 4.5; the
+  GPT-5.5/5.4/5 families, GPT-4.1, GPT-4o). `Truffle.models` lists them all and
+  `Truffle.model(id)` resolves one, accepting a dated snapshot id
+  (`gpt-4o-2024-08-06`, `claude-sonnet-4-5-20250929`) as its base model.
+  `Truffle::Pricing` is now a thin facade reading rates off the catalog, so
+  pricing can never drift from the model list. A freshness test fails loudly if
+  the current flagships ever regress to a stale lineup.
 - A native Anthropic Messages provider (`Providers::Anthropic`), ported from pi's
   `anthropic-messages.ts` wire shapes and hand-written on `Net::HTTP` with no
   client gem. `Truffle.agent(provider: :anthropic)` drives a full tool round
@@ -89,9 +103,6 @@ All notable changes to Truffle are documented here. The format follows
   common case.
 - Published to RubyGems: `gem install truffle`.
 - `docs/RELEASING.md`: versioning, changelog, publish, and upgrade flow.
-- `NORTH_STAR.md`: the project's fixed destination.
-- `docs/BRAIN.md`: the self-updating continuity file (locked invariants plus a
-  compacted mutable state) read and updated on every build run.
 - Rewritten `ROADMAP.md` mapping Phases 1–5 to pi's package structure.
 
 ## [0.1.0] - 2026-06-28

@@ -4,6 +4,8 @@ require_relative "truffle/version"
 require_relative "truffle/content"
 require_relative "truffle/stop_reason"
 require_relative "truffle/abort_signal"
+require_relative "truffle/model"
+require_relative "truffle/models"
 require_relative "truffle/pricing"
 require_relative "truffle/usage"
 require_relative "truffle/message"
@@ -79,4 +81,11 @@ module Truffle
   def tool(name, description, &block)
     Tool.define(name, description, &block)
   end
+
+  # The model catalog. `Truffle.models` lists every known model;
+  # `Truffle.model("claude-opus-4-8")` looks one up (nil if unknown), accepting a
+  # dated snapshot id as its base model.
+  def models = Models.all
+
+  def model(id) = Models.find(id)
 end

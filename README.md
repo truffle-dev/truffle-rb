@@ -53,8 +53,13 @@ sessions, and memory. You can read the whole loop in one sitting
 
 - **Provider-agnostic, built from scratch.** The agent talks to a single `chat`
   seam. A provider is any object that answers `chat(messages:, tools:, model:)`.
-  An OpenAI provider ships in the box, written against the wire API directly with
-  no client gem. Anthropic and other providers follow the same hand-written path.
+  OpenAI Chat Completions and Anthropic Messages both ship in the box, each
+  written against the wire API directly with no client gem.
+- **A model catalog you can trust.** `Truffle.models` is a structured registry of
+  every model Truffle can address, current to its provider's published docs:
+  ids, context windows, max output, modalities, reasoning support, and per-token
+  pricing. `Truffle.model("claude-opus-4-8")` resolves a model (and dated
+  snapshots like `gpt-4o-2024-08-06`) to its rates and capabilities.
 - **Tools are plain blocks.** Define a tool with a name, a description, typed
   params, and a Ruby block. Truffle generates the JSON Schema the model needs and
   symbolizes the model's arguments back into keyword args for you.
@@ -169,18 +174,35 @@ def chat(messages:, tools:, model: nil, **options)
 end
 ```
 
-The bundled `Truffle::Providers::OpenAI` talks to the Chat Completions API over
-`Net::HTTP`. To target another backend, subclass `Truffle::Providers::Base` and
-implement `chat`. The roadmap adds first-class Anthropic and other providers,
-each hand-written against the seam.
+Two providers ship in the box. `Truffle::Providers::OpenAI` talks to the Chat
+Completions API and `Truffle::Providers::Anthropic` talks to the Messages API,
+both over `Net::HTTP` with no client gem. To target another backend, subclass
+`Truffle::Providers::Base` and implement `chat`.
+
+### The model catalog
+
+```ruby
+Truffle.models                       # => every model Truffle knows
+Truffle.model("claude-opus-4-8")     # => the Opus 4.8 entry
+Truffle.model("gpt-4o-2024-08-06")   # => resolves the dated snapshot to gpt-4o
+
+opus = Truffle.model("claude-opus-4-8")
+opus.context_window  # => 1_000_000
+opus.reasoning?      # => true
+opus.cost[:input]    # => 5.0  (US dollars per million input tokens)
+```
+
+Every entry carries its id, provider, context window, max output, input
+modalities, reasoning support, and a per-million-token cost hash
+(`:input`, `:output`, `:cache_read`, `:cache_write`). The catalog is the single
+source of truth: `Truffle::Pricing` reads its rates, and a test fails loudly if
+the current flagships ever regress to a stale lineup.
 
 ## Testing
 
 ```sh
 rake test
 ```
-
-![The test suite passing: 14 runs, 46 assertions, 0 failures](docs/test-suite.png)
 
 The default suite is hermetic and offline: it drives the agent loop with a stub
 provider, so you can run it anywhere without a key. One additional test
@@ -196,16 +218,20 @@ with only Docker.
 ## Project layout
 
 ```
-lib/truffle.rb                  # top-level API: Truffle.agent, Truffle.tool, Truffle.provider
-lib/truffle/agent.rb            # the agent loop (the heart of the port)
-lib/truffle/tool.rb             # tool DSL + JSON Schema generation
-lib/truffle/toolbox.rb          # a named collection of tools
-lib/truffle/message.rb          # message + tool-call value objects
-lib/truffle/response.rb         # a provider's reply
-lib/truffle/providers/base.rb   # the provider seam
-lib/truffle/providers/openai.rb # OpenAI Chat Completions provider
-examples/calculator.rb       # runnable multi-tool demo
-test/                        # minitest suite (offline + one live test)
+lib/truffle.rb                     # top-level API: Truffle.agent, Truffle.tool, Truffle.model
+lib/truffle/agent.rb               # the agent loop (the heart of the port)
+lib/truffle/tool.rb                # tool DSL + JSON Schema generation
+lib/truffle/toolbox.rb             # a named collection of tools
+lib/truffle/message.rb             # message + tool-call value objects
+lib/truffle/response.rb            # a provider's reply
+lib/truffle/model.rb               # a single model value object
+lib/truffle/models.rb              # the model catalog (single source of truth)
+lib/truffle/pricing.rb             # per-token pricing facade over the catalog
+lib/truffle/providers/base.rb      # the provider seam
+lib/truffle/providers/openai.rb    # OpenAI Chat Completions provider
+lib/truffle/providers/anthropic.rb # Anthropic Messages provider
+examples/calculator.rb          # runnable multi-tool demo
+test/                           # minitest suite (offline + one live test)
 ```
 
 ## Credits
