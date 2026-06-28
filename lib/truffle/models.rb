@@ -179,11 +179,73 @@ module Truffle
       alias [] find
     end
 
+    # Resolve a model reference to its catalog Model, the way pi's
+    # findExactModelReferenceMatch does, so a caller can name a model without
+    # also naming its provider. Accepts a bare id ("claude-opus-4-8"), a
+    # canonical "provider/id" reference ("anthropic/claude-opus-4-8"), or a dated
+    # snapshot of either. Matching trims surrounding space and is
+    # case-insensitive. A bare id served by more than one provider is ambiguous
+    # and resolves to nil rather than guessing. Returns nil for an unknown or nil
+    # reference.
+    #
+    # `models:` is the list to match against, defaulting to the full catalog;
+    # passing a list keeps the matcher a pure function (and lets a caller scope
+    # to a subset), the way pi threads availableModels through.
+    def resolve(reference, models: ALL)
+      trimmed = reference.to_s.strip
+      return nil if trimmed.empty?
+
+      # Tried in order: a canonical "provider/id", then a slash-split provider
+      # plus id, then a bare id. Each returns the single match, or nil when the
+      # step is ambiguous (more than one match) so we never guess.
+      one_of(models) { |m| "#{m.provider}/#{m.id}".casecmp?(trimmed) } ||
+        resolve_with_provider(trimmed, models) ||
+        one_of(models) { |m| id_match?(m, trimmed) }
+    end
+
+    # The provider symbol that serves a model reference, or nil when the
+    # reference does not resolve. The convenience behind inferring a provider in
+    # Truffle.agent from `model:` alone.
+    def provider_for(reference)
+      resolve(reference)&.provider
+    end
+
+    # The single model the block selects, or nil when zero or more than one
+    # match. The "more than one" case is what makes an ambiguous reference
+    # resolve to nil instead of an arbitrary pick.
+    def one_of(models, &)
+      matches = models.select(&)
+      matches.length == 1 ? matches.first : nil
+    end
+
+    # The slash step of resolve: split "provider/id", then match within that
+    # provider. nil when there is no usable slash so resolve falls through to a
+    # bare-id match.
+    def resolve_with_provider(reference, models)
+      slash = reference.index("/")
+      return nil unless slash
+
+      provider = reference[0...slash].strip
+      model_id = reference[(slash + 1)..].strip
+      return nil if provider.empty? || model_id.empty?
+
+      one_of(models) { |m| m.provider.to_s.casecmp?(provider) && id_match?(m, model_id) }
+    end
+
     # Strip a trailing date snapshot so a dated id resolves as its base. OpenAI
     # snapshots are dashed (gpt-4o-2024-08-06); Anthropic snapshots are compact
     # (claude-sonnet-4-5-20250929). Handle both.
     def base_id(id)
       id.sub(/-\d{4}-\d{2}-\d{2}\z/, "").sub(/-\d{8}\z/, "")
+    end
+
+    # A model id matches a reference exactly, or matches once a dated snapshot
+    # suffix is stripped from the reference, so "gpt-4o-2024-08-06" resolves like
+    # "gpt-4o". Case-insensitive to mirror pi's matcher.
+    def id_match?(model, reference)
+      ref = reference.downcase
+      id = model.id.downcase
+      id == ref || id == base_id(ref)
     end
   end
 end

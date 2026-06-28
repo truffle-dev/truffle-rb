@@ -150,4 +150,75 @@ class ModelsTest < Minitest::Test
     assert_nil Truffle::Pricing.cost_for("no-such-model")
     assert_nil Truffle::Pricing.cost_for(nil)
   end
+
+  # Provider resolution: a bare model reference names its provider, the way pi's
+  # findExactModelReferenceMatch resolves a model id against the catalog.
+  def test_resolve_bare_id_finds_the_model_and_its_provider
+    m = Truffle::Models.resolve("claude-opus-4-8")
+
+    assert_equal "claude-opus-4-8", m.id
+    assert_equal :anthropic, m.provider
+    assert_equal :openai, Truffle::Models.resolve("gpt-4o").provider
+    assert_equal :google, Truffle::Models.resolve("gemini-2.5-pro").provider
+  end
+
+  def test_resolve_accepts_a_canonical_provider_slash_id_reference
+    assert_equal Truffle::Models.find("claude-opus-4-8"),
+                 Truffle::Models.resolve("anthropic/claude-opus-4-8")
+    assert_equal Truffle::Models.find("gpt-4o"),
+                 Truffle::Models.resolve("openai/gpt-4o")
+  end
+
+  def test_resolve_is_case_insensitive_and_trims
+    assert_equal Truffle::Models.find("gpt-4o"), Truffle::Models.resolve("  GPT-4o ")
+    assert_equal Truffle::Models.find("claude-opus-4-8"),
+                 Truffle::Models.resolve("Anthropic/Claude-Opus-4-8")
+  end
+
+  def test_resolve_handles_dated_snapshots
+    assert_equal Truffle::Models.find("gpt-4o"),
+                 Truffle::Models.resolve("gpt-4o-2024-08-06")
+    assert_equal Truffle::Models.find("claude-sonnet-4-5"),
+                 Truffle::Models.resolve("anthropic/claude-sonnet-4-5-20250929")
+  end
+
+  def test_resolve_returns_nil_for_unknown_blank_and_nil
+    assert_nil Truffle::Models.resolve("no-such-model")
+    assert_nil Truffle::Models.resolve("anthropic/no-such-model")
+    assert_nil Truffle::Models.resolve("   ")
+    assert_nil Truffle::Models.resolve(nil)
+  end
+
+  def test_resolve_rejects_a_wrong_provider_prefix
+    # gpt-4o is real, but not under anthropic; a mismatched prefix does not fall
+    # through to a bare-id match.
+    assert_nil Truffle::Models.resolve("anthropic/gpt-4o")
+  end
+
+  # A bare id served by more than one provider is ambiguous; pi returns no match
+  # rather than guessing. Proven against a hand-built two-provider list so the
+  # guard is exercised even though the shipped catalog has no id collisions.
+  def test_resolve_rejects_an_ambiguous_bare_id
+    a = Truffle::Model.new(id: "shared-1", name: "A", provider: :openai,
+                           api: :openai_completions, context_window: 1, max_output: 1,
+                           cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 })
+    b = Truffle::Model.new(id: "shared-1", name: "B", provider: :anthropic,
+                           api: :anthropic_messages, context_window: 1, max_output: 1,
+                           cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 })
+
+    assert_nil Truffle::Models.resolve("shared-1", models: [a, b])
+    # The same ambiguity is resolvable once a provider is named.
+    assert_equal a, Truffle::Models.resolve("openai/shared-1", models: [a, b])
+    assert_equal b, Truffle::Models.resolve("anthropic/shared-1", models: [a, b])
+  end
+
+  def test_provider_for_returns_the_serving_provider_symbol
+    assert_equal :anthropic, Truffle::Models.provider_for("claude-opus-4-8")
+    assert_equal :openai, Truffle::Models.provider_for("openai/gpt-4o")
+    assert_nil Truffle::Models.provider_for("no-such-model")
+  end
+
+  def test_top_level_resolve_model_delegates
+    assert_equal Truffle::Models.resolve("gpt-4o"), Truffle.resolve_model("gpt-4o")
+  end
 end

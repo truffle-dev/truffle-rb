@@ -70,8 +70,26 @@ module Truffle
 
   # Convenience constructor: Truffle.agent(provider: :openai, tools: [...], ...).
   # `provider:` may be a symbol, an options-less default, or a provider instance.
-  def agent(provider:, system_prompt: nil, tools: [], model: nil,
+  #
+  # `provider:` is optional when `model:` names a catalog model: the provider is
+  # then inferred from the model (Truffle.agent(model: "claude-opus-4-8")), and a
+  # canonical "provider/id" reference is reduced to the bare wire id the provider
+  # expects. An explicit `provider:` is left untouched, so an unlisted or custom
+  # model id still works when the provider is named.
+  def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
             max_turns: Agent::DEFAULT_MAX_TURNS, **provider_options)
+    if provider.nil?
+      raise Error, "pass provider:, or a model: that names one" if model.nil?
+
+      resolved = Models.resolve(model)
+      if resolved.nil?
+        raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
+      end
+
+      provider = resolved.provider
+      model = resolved.id
+    end
+
     prov = provider(provider, **provider_options)
     Agent.new(
       provider: prov,
@@ -93,4 +111,8 @@ module Truffle
   def models = Models.all
 
   def model(id) = Models.find(id)
+
+  # Resolve a model reference (bare id or "provider/id", dated snapshots welcome)
+  # to its catalog Model, or nil when it does not resolve unambiguously.
+  def resolve_model(reference) = Models.resolve(reference)
 end

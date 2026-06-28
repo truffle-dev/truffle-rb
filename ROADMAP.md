@@ -69,9 +69,13 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
      per-token cost hash, mirroring pi's generated `*.models.ts` tables and kept
      current to each provider's published docs. `Pricing` reads its rates; a
      freshness test guards against the lineup going stale.
-   - [ ] **Provider resolution.** Resolve a bare `model:` string to the right
+   - [x] **Provider resolution.** Resolve a bare `model:` string to the right
      provider automatically the way pi's `ai` package does, so the caller need
-     not also name the provider.
+     not also name the provider. `Models.resolve` ports pi's
+     `findExactModelReferenceMatch` (bare id, canonical `provider/id`, dated
+     snapshots, case-insensitive, ambiguity rejected); `Truffle.agent` infers the
+     provider from `model:` and reduces a `provider/id` reference to the bare wire
+     id.
 9. **Structured tool results.** A tool may return a hash/array, serialized as
    JSON for the model; plain strings keep working.
 

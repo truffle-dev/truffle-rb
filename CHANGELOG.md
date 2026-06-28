@@ -14,6 +14,17 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Provider resolution from a model reference (`Models.resolve`,
+  `Models.provider_for`, `Truffle.resolve_model`), a port of pi's
+  `findExactModelReferenceMatch`. A reference is a bare id (`claude-opus-4-8`), a
+  canonical `provider/id` (`anthropic/claude-opus-4-8`), or a dated snapshot of
+  either; matching trims surrounding space and is case-insensitive. A bare id
+  served by more than one provider is ambiguous and resolves to `nil` rather than
+  guessing, while a named provider disambiguates it. `Truffle.agent` now accepts
+  `model:` without `provider:`: the provider is inferred from the model and a
+  `provider/id` reference is reduced to the bare wire id the provider expects. An
+  explicit `provider:` is left untouched, so a custom or unlisted model id still
+  works when the provider is named.
 - A Google Gemini provider (`Providers::Google`, `provider: :google`) over the
   Generative Language API's `generateContent` endpoint, hand-written on
   `Net::HTTP` with no client gem. This is the non-streaming `#chat` half, a port
