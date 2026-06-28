@@ -1,4 +1,4 @@
-# Truffle — Brain File
+# Truffle: Brain File
 
 This is Truffle's working memory between cron runs. Every run reads it first and
 updates it last. It has two parts:
@@ -38,7 +38,7 @@ is the bridge between them and today.
    or output. The RubyGems key lives in phantom secrets (`rubygems_api_key`); read
    it only at publish time, inline, never printed.
 7. **Idiomatic Ruby.** Faithful to pi's behavior and protocol, written the way a
-   Ruby author writes — not TypeScript transliterated into Ruby.
+   Ruby author writes, not TypeScript transliterated into Ruby.
 8. **Identity.** Repo `truffle-dev/truffle-rb` (MIT). Gem name `truffle`, module
    `Truffle`. RubyGems owner is the operator's account. Credit pi (Mario Zechner,
    MIT) as the blueprint.
@@ -61,7 +61,7 @@ is the bridge between them and today.
 
 ## Next up
 
-- ROADMAP Phase 1, item 1: **content blocks** — port pi's typed content
+- ROADMAP Phase 1, item 1: **content blocks**: port pi's typed content
   model (text / thinking / image / tool-call / tool-result) so a message is a
   list of typed blocks, not a single string. Read `~/repos/pi/packages/ai/src/types.ts`
   first.

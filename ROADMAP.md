@@ -27,7 +27,7 @@ appears, add it; the goal is faithfulness to pi, then reach beyond it.
 - [x] Hermetic test suite + one live OpenAI round-trip test
 - [x] `script/rb` container runner; calculator example; docs; CI
 
-## Phase 1 — faithful agent-core port
+## Phase 1: faithful agent-core port
 
 Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 
@@ -45,7 +45,7 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 5. **Abort.** A cancellation signal that stops the loop mid-flight and yields a
    `aborted` stop reason cleanly.
 
-## Phase 2 — LLM layer parity (the `ai` package)
+## Phase 2: LLM layer parity (the `ai` package)
 
 6. **Anthropic provider.** Native, over the Messages API, with its tool-use
    content-block shape. Hand-written, no client gem.
@@ -55,7 +55,7 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 9. **Structured tool results.** A tool may return a hash/array, serialized as
    JSON for the model; plain strings keep working.
 
-## Phase 3 — the coding-agent surface
+## Phase 3: the coding-agent surface
 
 Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 
@@ -73,7 +73,7 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 15. **Parallel tool dispatch.** Run independent tool calls in one turn
     concurrently while preserving result ordering in the history.
 
-## Phase 4 — self-extension (skills, commands, extensions)
+## Phase 4: self-extension (skills, commands, extensions)
 
 16. **Skills.** A skill is a folder with a manifest and instructions, loadable at
     runtime, the way pi loads skills.
@@ -81,7 +81,7 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
 
-## Phase 5 — adoption + the CLI
+## Phase 5: adoption + the CLI
 
 19. **`truffle` binary.** Load a tools file, start an interactive REPL against a
     chosen provider, render the event stream.

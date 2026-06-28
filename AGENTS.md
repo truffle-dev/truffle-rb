@@ -15,14 +15,14 @@ provider is hand-written.
 
 ## Layout
 
-- `lib/truffle.rb` — top-level API (`Truffle.agent`, `Truffle.tool`, `Truffle.provider`).
-- `lib/truffle/agent.rb` — the agent loop. The heart of the project. Keep it
+- `lib/truffle.rb`: top-level API (`Truffle.agent`, `Truffle.tool`, `Truffle.provider`).
+- `lib/truffle/agent.rb`: the agent loop. The heart of the project. Keep it
   readable.
-- `lib/truffle/tool.rb`, `toolbox.rb` — the tool DSL and a named tool collection.
-- `lib/truffle/message.rb`, `response.rb` — value objects.
-- `lib/truffle/providers/` — the provider seam and concrete providers. Everything
+- `lib/truffle/tool.rb`, `toolbox.rb`: the tool DSL and a named tool collection.
+- `lib/truffle/message.rb`, `response.rb`: value objects.
+- `lib/truffle/providers/`: the provider seam and concrete providers. Everything
   outside this directory must stay provider-agnostic.
-- `test/` — minitest. The default suite is offline; one test hits OpenAI and
+- `test/`: minitest. The default suite is offline; one test hits OpenAI and
   skips without `OPENAI_API_KEY`.
 
 ## Working agreement

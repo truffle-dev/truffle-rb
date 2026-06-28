@@ -1,9 +1,9 @@
-# Truffle build cron — prompt
+# Truffle build cron: prompt
 
-This is the exact prompt the `truffle-build-advance` scheduled job runs. It is
-kept in the repo so it can be reviewed and edited. After editing, re-create the
-schedule so the live job matches this file (the scheduler has no in-place update;
-delete and re-create).
+This is the exact prompt the `truffle-build-advance` scheduled job runs. The job
+fires every two hours. It is kept in the repo so it can be reviewed and edited.
+After editing, re-create the schedule so the live job matches this file (the
+scheduler has no in-place update; delete and re-create).
 
 The prompt is deliberately open-ended. It names the destination and the
 discipline, not the next step. The next step comes from the brain file and the
@@ -51,7 +51,7 @@ real, shipped increment rather than stopping early.
     "Unreleased," check off the `ROADMAP.md` item (or add the better one you
     found), and update `docs/BRAIN.md`.
 11. Updating the brain file means: never delete or weaken the LOCKED section;
-    rewrite the MUTABLE section so it is compact and current — fold in what you
+    rewrite the MUTABLE section so it is compact and current, fold in what you
     just shipped, set a precise "Next up," prune stale learnings, and keep it to
     about one screen. The brain file must not grow without bound.
 12. Commit with a clear imperative subject and a body that says what shipped, why
@@ -76,5 +76,10 @@ manufacture churn for a commit count.
 - From scratch, zero runtime deps. Idiomatic Ruby, not transliterated TypeScript.
 - One tested slice, green, with changelog + roadmap + brain updated together.
 - Secrets never appear in files, commits, logs, or output.
+- Voice: write like an engineer, not a brochure. No AI jargon (no "seamless",
+  "robust", "powerful", "unlock", "leverage", "comprehensive"). No em-dashes;
+  use a comma, a colon, or two sentences. Comments are concise and explain why,
+  not what; do not narrate the obvious. Same bar for the changelog, the brain
+  file, and any prose you touch.
 - Report at the end: the slice shipped, the commit SHA, CI status, and the next
   slice you set in the brain file. Keep the report tight.

@@ -32,10 +32,12 @@ The model decided to call `get_weather(city: "Lisbon")`, Truffle ran your Ruby
 block, handed the result back, and the model wrote the final answer. That whole
 round trip is the agent loop, and it is the thing Truffle exists to give you.
 
-![Truffle test suite and a live three-tool agent run](docs/screenshot-tests.png)
+![The calculator example running: the model calls add, then multiply, and Truffle returns 140](docs/calculator-demo.png)
 
-*The full suite (unit tests plus one live OpenAI round-trip) passing, and the
-calculator example chaining three real tool calls to reach 240.*
+*The bundled calculator example. The model called `add(12, 8)`, Truffle ran the
+Ruby block and fed back `20`, the model called `multiply(20, 7)`, and the loop
+returned the final answer. Every arrow is a real tool call printed through the
+event API.*
 
 ## Why Truffle
 
@@ -177,6 +179,8 @@ each hand-written against the seam.
 ```sh
 rake test
 ```
+
+![The test suite passing: 14 runs, 46 assertions, 0 failures](docs/test-suite.png)
 
 The default suite is hermetic and offline: it drives the agent loop with a stub
 provider, so you can run it anywhere without a key. One additional test
