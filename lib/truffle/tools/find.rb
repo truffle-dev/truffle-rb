@@ -2,6 +2,7 @@
 
 require_relative "path"
 require_relative "truncate"
+require_relative "gitignore"
 
 module Truffle
   module Tools
@@ -32,12 +33,19 @@ module Truffle
       end
 
       # Match the pattern against the tree under root and return posix-relative
-      # paths with .git and node_modules pruned. Dir.glob already yields paths
-      # relative to base and sorted, so the output is stable across runs.
+      # paths with .git and node_modules pruned and .gitignore'd paths removed.
+      # Dir.glob already yields paths relative to base and sorted, so the output
+      # is stable across runs. The exclusion is a superset: a result is dropped
+      # when it is a hardcoded-excluded dir (the floor pi's glob branch always
+      # prunes) OR matched by the per-directory .gitignore stack (what pi gets
+      # from fd's ignore crate). Both are honored, mirroring fd's actual output.
       def search(pattern, root)
         effective = normalize_pattern(pattern)
         flags = File::FNM_EXTGLOB | File::FNM_DOTMATCH
-        Dir.glob(effective, base: root, flags: flags).reject { |rel| excluded?(rel) }
+        matcher = Gitignore.matcher(root)
+        Dir.glob(effective, base: root, flags: flags).reject do |rel|
+          excluded?(rel) || matcher.ignored?(rel, File.directory?(File.join(root, rel)))
+        end
       end
 
       # pi prepends "**/" to a bare pattern so a basename like "*.ts" matches at
@@ -79,8 +87,8 @@ module Truffle
 
     FIND_DESCRIPTION =
       "Search for files by glob pattern. Returns matching file paths relative " \
-      "to the search directory. Excludes .git and node_modules. Output is " \
-      "truncated to #{Find::DEFAULT_LIMIT} results or " \
+      "to the search directory. Excludes .git, node_modules, and paths matched " \
+      "by .gitignore. Output is truncated to #{Find::DEFAULT_LIMIT} results or " \
       "#{Truncate::DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first).".freeze
 
     # Build pi's `find` tool, bound to a working directory. The model passes a
@@ -89,10 +97,10 @@ module Truffle
     # line, posix-separated. pi's default implementation shells out to the `fd`
     # binary (auto-downloaded) so it can honor .gitignore; that pulls an external
     # Rust tool, which breaks the zero-dependency and offline constraints, so this
-    # port matches against the filesystem natively with Dir.glob. The native path
-    # mirrors pi's pluggable FindOperations.glob branch: .git and node_modules are
-    # always excluded and hidden files are included. Full .gitignore respect is a
-    # planned follow-up slice. pi's TUI call and result rendering is out of scope.
+    # port matches against the filesystem natively with Dir.glob and evaluates
+    # the .gitignore stack itself (see Gitignore). .git and node_modules are
+    # always excluded, hidden files are included, and per-directory .gitignore
+    # rules are honored. pi's TUI call and result rendering is out of scope.
     def self.find(cwd: Dir.pwd)
       Tool.define("find", FIND_DESCRIPTION) do
         param :pattern, :string,

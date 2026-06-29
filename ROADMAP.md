@@ -125,8 +125,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       hidden files are included. A bare pattern is prepended with `**/` so it
       recurses; paths are returned relative to the search root, posix-separated.
       The result limit and the 50KB byte ceiling produce pi's bracketed
-      notices. Full `.gitignore` respect is the next slice.
-    - [ ] gitignore respect for find, grep.
+      notices.
+    - [x] **gitignore respect for find.** `Truffle::Tools::Gitignore` evaluates
+      the per-directory `.gitignore` stack natively (what pi gets from fd's
+      `ignore` crate): last-match-wins negation, anchored versus floating
+      patterns, directory-only trailing `/`, the `**` forms, and the prune rule
+      (an excluded directory can't have a child re-included). Applied alongside
+      the hardcoded `.git`/`node_modules` floor.
+    - [ ] gitignore respect for grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a

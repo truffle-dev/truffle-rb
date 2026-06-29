@@ -26,7 +26,18 @@ All notable changes to Truffle are documented here. The format follows
   A bare pattern is prepended with `**/` so a basename like `*.rb` recurses, as
   fd's basename matching does. The result limit and the shared 50KB byte ceiling
   produce pi's bracketed notices, and an empty result returns "No files found
-  matching pattern". Full `.gitignore` respect is a planned follow-up slice.
+  matching pattern".
+- `.gitignore` respect for `find` (`Truffle::Tools::Gitignore`). pi inherits this
+  from fd's Rust `ignore` crate; since this port matches the tree itself, the
+  rules are evaluated natively per gitignore(5): per-directory `.gitignore`
+  files, last-match-wins with `!` negation, anchored (a slash in the pattern)
+  versus floating patterns, directory-only trailing `/`, and the leading,
+  trailing, and middle `**` forms. A directory excluded by a rule prunes
+  everything beneath it, so a file cannot be re-included while its parent stays
+  excluded. The hardcoded `.git`/`node_modules` floor and the `.gitignore` stack
+  are both applied, mirroring fd's actual output. Not yet covered (faithful
+  follow-ups): the global excludesfile, `.git/info/exclude`, `.ignore`/`.fdignore`
+  files, and nested-repo boundaries.
 - The `edit` built-in tool (`Truffle::Tools.edit`), ported from pi's `edit.ts`
   and the matching core in `edit-diff.ts`. It takes a `path` and an `edits`
   array of `{oldText, newText}` replacements. Each `oldText` is matched against
