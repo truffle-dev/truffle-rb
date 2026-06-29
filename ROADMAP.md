@@ -87,6 +87,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 
 10. **Built-in tools.** bash, read, write, edit, glob, grep, written from
     scratch, matching pi's tool contracts and safety behavior.
+    - [x] **read.** `Truffle::Tools.read` ports pi's `read.ts` text path: a
+      `path` resolved against a bound cwd (or absolute), a 1-indexed `offset`, an
+      optional line `limit`, head truncation at 2000 lines / 50KB via the shared
+      `Truffle::Tools::Truncate` (a port of `truncate.ts`), and pi's continuation
+      notices. Text-first: images and macOS path variants are out of scope.
+    - [ ] bash, write, edit, glob, grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a

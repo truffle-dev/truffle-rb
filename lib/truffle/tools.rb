@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+
+# Built-in tools: the concrete tools that make Truffle an agent that can act on a
+# project, ported from pi's coding-agent. Each lives in its own file under
+# tools/ and is built by a factory bound to a working directory. `read` is the
+# first; bash, write, edit, glob, and grep follow.
+require_relative "tools/truncate"
+require_relative "tools/read"

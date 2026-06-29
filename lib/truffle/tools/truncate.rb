@@ -1,0 +1,106 @@
+# frozen_string_literal: true
+
+module Truffle
+  module Tools
+    # Shared truncation utilities for tool output.
+    #
+    # A port of pi's coding-agent `truncate.ts`. Truncation is governed by two
+    # independent limits, and whichever is hit first wins: a line limit (default
+    # 2000) and a byte limit (default 50KB). Output never ends on a partial line
+    # for head truncation; if the very first line already exceeds the byte limit
+    # the result is empty and `first_line_exceeds_limit` is set so the caller can
+    # point the model at a byte-bounded fallback.
+    #
+    # `read` is the first consumer; `bash` (tail) and `grep` (per-line) will share
+    # this module as they land, which is why the full result shape is ported now.
+    module Truncate
+      DEFAULT_MAX_LINES = 2000
+      DEFAULT_MAX_BYTES = 50 * 1024 # 50KB
+
+      # The outcome of a truncation pass. Mirrors pi's TruncationResult so later
+      # tools (bash, grep) can read the same fields without reshaping.
+      Result = Struct.new(
+        :content, :truncated, :truncated_by, :total_lines, :total_bytes,
+        :output_lines, :output_bytes, :last_line_partial, :first_line_exceeds_limit,
+        :max_lines, :max_bytes, keyword_init: true
+      )
+
+      module_function
+
+      # Truncate from the head: keep the first lines/bytes that fit. Suitable for
+      # file reads where the beginning is what matters.
+      def head(content, max_lines: DEFAULT_MAX_LINES, max_bytes: DEFAULT_MAX_BYTES)
+        total_bytes = content.bytesize
+        lines = split_for_counting(content)
+        total_lines = lines.length
+        totals = { total_lines: total_lines, total_bytes: total_bytes,
+                   max_lines: max_lines, max_bytes: max_bytes }
+
+        if total_lines <= max_lines && total_bytes <= max_bytes
+          return Result.new(content: content, truncated: false, truncated_by: nil,
+                            output_lines: total_lines, output_bytes: total_bytes,
+                            last_line_partial: false, first_line_exceeds_limit: false, **totals)
+        end
+
+        if lines[0].bytesize > max_bytes
+          return Result.new(content: "", truncated: true, truncated_by: "bytes",
+                            output_lines: 0, output_bytes: 0, last_line_partial: false,
+                            first_line_exceeds_limit: true, **totals)
+        end
+
+        kept, _used, truncated_by = collect_head(lines, max_lines, max_bytes)
+        output = kept.join("\n")
+        Result.new(content: output, truncated: true, truncated_by: truncated_by,
+                   output_lines: kept.length, output_bytes: output.bytesize,
+                   last_line_partial: false, first_line_exceeds_limit: false, **totals)
+      end
+
+      # Format a byte count the way pi's formatSize does: "512B", "1.5KB", "2.0MB".
+      def format_size(bytes)
+        if bytes < 1024
+          "#{bytes}B"
+        elsif bytes < 1024 * 1024
+          "#{format("%.1f", bytes / 1024.0)}KB"
+        else
+          "#{format("%.1f", bytes / (1024.0 * 1024))}MB"
+        end
+      end
+
+      # Count lines the way pi does: split keeping trailing empties, then drop the
+      # single empty produced by a trailing newline so "a\nb\n" counts as two
+      # lines, not three. Empty content counts as zero lines.
+      def split_for_counting(content)
+        return [] if content.empty?
+
+        lines = content.split("\n", -1)
+        lines.pop if content.end_with?("\n")
+        lines
+      end
+
+      # Walk the lines, keeping complete ones until either limit is hit. A line
+      # after the first costs one extra byte for the joining newline, matching how
+      # the kept lines are later rejoined with "\n".
+      def collect_head(lines, max_lines, max_bytes)
+        kept = []
+        used = 0
+        truncated_by = "lines"
+
+        lines.each_with_index do |line, i|
+          break if i >= max_lines
+
+          line_bytes = line.bytesize + (i.positive? ? 1 : 0)
+          if used + line_bytes > max_bytes
+            truncated_by = "bytes"
+            break
+          end
+
+          kept << line
+          used += line_bytes
+        end
+
+        truncated_by = "lines" if kept.length >= max_lines && used <= max_bytes
+        [kept, used, truncated_by]
+      end
+    end
+  end
+end

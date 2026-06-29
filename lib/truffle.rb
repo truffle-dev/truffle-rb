@@ -22,6 +22,7 @@ require_relative "truffle/providers/anthropic_stream"
 require_relative "truffle/providers/google"
 require_relative "truffle/providers/google_stream"
 require_relative "truffle/agent"
+require_relative "truffle/tools"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.
 #

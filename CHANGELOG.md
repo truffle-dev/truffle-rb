@@ -14,6 +14,17 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `read` built-in tool (`Truffle::Tools.read`), the first concrete
+  coding-agent tool, ported from pi's `read.ts`. It reads a UTF-8 text file
+  relative to a bound working directory (or by absolute path), with a 1-indexed
+  `offset` start line and an optional `limit` on lines returned. Output passes
+  through head truncation at 2000 lines or 50KB (whichever is hit first), and a
+  large or windowed read appends a continuation notice telling the model the next
+  `offset` to use. A single line over the byte limit returns a byte-bounded bash
+  fallback instead of flooding the context. The shared truncation utility it
+  depends on (`Truffle::Tools::Truncate`, a port of pi's `truncate.ts`) lands
+  alongside it for the bash and grep tools to come. Images and macOS path
+  variants are out of scope for this text-first port.
 - Structured tool results: a tool whose handler returns a Hash or Array (or any
   non-String value) now serializes that return as JSON for the model, the way pi
   stringifies a structured tool result. A String return still passes through
