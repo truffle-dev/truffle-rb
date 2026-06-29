@@ -105,7 +105,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `Truncate.tail` (port of `truncateTail`), full output to a temp file when
       truncated. The streaming `OutputAccumulator` is deferred; buffering the
       full output keeps the observable contract identical.
-    - [ ] edit, glob, grep.
+    - [x] **edit.** `Truffle::Tools.edit` ports pi's `edit.ts` plus the matching
+      core in `edit-diff.ts`: a `path` and an `edits` array of `{oldText,
+      newText}`. Each `oldText` is matched against the original (exact first,
+      then a fuzzy fold of NFKC, per-line trailing-whitespace strip, smart
+      quotes, unicode dashes, and special spaces), must be unique and
+      non-overlapping, and at least one byte must change. Line endings and a
+      leading BOM are preserved; the fuzzy path rewrites only touched lines and
+      copies the rest back byte for byte. `prepareArguments` (JSON-string
+      `edits`, legacy top-level `oldText`/`newText`) is ported. The diff and
+      unified-patch rendering feeds only pi's TUI and pulls in the `diff`
+      package, so it is out of scope.
+    - [ ] glob, grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a

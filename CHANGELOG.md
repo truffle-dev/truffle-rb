@@ -14,6 +14,24 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `edit` built-in tool (`Truffle::Tools.edit`), ported from pi's `edit.ts`
+  and the matching core in `edit-diff.ts`. It takes a `path` and an `edits`
+  array of `{oldText, newText}` replacements. Each `oldText` is matched against
+  the original file (exact match first, then a fuzzy fold that applies NFKC
+  normalization, strips per-line trailing whitespace, and folds smart quotes,
+  unicode dashes, and special spaces to ASCII), must be unique, and must not
+  overlap another edit's match; at least one byte must change. The file's line
+  endings (LF or CRLF) and a leading BOM are preserved, and the fuzzy path
+  rewrites only the lines a replacement touches, copying every other line back
+  byte for byte so unchanged blocks keep their exact content. pi's
+  `prepareArguments` is ported too: an `edits` value sent as a JSON string is
+  parsed, and a legacy top-level `oldText`/`newText` pair is folded onto the
+  list. The error messages match pi verbatim (not found, non-unique, empty
+  `oldText`, overlap, no change), so the agent loop reports the same guidance.
+  pi's diff and unified-patch rendering feeds only the TUI and pulls in the
+  `diff` package, so it is out of scope. Occurrence counting uses an escaped
+  regexp split so a single-space `oldText` keeps literal semantics rather than
+  Ruby's `split(" ")` whitespace-run behavior.
 - The `bash` built-in tool (`Truffle::Tools.bash`), ported from pi's `bash.ts`.
   It runs a command under bash in a bound working directory with stdout and
   stderr combined in command order, and returns the raw output. An optional
