@@ -206,4 +206,96 @@ class TestCompaction < Minitest::Test
 
     assert_equal(-1, Compaction.find_turn_start_index(entries, 1, 0))
   end
+
+  def test_serialize_conversation_labels_a_user_turn
+    messages = [Truffle::Message.user("how do I sort a list")]
+
+    assert_equal "[User]: how do I sort a list", Compaction.serialize_conversation(messages)
+  end
+
+  def test_serialize_conversation_skips_the_system_prompt_and_empty_turns
+    messages = [
+      Truffle::Message.system("be helpful"),
+      Truffle::Message.user(""),
+      Truffle::Message.user("real question")
+    ]
+
+    assert_equal "[User]: real question", Compaction.serialize_conversation(messages)
+  end
+
+  def test_serialize_conversation_orders_assistant_parts_thinking_text_then_calls
+    # Blocks are out of order on the message; serialization fixes the order to
+    # thinking, then text, then tool calls.
+    blocks = [
+      Truffle::ToolCall.new(id: "1", name: "read", arguments: { "path" => "a.rb" }),
+      Truffle::Content::Text.new(text: "let me look"),
+      Truffle::Content::Thinking.new(thinking: "need the file")
+    ]
+    messages = [Truffle::Message.assistant(content: blocks)]
+
+    expected = "[Assistant thinking]: need the file\n\n" \
+               "[Assistant]: let me look\n\n" \
+               '[Assistant tool calls]: read(path="a.rb")'
+
+    assert_equal expected, Compaction.serialize_conversation(messages)
+  end
+
+  def test_serialize_conversation_joins_messages_with_a_blank_line
+    messages = [
+      Truffle::Message.user("hi"),
+      Truffle::Message.tool(content: "ok", tool_call_id: "1")
+    ]
+
+    assert_equal "[User]: hi\n\n[Tool result]: ok", Compaction.serialize_conversation(messages)
+  end
+
+  def test_serialize_conversation_keeps_a_tool_result_at_the_budget_whole
+    text = "x" * 2000
+    messages = [Truffle::Message.tool(content: text, tool_call_id: "1")]
+
+    assert_equal "[Tool result]: #{text}", Compaction.serialize_conversation(messages)
+  end
+
+  def test_serialize_conversation_truncates_a_tool_result_over_the_budget
+    text = "x" * 2001
+    messages = [Truffle::Message.tool(content: text, tool_call_id: "1")]
+
+    expected = "[Tool result]: #{"x" * 2000}\n\n[... 1 more characters truncated]"
+
+    assert_equal expected, Compaction.serialize_conversation(messages)
+  end
+
+  def test_summarization_prompt_uses_the_fresh_checkpoint_base_without_a_prior
+    prompt = Compaction.summarization_prompt([Truffle::Message.user("hi")])
+
+    assert_includes prompt, "<conversation>\n[User]: hi\n</conversation>"
+    assert_includes prompt, "Create a structured context checkpoint summary"
+    refute_includes prompt, "<previous-summary>"
+  end
+
+  def test_summarization_prompt_uses_the_update_base_and_embeds_the_prior_summary
+    prompt = Compaction.summarization_prompt(
+      [Truffle::Message.user("more")],
+      previous_summary: "## Goal\nship it"
+    )
+
+    assert_includes prompt, "<previous-summary>\n## Goal\nship it\n</previous-summary>"
+    assert_includes prompt, "incorporate into the existing summary"
+  end
+
+  def test_summarization_prompt_appends_a_custom_focus
+    prompt = Compaction.summarization_prompt(
+      [Truffle::Message.user("hi")],
+      custom_instructions: "track the migration"
+    )
+
+    assert_includes prompt, "Additional focus: track the migration"
+  end
+
+  def test_turn_prefix_prompt_wraps_the_conversation_and_appends_the_prefix_instruction
+    prompt = Compaction.turn_prefix_prompt([Truffle::Message.user("hi")])
+
+    assert_includes prompt, "<conversation>\n[User]: hi\n</conversation>"
+    assert_includes prompt, "This is the PREFIX of a turn that was too large to keep"
+  end
 end

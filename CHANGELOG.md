@@ -14,6 +14,15 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Compaction.serialize_conversation`, which renders the messages a cut keeps into
+  the labeled plain-text body the summarizing model reads: a user turn is its text,
+  an assistant turn is up to three parts (thinking, then text, then tool calls) in
+  that fixed order, and a tool result is its text clipped to `TOOL_RESULT_MAX_CHARS`.
+  `summarization_prompt` and `turn_prefix_prompt` wrap that body in `<conversation>`
+  tags, fold in a prior summary, and append the matching instruction (fresh
+  checkpoint, update, or turn-prefix). Ports pi's `serializeConversation` and the
+  prompt assembly of `generateSummary` / `generateTurnPrefixSummary`; the model call
+  itself stays a later slice.
 - `Compaction.find_cut_point`, which chooses where to compact a session: it walks
   the conversation path backward summing the per-message estimate until the recent
   budget is met, then snaps the cut to a user or assistant boundary, never inside a

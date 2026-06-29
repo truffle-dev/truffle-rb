@@ -182,8 +182,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       budget is met, snap to a user or assistant boundary (never mid tool-result),
       pull back over settings entries, and record the split-turn case
       (`turn_start_index`, `split_turn`).
-    - [ ] The summarizer that calls the model, writes a `compaction` entry, and is
-      driven from the agent loop.
+    - [x] **Prompt building.** `Compaction.serialize_conversation` renders the kept
+      messages into the labeled plain-text body the summarizer reads (user text,
+      ordered assistant thinking/text/tool-calls, tool results clipped to
+      `TOOL_RESULT_MAX_CHARS`), and `summarization_prompt` / `turn_prefix_prompt`
+      wrap it with the prior summary and the four verbatim pi prompt strings. Pure
+      and offline; ports pi's `serializeConversation` and `generateSummary` /
+      `generateTurnPrefixSummary` prompt assembly.
+    - [ ] The summarizer that calls the model with these prompts, writes a
+      `compaction` entry, and is driven from the agent loop.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,

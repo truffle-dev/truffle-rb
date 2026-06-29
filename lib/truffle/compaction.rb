@@ -8,11 +8,13 @@ module Truffle
   # conversation is using, and whether that has crossed the threshold where old
   # turns must be summarized to stay under the model's window.
   #
-  # A faithful port of the trigger half of pi's compaction
-  # (packages/agent/src/harness/compaction/compaction.ts): calculateContextTokens,
-  # estimateTokens, estimateContextTokens, shouldCompact, and the settings. The
-  # retention cut-point selection and the summarizer that calls the model are
-  # separate slices; this one is pure and offline, so it can be checked exactly.
+  # A faithful port of pi's compaction
+  # (packages/agent/src/harness/compaction/{compaction,utils}.ts): the trigger half
+  # (calculateContextTokens, estimateTokens, estimateContextTokens, shouldCompact),
+  # the retention cut-point selection (findCutPoint and friends), and the prompt
+  # building the summarizer feeds the model (serializeConversation and the prompt
+  # text). Everything here is pure and offline, so it can be checked exactly. The
+  # model call that turns these prompts into a summary is a separate slice.
   module Compaction
     # Compaction thresholds and retention budget. reserve_tokens is held back for
     # the summary prompt and its output; keep_recent_tokens is the approximate
@@ -38,6 +40,118 @@ module Truffle
     # split_turn is true, so the summarizer can fold the cut-off prefix of the
     # turn into the summary. Mirrors pi's CutPointResult.
     CutPoint = Struct.new(:first_kept_index, :turn_start_index, :split_turn, keyword_init: true)
+
+    # A tool result is clipped before it goes into a summary prompt, so one noisy
+    # command output cannot crowd out the conversation. pi's TOOL_RESULT_MAX_CHARS.
+    TOOL_RESULT_MAX_CHARS = 2000
+
+    # The system prompt for the summarizing model: read the conversation, emit only
+    # the structured summary, do not continue the conversation. Verbatim from pi.
+    SUMMARIZATION_SYSTEM_PROMPT =
+      "You are a context summarization assistant. Your task is to read a " \
+      "conversation between a user and an AI assistant, then produce a structured " \
+      "summary following the exact format specified.\n\nDo NOT continue the " \
+      "conversation. Do NOT respond to any questions in the conversation. ONLY " \
+      "output the structured summary."
+
+    # The instruction appended after the conversation when there is no prior
+    # summary: produce a fresh structured checkpoint in pi's exact section format.
+    SUMMARIZATION_PROMPT = <<~PROMPT.chomp
+      The messages above are a conversation to summarize. Create a structured context checkpoint summary that another LLM will use to continue the work.
+
+      Use this EXACT format:
+
+      ## Goal
+      [What is the user trying to accomplish? Can be multiple items if the session covers different tasks.]
+
+      ## Constraints & Preferences
+      - [Any constraints, preferences, or requirements mentioned by user]
+      - [Or "(none)" if none were mentioned]
+
+      ## Progress
+      ### Done
+      - [x] [Completed tasks/changes]
+
+      ### In Progress
+      - [ ] [Current work]
+
+      ### Blocked
+      - [Issues preventing progress, if any]
+
+      ## Key Decisions
+      - **[Decision]**: [Brief rationale]
+
+      ## Next Steps
+      1. [Ordered list of what should happen next]
+
+      ## Critical Context
+      - [Any data, examples, or references needed to continue]
+      - [Or "(none)" if not applicable]
+
+      Keep each section concise. Preserve exact file paths, function names, and error messages.
+    PROMPT
+
+    # The instruction used when a prior summary exists: fold the new messages into
+    # it, preserving what was there. Verbatim from pi.
+    UPDATE_SUMMARIZATION_PROMPT = <<~PROMPT.chomp
+      The messages above are NEW conversation messages to incorporate into the existing summary provided in <previous-summary> tags.
+
+      Update the existing structured summary with new information. RULES:
+      - PRESERVE all existing information from the previous summary
+      - ADD new progress, decisions, and context from the new messages
+      - UPDATE the Progress section: move items from "In Progress" to "Done" when completed
+      - UPDATE "Next Steps" based on what was accomplished
+      - PRESERVE exact file paths, function names, and error messages
+      - If something is no longer relevant, you may remove it
+
+      Use this EXACT format:
+
+      ## Goal
+      [Preserve existing goals, add new ones if the task expanded]
+
+      ## Constraints & Preferences
+      - [Preserve existing, add new ones discovered]
+
+      ## Progress
+      ### Done
+      - [x] [Include previously done items AND newly completed items]
+
+      ### In Progress
+      - [ ] [Current work - update based on progress]
+
+      ### Blocked
+      - [Current blockers - remove if resolved]
+
+      ## Key Decisions
+      - **[Decision]**: [Brief rationale] (preserve all previous, add new)
+
+      ## Next Steps
+      1. [Update based on current state]
+
+      ## Critical Context
+      - [Preserve important context, add new if needed]
+
+      Keep each section concise. Preserve exact file paths, function names, and error messages.
+    PROMPT
+
+    # The instruction used to summarize the cut-off prefix of a split turn, so the
+    # retained suffix still has its setup. Verbatim from pi.
+    TURN_PREFIX_SUMMARIZATION_PROMPT = <<~PROMPT.chomp
+      This is the PREFIX of a turn that was too large to keep. The SUFFIX (recent work) is retained.
+
+      Summarize the prefix to provide context for the retained suffix:
+
+      ## Original Request
+      [What did the user ask for in this turn?]
+
+      ## Early Progress
+      - [Key decisions and work done in the prefix]
+
+      ## Context for Suffix
+      - [Information needed to understand the retained recent work]
+
+      Be concise. Focus on what's needed to understand the kept suffix.
+    PROMPT
 
     module_function
 
@@ -87,6 +201,39 @@ module Truffle
       return false unless settings.enabled
 
       context_tokens > context_window - settings.reserve_tokens
+    end
+
+    # Render the messages a cut keeps into the plain-text conversation body the
+    # summarizing model reads. Each message becomes one or more labeled parts
+    # joined by a blank line: a user turn is its text, an assistant turn is up to
+    # three parts (thinking, then text, then tool calls) in that fixed order, and a
+    # tool result is its text clipped to TOOL_RESULT_MAX_CHARS. Empty turns and the
+    # system prompt contribute nothing. Port of pi's serializeConversation.
+    def serialize_conversation(messages)
+      parts = []
+      messages.each { |message| append_serialized(parts, message) }
+      parts.join("\n\n")
+    end
+
+    # Build the full prompt text the summarizer reads: the conversation wrapped in
+    # <conversation> tags, the prior summary in <previous-summary> tags when one
+    # exists, then the base instruction (the update variant when continuing a
+    # summary, otherwise the fresh-checkpoint variant). A custom focus is appended
+    # to the base instruction. Port of pi's generateSummary prompt assembly, minus
+    # the provider call and token budgeting.
+    def summarization_prompt(messages, previous_summary: nil, custom_instructions: nil)
+      base = previous_summary ? UPDATE_SUMMARIZATION_PROMPT : SUMMARIZATION_PROMPT
+      base = "#{base}\n\nAdditional focus: #{custom_instructions}" if custom_instructions
+      text = "<conversation>\n#{serialize_conversation(messages)}\n</conversation>\n\n"
+      text += "<previous-summary>\n#{previous_summary}\n</previous-summary>\n\n" if previous_summary
+      text + base
+    end
+
+    # Build the prompt that summarizes the cut-off prefix of a split turn. Port of
+    # pi's generateTurnPrefixSummary prompt assembly, minus the provider call.
+    def turn_prefix_prompt(messages)
+      "<conversation>\n#{serialize_conversation(messages)}\n</conversation>\n\n" \
+        "#{TURN_PREFIX_SUMMARIZATION_PROMPT}"
     end
 
     # Choose where to cut the session for a compaction: keep roughly the most
@@ -194,6 +341,67 @@ module Truffle
       role&.to_sym
     end
     private_class_method :message_role
+
+    # Append the labeled parts for one message to the running parts list. The
+    # system prompt and empty turns add nothing, matching pi's role switch.
+    def append_serialized(parts, message)
+      case message.role
+      when :user then append_text_part(parts, "[User]", message)
+      when :assistant then append_assistant(parts, message)
+      when :tool then append_tool_result(parts, message)
+      end
+    end
+    private_class_method :append_serialized
+
+    # A single labeled part from a message's joined text, skipped when empty. Used
+    # for the user turn; the tool result clips first and so has its own helper.
+    def append_text_part(parts, label, message)
+      text = message.text
+      parts << "#{label}: #{text}" if text && !text.empty?
+    end
+    private_class_method :append_text_part
+
+    # The assistant turn's parts: thinking, then text, then tool calls, each
+    # emitted only when present and always in that order regardless of block order.
+    def append_assistant(parts, message)
+      thinking = message.content.grep(Content::Thinking).map(&:thinking)
+      text = message.content.grep(Content::Text).map(&:text)
+      tool_calls = message.content.grep(ToolCall).map { |call| serialize_tool_call(call) }
+
+      parts << "[Assistant thinking]: #{thinking.join("\n")}" unless thinking.empty?
+      parts << "[Assistant]: #{text.join("\n")}" unless text.empty?
+      parts << "[Assistant tool calls]: #{tool_calls.join("; ")}" unless tool_calls.empty?
+    end
+    private_class_method :append_assistant
+
+    # One tool call rendered as name(k=json(v), ...), the arguments in insertion
+    # order. Mirrors pi's Object.entries(args) walk.
+    def serialize_tool_call(call)
+      args = call.arguments.map { |key, value| "#{key}=#{safe_json(value)}" }.join(", ")
+      "#{call.name}(#{args})"
+    end
+    private_class_method :serialize_tool_call
+
+    # The tool result part, its text clipped to the per-result budget and skipped
+    # when empty.
+    def append_tool_result(parts, message)
+      text = message.text
+      return if text.nil? || text.empty?
+
+      parts << "[Tool result]: #{truncate_for_summary(text, TOOL_RESULT_MAX_CHARS)}"
+    end
+    private_class_method :append_tool_result
+
+    # Clip text to max_chars, appending a note of how many characters were dropped.
+    # A text at or under the budget is returned unchanged. Port of pi's
+    # truncateForSummary.
+    def truncate_for_summary(text, max_chars)
+      return text if text.length <= max_chars
+
+      dropped = text.length - max_chars
+      "#{text[0, max_chars]}\n\n[... #{dropped} more characters truncated]"
+    end
+    private_class_method :truncate_for_summary
 
     # Characters one content block contributes to the token estimate. A tool call
     # is its name plus the JSON of its arguments, matching pi's
