@@ -52,6 +52,18 @@ module Truffle
       new(role: :tool, content: content, tool_call_id: tool_call_id, name: name)
     end
 
+    # Rebuild a Message from the Hash that #to_h produced, the inverse used when a
+    # session is read back from disk. Keys may be symbols (a direct #to_h) or
+    # strings (after a JSON round-trip). The content list is rebuilt block by
+    # block, tool calls included, so a turn restores to the same shape it had in
+    # memory. Tool-call blocks pass straight through normalize_content (they
+    # already answer #type), so they land back in the content list in order.
+    def self.from_h(hash)
+      h = hash.transform_keys(&:to_s)
+      blocks = Array(h["content"]).map { |block| Content.from_h(block) }
+      new(role: h["role"], content: blocks, tool_call_id: h["tool_call_id"], name: h["name"])
+    end
+
     # The tool calls the model requested this turn, lifted out of the content
     # blocks so the agent loop can dispatch them.
     def tool_calls

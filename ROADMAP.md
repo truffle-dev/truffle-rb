@@ -146,6 +146,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       floor apply.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
+    - [x] **Session store.** `Truffle::Session`: an append-only JSONL file (header
+      line + message entries chained through `parent_id`) that round-trips a
+      message history via `create` / `append_message` / `load` / `messages`,
+      built on a new `Truffle::UUID` (uuidv7 session ids, 8-hex entry ids) and
+      `Message.from_h` / `Content.from_h` deserialization. Faithful to pi's
+      session-manager structure; the leaf-to-root walk is the conversation.
+    - [ ] Branching (a second child off a node), settings entries (model and
+      thinking-level changes), compaction and branch-summary entries, labels,
+      the deferred-first-flush optimization, and v1/v2 file migration.
+    - [ ] `Agent#dump` / `Agent.load` wired onto the session store, persisting
+      tool definitions by name so a resumed agent rebinds its toolbox.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
     locked, non-removable head (system prompt, pinned facts), mirroring how pi
     compacts.

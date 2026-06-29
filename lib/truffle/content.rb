@@ -9,6 +9,30 @@ module Truffle
   # Each block answers #type with a symbol and #to_h with a plain Hash, so a
   # history round-trips through JSON without the agent loop knowing block shapes.
   module Content
+    module_function
+
+    # Rebuild a typed block from the Hash that #to_h produced, the inverse used
+    # when a session is read back from disk. Keys may be symbols (a direct #to_h)
+    # or strings (after a JSON round-trip), so they are folded to strings first.
+    # A "tool_call" block rebuilds a Truffle::ToolCall, which lives in the same
+    # list as the content blocks (see message.rb).
+    def from_h(hash)
+      h = hash.transform_keys(&:to_s)
+      case h["type"].to_s
+      when "text"
+        Text.new(text: h["text"], signature: h["signature"])
+      when "thinking"
+        Thinking.new(thinking: h["thinking"], signature: h["signature"],
+                     redacted: h.fetch("redacted", false))
+      when "image"
+        Image.new(data: h["data"], mime_type: h["mime_type"])
+      when "tool_call"
+        ToolCall.new(id: h["id"], name: h["name"], arguments: h["arguments"])
+      else
+        raise ArgumentError, "unknown content block type #{h["type"].inspect}"
+      end
+    end
+
     # A run of assistant or user text. `signature` carries opaque provider
     # metadata (for example an OpenAI responses message id) when one is present.
     class Text

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
+require "json"
 
 # Covers the typed content blocks and the way Message normalizes a turn's
 # content into a list of them.
@@ -112,5 +113,51 @@ class TestContent < Minitest::Test
       [{ type: :text, text: "hi" }, { type: :tool_call, id: "c", name: "t", arguments: {} }],
       h[:content]
     )
+  end
+
+  def test_content_from_h_round_trips_each_block_type
+    [
+      Truffle::Content::Text.new(text: "hi", signature: "msg_1"),
+      Truffle::Content::Thinking.new(thinking: "reasoning", signature: "sig"),
+      Truffle::Content::Thinking.new(thinking: "", signature: "sig", redacted: true),
+      Truffle::Content::Image.new(data: "abc", mime_type: "image/png"),
+      Truffle::ToolCall.new(id: "c1", name: "add", arguments: { "a" => 1 })
+    ].each do |block|
+      assert_equal block, Truffle::Content.from_h(block.to_h)
+    end
+  end
+
+  def test_content_from_h_tolerates_string_keys_after_a_json_round_trip
+    original = Truffle::Content::Text.new(text: "hi")
+    string_keyed = JSON.parse(JSON.generate(original.to_h))
+
+    assert_equal original, Truffle::Content.from_h(string_keyed)
+  end
+
+  def test_content_from_h_rejects_an_unknown_block_type
+    assert_raises(ArgumentError) { Truffle::Content.from_h({ type: "mystery" }) }
+  end
+
+  def test_message_from_h_round_trips_a_turn_with_text_and_tool_call
+    call = Truffle::ToolCall.new(id: "c", name: "t", arguments: { "x" => 1 })
+    original = Truffle::Message.assistant(content: "calling", tool_calls: [call])
+
+    restored = Truffle::Message.from_h(JSON.parse(JSON.generate(original.to_h)))
+
+    assert_equal :assistant, restored.role
+    assert_equal "calling", restored.text
+    assert_equal "t", restored.tool_calls.first.name
+    assert_equal({ "x" => 1 }, restored.tool_calls.first.arguments)
+  end
+
+  def test_message_from_h_round_trips_a_tool_result
+    original = Truffle::Message.tool(content: "42", tool_call_id: "c", name: "add")
+
+    restored = Truffle::Message.from_h(original.to_h)
+
+    assert_equal :tool, restored.role
+    assert_equal "c", restored.tool_call_id
+    assert_equal "add", restored.name
+    assert_equal "42", restored.text
   end
 end

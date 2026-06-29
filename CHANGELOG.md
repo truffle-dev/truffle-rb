@@ -14,6 +14,22 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- An append-only session store (`Truffle::Session`), ported from pi's session
+  manager. A session is a JSONL file: the first line is a header (`type`,
+  `version`, `id`, `cwd`, optional `parent_session`) and every line after it is
+  a message entry with its own `id`, the `parent_id` of the entry it follows,
+  and a `timestamp`. Entries chain through `parent_id`, so the conversation is
+  the leaf-to-root path through the file. `Session.create` writes the header and
+  binds to the file, `append_message` appends one line per message and advances
+  the leaf, `Session.load` parses the file back (skipping a truncated final
+  line, as pi tolerates) and validates the header, and `messages` walks the leaf
+  to the root and rebuilds the `Truffle::Message` list in order. Built on two
+  new pieces: `Truffle::UUID` (a uuidv7 for the session id so ids sort in
+  creation order, and an 8-hex short id for entries, both against the standard
+  library) and `Message.from_h` / `Content.from_h`, the inverse of the existing
+  `to_h` that rebuilds a turn block by block (tool calls included) when a session
+  is read from disk. Branching, settings and compaction entries, labels, the
+  deferred-first-flush optimization, and v1/v2 file migration are follow-ups.
 - The `grep` built-in tool (`Truffle::Tools.grep`), ported from pi's `grep.ts`.
   It takes a `pattern` (a regular expression, or a literal string when `literal`
   is set), an optional `path` (a file or directory, default the current
