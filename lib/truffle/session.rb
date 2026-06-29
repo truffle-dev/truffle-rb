@@ -144,12 +144,36 @@ module Truffle
     # summary. tokens_before is the size that was compacted away, kept for display.
     # After this, #context returns the summary plus the kept tail, not the full
     # history. The caller summarizes; the session only stores the marker.
-    def append_compaction(summary:, first_kept_entry_id:, tokens_before:)
-      append_typed(
-        "compaction",
+    #
+    # details, when given, is the read/modified file lists the compacted history
+    # touched (Compaction's CompactionResult#details). A later compaction reads it
+    # off the prior compaction entry to carry those file operations forward, the
+    # way pi seeds file ops from a previous CompactionEntry. It is omitted when
+    # nil, so a compaction without file metadata is written exactly as pi writes one.
+    def append_compaction(summary:, first_kept_entry_id:, tokens_before:, details: nil)
+      fields = {
         summary: summary,
         first_kept_entry_id: first_kept_entry_id,
         tokens_before: tokens_before
+      }
+      fields[:details] = details if details
+      append_typed("compaction", **fields)
+    end
+
+    # Build the context for a leaf-to-root path that has already been resolved
+    # into chronological order: the messages to feed the model (the compaction
+    # summary plus the kept tail when the path was compacted, otherwise the whole
+    # history), and the thinking level and model in force at the path's leaf. This
+    # is the pure half of pi's buildSessionContext, taking entries rather than a
+    # leaf id, so compaction can compute a path's effective context size without a
+    # bound session. (pi also lets an assistant message carry the model; my Message
+    # has no provider/model field yet, so only model_change entries set the model.)
+    def self.build_context(path)
+      thinking_level, model, compaction = scan_settings(path)
+      Context.new(
+        messages: build_messages(path, compaction),
+        thinking_level: thinking_level,
+        model: model
       )
     end
 
@@ -157,23 +181,21 @@ module Truffle
     # turning each message entry back into a Message, oldest first. This is every
     # message on the path, ignoring compaction; #context applies compaction.
     def messages(leaf_id: @leaf_id)
-      message_entries(path_to(leaf_id))
+      self.class.message_entries(path_to(leaf_id))
     end
 
-    # Reconstruct what a resumed agent should start from: the messages to feed the
-    # model (the compaction summary plus the kept tail when the path was compacted,
-    # otherwise the whole history), and the thinking level and model in force at
-    # the leaf. This is pi's buildSessionContext. (pi also lets an assistant
-    # message carry the model; my Message has no provider/model field yet, so only
-    # model_change entries set the model here.)
+    # Reconstruct what a resumed agent should start from, for the conversation
+    # ending at leaf_id. Resolves the path, then defers to build_context.
     def context(leaf_id: @leaf_id)
-      path = path_to(leaf_id)
-      thinking_level, model, compaction = scan_settings(path)
-      Context.new(
-        messages: build_messages(path, compaction),
-        thinking_level: thinking_level,
-        model: model
-      )
+      self.class.build_context(path_to(leaf_id))
+    end
+
+    # Turn the message entries on a path into Messages, dropping settings and
+    # compaction entries (they shape the walk but are not messages themselves).
+    def self.message_entries(entries)
+      entries.filter_map do |entry|
+        Message.from_h(entry[:message]) if entry[:type] == "message"
+      end
     end
 
     private
@@ -210,17 +232,9 @@ module Truffle
       path.reverse
     end
 
-    # Turn the message entries on a path into Messages, dropping settings and
-    # compaction entries (they shape the walk but are not messages themselves).
-    def message_entries(entries)
-      entries.filter_map do |entry|
-        Message.from_h(entry[:message]) if entry[:type] == "message"
-      end
-    end
-
     # Find the thinking level and model in force at the leaf (the latest such
     # entry wins) and the compaction entry if the path has one.
-    def scan_settings(path)
+    def self.scan_settings(path)
       thinking_level = "off"
       model = nil
       compaction = nil
@@ -233,36 +247,41 @@ module Truffle
       end
       [thinking_level, model, compaction]
     end
+    private_class_method :scan_settings
 
     # Build a ModelRef from a model_change entry.
-    def model_ref(entry)
+    def self.model_ref(entry)
       ModelRef.new(provider: entry[:provider], model_id: entry[:model_id])
     end
+    private_class_method :model_ref
 
     # The messages to feed the model: every message when there was no compaction,
     # otherwise the summary followed by the kept tail.
-    def build_messages(path, compaction)
+    def self.build_messages(path, compaction)
       return message_entries(path) unless compaction
 
       [compaction_summary_message(compaction), *message_entries(kept_window(path, compaction))]
     end
+    private_class_method :build_messages
 
     # The entries a compaction keeps: those from first_kept_entry_id up to the
     # compaction (its recent context), plus everything after it. If the kept id is
     # not on the path the kept head is empty, matching pi's foundFirstKept flag.
-    def kept_window(path, compaction)
+    def self.kept_window(path, compaction)
       idx = path.index { |entry| entry[:id] == compaction[:id] }
       before = path[0...idx]
       kept_start = before.index { |entry| entry[:id] == compaction[:first_kept_entry_id] }
       kept = kept_start ? before[kept_start..] : []
       kept + (path[(idx + 1)..] || [])
     end
+    private_class_method :kept_window
 
     # The user message that stands in for the compacted turns.
-    def compaction_summary_message(compaction)
+    def self.compaction_summary_message(compaction)
       text = COMPACTION_SUMMARY_PREFIX + compaction[:summary] + COMPACTION_SUMMARY_SUFFIX
       Message.user(text)
     end
+    private_class_method :compaction_summary_message
 
     # Record an entry in the id map and advance the leaf to it. Called once per
     # loaded entry by the constructor and once per appended entry.

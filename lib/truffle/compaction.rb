@@ -3,19 +3,21 @@
 require "json"
 require "set"
 require_relative "message"
+require_relative "session"
+require_relative "compaction/utils"
 
 module Truffle
   # The decision layer for context compaction: how many context tokens a
   # conversation is using, and whether that has crossed the threshold where old
   # turns must be summarized to stay under the model's window.
   #
-  # A faithful port of pi's compaction
-  # (packages/agent/src/harness/compaction/{compaction,utils}.ts): the trigger half
+  # A faithful port of pi's compaction.ts: the trigger half
   # (calculateContextTokens, estimateTokens, estimateContextTokens, shouldCompact),
-  # the retention cut-point selection (findCutPoint and friends), and the prompt
-  # building the summarizer feeds the model (serializeConversation and the prompt
-  # text). Everything here is pure and offline, so it can be checked exactly. The
-  # model call that turns these prompts into a summary is a separate slice.
+  # the retention cut-point selection (findCutPoint and friends), the prompt text
+  # the summarizer feeds the model, and the prepareCompaction/compact assembly.
+  # File tracking and conversation serialization live in compaction/utils.rb, the
+  # port of pi's compaction/utils.ts. The model call that turns these prompts into
+  # a summary runs through the provider seam; everything else here is pure.
   module Compaction
     # Compaction thresholds and retention budget. reserve_tokens is held back for
     # the summary prompt and its output; keep_recent_tokens is the approximate
@@ -30,10 +32,6 @@ module Truffle
       keep_recent_tokens: 20_000
     ).freeze
 
-    # pi's ESTIMATED_IMAGE_CHARS: an image is charged a flat character budget,
-    # since its real token cost is not in the text.
-    ESTIMATED_IMAGE_CHARS = 4800
-
     # The cut point a compaction selects: the index of the first session entry
     # kept after the summary, plus the split-turn bookkeeping. When the cut lands
     # inside a turn (on an assistant or tool entry rather than the user message
@@ -42,17 +40,28 @@ module Truffle
     # turn into the summary. Mirrors pi's CutPointResult.
     CutPoint = Struct.new(:first_kept_index, :turn_start_index, :split_turn, keyword_init: true)
 
-    # The files a stretch of compacted history touched, grouped by how a tool
-    # touched them: read holds files a read tool saw, written holds full-file
-    # writes, edited holds in-place edits. A compaction folds these into the
-    # summary as metadata tags so a resumed session still knows which files the
-    # dropped history cared about. Each field is a Set of path strings. Mirrors
-    # pi's FileOperations.
-    FileOperations = Struct.new(:read, :written, :edited, keyword_init: true)
+    # Everything a compaction needs before any model call: where retained history
+    # begins (first_kept_entry_id), the messages to fold into the history summary
+    # (messages_to_summarize) and, for a split turn, the cut-off prefix to
+    # summarize separately (turn_prefix_messages, split_turn), the size being
+    # compacted away (tokens_before), the prior summary to extend when continuing
+    # one (previous_summary), the file operations the dropped history touched
+    # (file_ops), and the settings used. Pure; the model call happens in compact.
+    # Mirrors pi's CompactionPreparation.
+    Preparation = Struct.new(
+      :first_kept_entry_id, :messages_to_summarize, :turn_prefix_messages,
+      :split_turn, :tokens_before, :previous_summary, :file_ops, :settings,
+      keyword_init: true
+    )
 
-    # A tool result is clipped before it goes into a summary prompt, so one noisy
-    # command output cannot crowd out the conversation. pi's TOOL_RESULT_MAX_CHARS.
-    TOOL_RESULT_MAX_CHARS = 2000
+    # The result of a compaction, ready to be persisted as a session compaction
+    # entry: the summary that stands in for the dropped turns, the id where kept
+    # history resumes, the context size that was compacted away, and the read and
+    # modified file lists (so a later compaction can carry them forward). Mirrors
+    # pi's CompactionResult.
+    CompactionResult = Struct.new(
+      :summary, :first_kept_entry_id, :tokens_before, :details, keyword_init: true
+    )
 
     # The system prompt for the summarizing model: read the conversation, emit only
     # the structured summary, do not continue the conversation. Verbatim from pi.
@@ -225,18 +234,6 @@ module Truffle
       context_tokens > context_window - settings.reserve_tokens
     end
 
-    # Render the messages a cut keeps into the plain-text conversation body the
-    # summarizing model reads. Each message becomes one or more labeled parts
-    # joined by a blank line: a user turn is its text, an assistant turn is up to
-    # three parts (thinking, then text, then tool calls) in that fixed order, and a
-    # tool result is its text clipped to TOOL_RESULT_MAX_CHARS. Empty turns and the
-    # system prompt contribute nothing. Port of pi's serializeConversation.
-    def serialize_conversation(messages)
-      parts = []
-      messages.each { |message| append_serialized(parts, message) }
-      parts.join("\n\n")
-    end
-
     # Build the full prompt text the summarizer reads: the conversation wrapped in
     # <conversation> tags, the prior summary in <previous-summary> tags when one
     # exists, then the base instruction (the update variant when continuing a
@@ -284,67 +281,202 @@ module Truffle
       run_summarizer(provider, model, prompt, max_tokens, signal)
     end
 
-    # An empty file-operation accumulator. Port of pi's createFileOps.
-    def create_file_ops
-      FileOperations.new(read: Set.new, written: Set.new, edited: Set.new)
-    end
+    # Work out everything a compaction needs before any model call, for a session
+    # path already resolved into chronological order. Returns nil when there is
+    # nothing to compact: an empty path, or one whose last entry is already a
+    # compaction. Otherwise it finds the cut point, the history to summarize, the
+    # split-turn prefix when the cut lands inside a turn, the file operations the
+    # dropped history touched (seeded from a prior compaction's details), and the
+    # context size being compacted away. Port of pi's prepareCompaction.
+    #
+    # When a prior compaction sits on the path, summarization continues from it:
+    # its summary becomes previous_summary and the window starts at the entry it
+    # kept (or just after it when that entry is gone), so a session is summarized
+    # incrementally rather than from scratch each time.
+    def prepare_compaction(path_entries, settings = DEFAULT_SETTINGS)
+      return nil if path_entries.empty? || path_entries.last[:type] == "compaction"
 
-    # Record the file operations an assistant turn performed into file_ops. Only
-    # an assistant message carries tool calls, so other roles add nothing. Each
-    # read, write, or edit call with a non-empty string path adds that path to the
-    # matching set; other tools and missing or non-string paths are ignored. pi
-    # drops a falsey path, which includes the empty string, so an empty path is
-    # not recorded here either. Port of pi's extractFileOpsFromMessage.
-    def extract_file_ops_from_message(message, file_ops)
-      return unless message.role == :assistant
+      prev_index = last_compaction_index(path_entries)
+      previous_summary, boundary_start = previous_compaction_window(path_entries, prev_index)
+      tokens_before = estimate_context_tokens(Session.build_context(path_entries).messages)
 
-      message.content.grep(ToolCall).each do |call|
-        args = call.arguments
-        next unless args.is_a?(Hash)
-
-        path = args["path"]
-        next unless path.is_a?(String) && !path.empty?
-
-        record_file_op(file_ops, call.name, path)
+      cut = find_cut_point(path_entries, boundary_start, path_entries.length,
+                           settings.keep_recent_tokens)
+      first_kept = path_entries[cut.first_kept_index]
+      unless first_kept && first_kept[:id]
+        raise Error.new(:invalid_session, "First kept entry has no id - session may need migration")
       end
+
+      build_preparation(
+        entries: path_entries, cut: cut, prev_index: prev_index, boundary_start: boundary_start,
+        previous_summary: previous_summary, tokens_before: tokens_before, settings: settings
+      )
     end
 
-    # Sorted read-only and modified file lists from accumulated operations. A file
-    # that was written or edited is modified; a file only ever read is read-only.
-    # A path that was both read and modified counts only as modified, so the two
-    # lists never overlap. Both are sorted. Port of pi's computeFileLists.
-    def compute_file_lists(file_ops)
-      modified = file_ops.edited | file_ops.written
-      read_only = (file_ops.read - modified).sort
-      { read_files: read_only, modified_files: modified.sort }
-    end
-
-    # Render the read-only and modified file lists as the metadata tags appended
-    # to a compaction summary. Each non-empty list becomes a <read-files> or
-    # <modified-files> block; with neither list populated the result is the empty
-    # string. The leading blank line separates the tags from the summary body.
-    # Port of pi's formatFileOperations.
-    def format_file_operations(read_files, modified_files)
-      sections = []
-      sections << "<read-files>\n#{read_files.join("\n")}\n</read-files>" unless read_files.empty?
-      unless modified_files.empty?
-        sections << "<modified-files>\n#{modified_files.join("\n")}\n</modified-files>"
+    # Turn a Preparation into a finished summary by calling the model. With a
+    # split turn it summarizes the history and the cut-off turn prefix separately
+    # and joins them under a labeled divider (an empty history becomes the literal
+    # "No prior history."); otherwise it summarizes the history alone. Either way
+    # the read and modified file lists are appended as metadata tags, and the
+    # result carries those lists so a later compaction can seed from them. A
+    # Compaction::Error from the summarizer (aborted or provider error) propagates.
+    # Port of pi's compact.
+    def compact(preparation, provider, model, custom_instructions: nil, signal: nil)
+      if preparation.first_kept_entry_id.nil? || preparation.first_kept_entry_id.empty?
+        raise Error.new(:invalid_session, "First kept entry has no id - session may need migration")
       end
-      return "" if sections.empty?
 
-      "\n\n#{sections.join("\n\n")}"
+      summary = build_summary(preparation, provider, model, custom_instructions, signal)
+      lists = compute_file_lists(preparation.file_ops)
+      summary += format_file_operations(lists[:read_files], lists[:modified_files])
+
+      CompactionResult.new(
+        summary: summary,
+        first_kept_entry_id: preparation.first_kept_entry_id,
+        tokens_before: preparation.tokens_before,
+        details: { read_files: lists[:read_files], modified_files: lists[:modified_files] }
+      )
     end
 
-    # Add one tool call's path to the set its tool name maps to. A tool that is
-    # not one of read/write/edit touches no file set.
-    def record_file_op(file_ops, name, path)
-      case name
-      when "read" then file_ops.read << path
-      when "write" then file_ops.written << path
-      when "edit" then file_ops.edited << path
+    # The index of the last compaction entry on the path, or -1 when none. A
+    # prior compaction is the point summarization continues from.
+    def last_compaction_index(entries)
+      (entries.length - 1).downto(0) do |i|
+        return i if entries[i][:type] == "compaction"
       end
+      -1
     end
-    private_class_method :record_file_op
+    private_class_method :last_compaction_index
+
+    # The prior summary to extend and the index where this compaction's window
+    # begins. With no prior compaction the window is the whole path and there is
+    # no prior summary. With one, the window starts at the entry that compaction
+    # kept (or just after the compaction when that entry is no longer on the path,
+    # matching pi's findIndex fallback). Returns [previous_summary, boundary_start].
+    def previous_compaction_window(entries, prev_index)
+      return [nil, 0] if prev_index.negative?
+
+      prev = entries[prev_index]
+      kept_index = entries.index { |entry| entry[:id] == prev[:first_kept_entry_id] }
+      [prev[:summary], kept_index || (prev_index + 1)]
+    end
+    private_class_method :previous_compaction_window
+
+    # Assemble the Preparation from a chosen cut: the history messages from the
+    # window start up to where the kept tail begins (the turn start on a split,
+    # otherwise the first kept entry), the split-turn prefix messages, and the
+    # file operations both stretches touched (seeded from the prior compaction).
+    def build_preparation(entries:, cut:, prev_index:, boundary_start:, previous_summary:,
+                          tokens_before:, settings:)
+      history_end = cut.split_turn ? cut.turn_start_index : cut.first_kept_index
+      messages_to_summarize = messages_in_range(entries, boundary_start, history_end)
+      turn_prefix_messages =
+        cut.split_turn ? messages_in_range(entries, cut.turn_start_index, cut.first_kept_index) : []
+
+      file_ops = extract_file_operations(messages_to_summarize, entries, prev_index)
+      turn_prefix_messages.each { |message| extract_file_ops_from_message(message, file_ops) }
+
+      Preparation.new(
+        first_kept_entry_id: entries[cut.first_kept_index][:id],
+        messages_to_summarize: messages_to_summarize,
+        turn_prefix_messages: turn_prefix_messages,
+        split_turn: cut.split_turn,
+        tokens_before: tokens_before,
+        previous_summary: previous_summary,
+        file_ops: file_ops,
+        settings: settings
+      )
+    end
+    private_class_method :build_preparation
+
+    # The messages from entries[from...to], skipping entries that produce none (a
+    # compaction entry and the settings entries). Port of the getMessageFromEntry
+    # ForCompaction walk over an index range.
+    def messages_in_range(entries, from, to)
+      (from...to).filter_map { |i| message_from_entry_for_compaction(entries[i]) }
+    end
+    private_class_method :messages_in_range
+
+    # The Message an entry contributes to a compaction summary, or nil. A
+    # compaction entry contributes nothing (its summary is not re-summarized), a
+    # message entry becomes its Message, and a settings entry contributes nothing.
+    # Port of pi's getMessageFromEntryForCompaction, narrowed to this port's entry
+    # kinds (custom_message and branch_summary arrive with their session slices).
+    def message_from_entry_for_compaction(entry)
+      return nil if entry[:type] == "compaction"
+      return Message.from_h(entry[:message]) if entry[:type] == "message"
+
+      nil
+    end
+    private_class_method :message_from_entry_for_compaction
+
+    # Collect the file operations a compacted stretch touched: seed from the prior
+    # compaction's stored details (its read files as reads, its modified files as
+    # edits, so they survive across successive compactions), then fold in every
+    # message's own tool calls. Port of pi's extractFileOperations.
+    def extract_file_operations(messages, entries, prev_index)
+      file_ops = create_file_ops
+      seed_file_ops_from_previous(file_ops, entries[prev_index]) unless prev_index.negative?
+      messages.each { |message| extract_file_ops_from_message(message, file_ops) }
+      file_ops
+    end
+    private_class_method :extract_file_operations
+
+    # Seed an accumulator from a prior compaction entry's details. The details
+    # hash is symbol-keyed in memory and string-keyed after a JSON round trip, so
+    # both forms are read. A compaction written without details seeds nothing.
+    def seed_file_ops_from_previous(file_ops, prev_entry)
+      details = prev_entry[:details] || prev_entry["details"]
+      return unless details.is_a?(Hash)
+
+      read = details[:read_files] || details["read_files"]
+      modified = details[:modified_files] || details["modified_files"]
+      Array(read).each { |path| file_ops.read << path if path.is_a?(String) }
+      Array(modified).each { |path| file_ops.edited << path if path.is_a?(String) }
+    end
+    private_class_method :seed_file_ops_from_previous
+
+    # The summary body for a preparation, before file-operation tags. A split turn
+    # summarizes the history and the cut-off prefix separately and joins them under
+    # a labeled divider, with an empty history standing in as "No prior history.";
+    # otherwise it summarizes the history alone.
+    def build_summary(preparation, provider, model, custom_instructions, signal)
+      unless split?(preparation)
+        return history_summary(preparation, provider, model, custom_instructions,
+                               signal)
+      end
+
+      history = if preparation.messages_to_summarize.empty?
+                  "No prior history."
+                else
+                  history_summary(preparation, provider, model, custom_instructions, signal)
+                end
+      prefix = generate_turn_prefix_summary(
+        provider, model, preparation.turn_prefix_messages,
+        reserve_tokens: preparation.settings.reserve_tokens, signal: signal
+      )
+      "#{history}\n\n---\n\n**Turn Context (split turn):**\n\n#{prefix}"
+    end
+    private_class_method :build_summary
+
+    # Whether a preparation summarizes a split turn (the cut landed inside a turn
+    # and there is a prefix to summarize). A split with an empty prefix is treated
+    # as a plain history summary, matching pi's `isSplitTurn && length > 0` guard.
+    def split?(preparation)
+      preparation.split_turn && !preparation.turn_prefix_messages.empty?
+    end
+    private_class_method :split?
+
+    # Summarize a preparation's history messages, folding in its prior summary and
+    # any custom focus. The shared call for the split and non-split paths.
+    def history_summary(preparation, provider, model, custom_instructions, signal)
+      generate_summary(
+        provider, model, preparation.messages_to_summarize,
+        reserve_tokens: preparation.settings.reserve_tokens, signal: signal,
+        custom_instructions: custom_instructions, previous_summary: preparation.previous_summary
+      )
+    end
+    private_class_method :history_summary
 
     # Choose where to cut the session for a compaction: keep roughly the most
     # recent keep_recent_tokens of conversation, snapped to a turn boundary, and
@@ -452,67 +584,6 @@ module Truffle
     end
     private_class_method :message_role
 
-    # Append the labeled parts for one message to the running parts list. The
-    # system prompt and empty turns add nothing, matching pi's role switch.
-    def append_serialized(parts, message)
-      case message.role
-      when :user then append_text_part(parts, "[User]", message)
-      when :assistant then append_assistant(parts, message)
-      when :tool then append_tool_result(parts, message)
-      end
-    end
-    private_class_method :append_serialized
-
-    # A single labeled part from a message's joined text, skipped when empty. Used
-    # for the user turn; the tool result clips first and so has its own helper.
-    def append_text_part(parts, label, message)
-      text = message.text
-      parts << "#{label}: #{text}" if text && !text.empty?
-    end
-    private_class_method :append_text_part
-
-    # The assistant turn's parts: thinking, then text, then tool calls, each
-    # emitted only when present and always in that order regardless of block order.
-    def append_assistant(parts, message)
-      thinking = message.content.grep(Content::Thinking).map(&:thinking)
-      text = message.content.grep(Content::Text).map(&:text)
-      tool_calls = message.content.grep(ToolCall).map { |call| serialize_tool_call(call) }
-
-      parts << "[Assistant thinking]: #{thinking.join("\n")}" unless thinking.empty?
-      parts << "[Assistant]: #{text.join("\n")}" unless text.empty?
-      parts << "[Assistant tool calls]: #{tool_calls.join("; ")}" unless tool_calls.empty?
-    end
-    private_class_method :append_assistant
-
-    # One tool call rendered as name(k=json(v), ...), the arguments in insertion
-    # order. Mirrors pi's Object.entries(args) walk.
-    def serialize_tool_call(call)
-      args = call.arguments.map { |key, value| "#{key}=#{safe_json(value)}" }.join(", ")
-      "#{call.name}(#{args})"
-    end
-    private_class_method :serialize_tool_call
-
-    # The tool result part, its text clipped to the per-result budget and skipped
-    # when empty.
-    def append_tool_result(parts, message)
-      text = message.text
-      return if text.nil? || text.empty?
-
-      parts << "[Tool result]: #{truncate_for_summary(text, TOOL_RESULT_MAX_CHARS)}"
-    end
-    private_class_method :append_tool_result
-
-    # Clip text to max_chars, appending a note of how many characters were dropped.
-    # A text at or under the budget is returned unchanged. Port of pi's
-    # truncateForSummary.
-    def truncate_for_summary(text, max_chars)
-      return text if text.length <= max_chars
-
-      dropped = text.length - max_chars
-      "#{text[0, max_chars]}\n\n[... #{dropped} more characters truncated]"
-    end
-    private_class_method :truncate_for_summary
-
     # Run one summarization call: wrap the prompt as a single user turn under the
     # summarizer system prompt, call the provider, and turn the response into the
     # summary text or a Compaction::Error. The signal is checked at the boundary
@@ -553,26 +624,5 @@ module Truffle
       response.message.content.grep(Content::Text).map(&:text).join("\n")
     end
     private_class_method :summary_text
-
-    # Characters one content block contributes to the token estimate. A tool call
-    # is its name plus the JSON of its arguments, matching pi's
-    # safeJsonStringify(arguments) accounting.
-    def block_chars(block)
-      case block.type
-      when :text then block.text.length
-      when :thinking then block.thinking.length
-      when :image then ESTIMATED_IMAGE_CHARS
-      when :tool_call then block.name.length + safe_json(block.arguments).length
-      else 0
-      end
-    end
-    private_class_method :block_chars
-
-    def safe_json(value)
-      JSON.generate(value)
-    rescue StandardError
-      "[unserializable]"
-    end
-    private_class_method :safe_json
   end
 end

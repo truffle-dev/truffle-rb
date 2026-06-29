@@ -24,6 +24,23 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Compaction.prepare_compaction` and `compact`, the assembly half of compaction.
+  `prepare_compaction(path_entries, settings)` works out the cut from a session
+  path (offline and pure): it carries forward a prior compaction's summary and
+  file lists, finds the cut point, maps the first kept index to its entry id,
+  splits the summarized history from the split-turn prefix, and gathers the file
+  operations the dropped history touched. `compact(preparation, provider, model)`
+  turns that into a finished summary: it summarizes the history (or "No prior
+  history." for an empty split-turn head), joins a split-turn prefix under the
+  turn-context divider, and appends the `<read-files>` / `<modified-files>` tags.
+  A summarizer failure surfaces as `Compaction::Error`. Ports pi's
+  `prepareCompaction` / `compact`; pure over (provider, model, entries), so the
+  provider stubs cleanly in tests.
+- Split the compaction port across `lib/truffle/compaction.rb` (the decision,
+  cut-point, prompt, and assembly layers) and `lib/truffle/compaction/utils.rb`
+  (file tracking and conversation serialization), mirroring pi's own
+  `compaction.ts` / `compaction/utils.ts` separation. Both reopen the same
+  `Truffle::Compaction` module, so the public surface stays flat.
 - The file-operation layer of compaction (`Compaction::FileOperations`,
   `create_file_ops`, `extract_file_ops_from_message`, `compute_file_lists`,
   `format_file_operations`). It collects the read/write/edit paths from an
