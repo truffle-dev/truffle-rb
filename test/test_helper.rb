@@ -21,8 +21,8 @@ class StubProvider < Truffle::Providers::Base
     "stub"
   end
 
-  def chat(messages:, tools: [], model: nil, **_options)
-    @calls << { messages: messages.map(&:to_h), tools: tools, model: model }
+  def chat(messages:, tools: [], model: nil, **options)
+    @calls << { messages: messages.map(&:to_h), tools: tools, model: model, options: options }
     raise "StubProvider ran out of scripted responses" if @script.empty?
 
     @script.shift

@@ -189,8 +189,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       wrap it with the prior summary and the four verbatim pi prompt strings. Pure
       and offline; ports pi's `serializeConversation` and `generateSummary` /
       `generateTurnPrefixSummary` prompt assembly.
-    - [ ] The summarizer that calls the model with these prompts, writes a
-      `compaction` entry, and is driven from the agent loop.
+    - [x] **Summarizer provider call.** `Compaction.generate_summary` and
+      `generate_turn_prefix_summary` build the prompt, cap the summary output at a
+      fraction of the reserve (0.8 history, 0.5 split-turn prefix) clamped to the
+      model max, call the provider under `SUMMARIZATION_SYSTEM_PROMPT`, and return
+      the summary text, raising `Compaction::Error` (`:aborted` /
+      `:summarization_failed`) on a cancelled or errored run. Ports pi's
+      `generateSummary` / `generateTurnPrefixSummary`; thinking-level passthrough
+      deferred until the provider seam has per-call reasoning control.
+    - [ ] `prepareCompaction` + `compact`: assemble the summary from a cut (the
+      split-turn prefix and the file-ops tags), then drive from the agent loop,
+      writing a `compaction` entry with the cut's `first_kept_entry_id`.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,

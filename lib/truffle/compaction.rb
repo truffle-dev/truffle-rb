@@ -153,6 +153,19 @@ module Truffle
       Be concise. Focus on what's needed to understand the kept suffix.
     PROMPT
 
+    # A compaction step that could not produce a summary. kind is :aborted when
+    # the run was cancelled or :summarization_failed when the provider returned an
+    # error, so the caller can tell a deliberate stop from a real failure. Mirrors
+    # pi's CompactionError; the :invalid_session kind arrives with the compact step.
+    class Error < StandardError
+      attr_reader :kind
+
+      def initialize(kind, message)
+        @kind = kind
+        super(message)
+      end
+    end
+
     module_function
 
     # The context tokens a provider usage block represents. pi prefers the
@@ -234,6 +247,32 @@ module Truffle
     def turn_prefix_prompt(messages)
       "<conversation>\n#{serialize_conversation(messages)}\n</conversation>\n\n" \
         "#{TURN_PREFIX_SUMMARIZATION_PROMPT}"
+    end
+
+    # Summarize a stretch of history into a structured checkpoint by asking the
+    # model. Builds the prompt (folding in a prior summary or a custom focus when
+    # given), caps the summary's own output at 0.8 of the reserve budget, and runs
+    # the summarizer. Returns the summary text, or raises Compaction::Error when
+    # the run is aborted or the provider errors. Port of pi's generateSummary,
+    # without the thinking-level option (this port's provider seam has no per-call
+    # reasoning control yet).
+    def generate_summary(provider, model, messages, reserve_tokens:, signal: nil,
+                         custom_instructions: nil, previous_summary: nil)
+      prompt = summarization_prompt(
+        messages, previous_summary: previous_summary, custom_instructions: custom_instructions
+      )
+      max_tokens = max_summary_tokens(model, reserve_tokens, 0.8)
+      run_summarizer(provider, model, prompt, max_tokens, signal)
+    end
+
+    # Summarize the cut-off prefix of a split turn. Same shape as generate_summary
+    # but with the turn-prefix prompt and a tighter 0.5-of-reserve output cap, since
+    # this summary is auxiliary to the retained suffix. Port of pi's
+    # generateTurnPrefixSummary.
+    def generate_turn_prefix_summary(provider, model, messages, reserve_tokens:, signal: nil)
+      prompt = turn_prefix_prompt(messages)
+      max_tokens = max_summary_tokens(model, reserve_tokens, 0.5)
+      run_summarizer(provider, model, prompt, max_tokens, signal)
     end
 
     # Choose where to cut the session for a compaction: keep roughly the most
@@ -402,6 +441,47 @@ module Truffle
       "#{text[0, max_chars]}\n\n[... #{dropped} more characters truncated]"
     end
     private_class_method :truncate_for_summary
+
+    # Run one summarization call: wrap the prompt as a single user turn under the
+    # summarizer system prompt, call the provider, and turn the response into the
+    # summary text or a Compaction::Error. The signal is checked at the boundary
+    # before the call (cooperative cancellation, matching the agent loop), and an
+    # aborted or errored response maps to the matching error kind.
+    def run_summarizer(provider, model, prompt_text, max_tokens, signal)
+      raise Error.new(:aborted, "Summarization aborted") if signal&.aborted?
+
+      messages = [Message.system(SUMMARIZATION_SYSTEM_PROMPT), Message.user(prompt_text)]
+      response = provider.chat(messages: messages, model: model.id, max_tokens: max_tokens)
+
+      case response.stop_reason
+      when StopReason::ABORTED
+        raise Error.new(:aborted, response.error_message || "Summarization aborted")
+      when StopReason::ERROR
+        raise Error.new(:summarization_failed,
+                        "Summarization failed: #{response.error_message || "Unknown error"}")
+      end
+
+      summary_text(response)
+    end
+    private_class_method :run_summarizer
+
+    # The output-token budget for a summary: a fraction of the reserve, but never
+    # more than the model can emit. A model that does not report a max output (0)
+    # is left uncapped by the model, so only the reserve fraction applies. Port of
+    # generateSummary's maxTokens computation.
+    def max_summary_tokens(model, reserve_tokens, factor)
+      budget = (factor * reserve_tokens).floor
+      cap = model.max_output.positive? ? model.max_output : Float::INFINITY
+      [budget, cap].min
+    end
+    private_class_method :max_summary_tokens
+
+    # The summary text from a response: its Text blocks joined by newlines (pi
+    # joins with "\n"), empty when the turn carried no text.
+    def summary_text(response)
+      response.message.content.grep(Content::Text).map(&:text).join("\n")
+    end
+    private_class_method :summary_text
 
     # Characters one content block contributes to the token estimate. A tool call
     # is its name plus the JSON of its arguments, matching pi's

@@ -14,6 +14,16 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Compaction.generate_summary` and `generate_turn_prefix_summary`, the summarizer
+  half of compaction: they build the prompt (folding in a prior summary or a custom
+  focus), cap the summary's own output at a fraction of the reserve budget (0.8 for
+  history, 0.5 for a split-turn prefix) clamped to the model's max output, send it
+  under `SUMMARIZATION_SYSTEM_PROMPT`, and return the summary text. A cancelled or
+  errored run raises `Compaction::Error` carrying `:aborted` or
+  `:summarization_failed`, so a caller can tell a deliberate stop from a real
+  failure. Ports pi's `generateSummary` / `generateTurnPrefixSummary`; the
+  thinking-level option is deferred until the provider seam gains per-call reasoning
+  control.
 - `Compaction.serialize_conversation`, which renders the messages a cut keeps into
   the labeled plain-text body the summarizing model reads: a user turn is its text,
   an assistant turn is up to three parts (thinking, then text, then tool calls) in
