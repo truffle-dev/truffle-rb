@@ -169,6 +169,16 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
     locked, non-removable head (system prompt, pinned facts), mirroring how pi
     compacts.
+    - [x] **Decision layer.** `Truffle::Compaction` ports pi's trigger half:
+      `estimate_tokens` (per-message character heuristic, flat image budget, tool
+      call charged name plus JSON arguments, system prompt excluded as the locked
+      head), `calculate_context_tokens` (context size of a usage block),
+      `estimate_context_tokens` (pure estimate, or measured usage plus the
+      trailing turns since), and `should_compact?` against the window-less-reserve
+      threshold, with `Settings` / `DEFAULT_SETTINGS`.
+    - [ ] Cut-point selection (`findCutPoint`, the recent-token retention budget
+      and split-turn handling) and the summarizer that calls the model, writes a
+      `compaction` entry, and is driven from the agent loop.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,

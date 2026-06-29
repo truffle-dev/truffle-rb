@@ -14,6 +14,16 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Truffle::Compaction`, the decision layer for context compaction, ported from
+  the trigger half of pi's compaction. `estimate_tokens` gives a conservative
+  per-message token estimate (four characters to a token, an image charged a flat
+  budget, a tool call charged its name plus its JSON arguments; the system prompt
+  is the locked head and estimates zero). `calculate_context_tokens` reads the
+  context size of a provider usage block. `estimate_context_tokens(messages,
+  usage:)` estimates a conversation, either purely from characters or, given the
+  last known usage, as that measured total plus the estimate of the turns since.
+  `should_compact?` reports whether context has crossed the window-minus-reserve
+  threshold. `Compaction::Settings` and `DEFAULT_SETTINGS` carry pi's thresholds.
 - `Agent#dump` and `Agent.load` to pause and resume an agent through a session
   file. `dump(dir:)` writes a new session: the conversation (the system prompt is
   left out, since it is regenerated from configuration on resume as in pi), a
