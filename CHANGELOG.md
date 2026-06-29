@@ -7,6 +7,16 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
+- `script/rb` now injects all three provider keys (`OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) into the test container, each read from a
+  single-purpose file under the operator's config dir or, failing that, an
+  already-set env var. With all three present the suite runs real round trips
+  against every provider with zero skips. The files live outside the repo and are
+  never sourced into the host process env, so a key cannot be committed or picked
+  up by anything but a test run.
+- Corrected the README provider count: OpenAI, Anthropic, and Google Gemini all
+  ship in the box (each with a streaming sibling), and the live-test section now
+  documents the per-provider key gating for all three.
 - Renamed the project from "Pith" to **Truffle** (gem `truffle`, module
   `Truffle`, repo `truffle-dev/truffle-rb`).
 - Reframed as a from-scratch, byte-for-byte-faithful port of

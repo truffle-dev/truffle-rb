@@ -3,26 +3,43 @@
 #
 # Why: this VM has no local Ruby, so we develop on disk and execute in a
 # throwaway container. A sibling container cannot bind-mount /app/repos (that is
-# a host path it can't see), so we mount the named Docker volume by name. The
-# OpenAI key is read from the operator's config file and injected as an env var
-# only for the lifetime of the command; it is never printed or committed.
+# a host path it can't see), so we mount the named Docker volume by name.
+#
+# Provider API keys (OpenAI, Anthropic, Gemini) are each read from a
+# single-purpose file under the operator's config dir and injected as an env var
+# ONLY for the lifetime of the container command. These files live outside the
+# repo, so they can never be committed, and they are NOT sourced into the agent's
+# own process env (env.sh does not reference them), so the host SDK never picks
+# them up. They are never printed. Each key gates only its provider's live tests;
+# without a key, that provider's integration test skips and the offline suite
+# still runs fully.
 #
 # Usage:
-#   script/rb rake test                  # unit tests
+#   script/rb rake test                  # full suite (live tests run if keyed)
 #   script/rb ruby examples/calculator.rb
 #   script/rb bash                       # interactive shell
 set -euo pipefail
 
 IMAGE="${TRUFFLE_RUBY_IMAGE:-ruby:3.3-slim}"
 VOLUME="${TRUFFLE_REPO_VOLUME:-phantom_phantom_repos}"
-KEY_FILE="${OPENAI_KEY_FILE:-$HOME/.config/truffle/openai_api_key}"
+CONFIG_DIR="${TRUFFLE_CONFIG_DIR:-$HOME/.config/truffle}"
 
 key_args=()
-if [[ -f "$KEY_FILE" ]]; then
-  key_args=(-e "OPENAI_API_KEY=$(tr -d '\n' < "$KEY_FILE")")
-elif [[ -n "${OPENAI_API_KEY:-}" ]]; then
-  key_args=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
-fi
+
+# Inject "$1" as env var "$2" from config file "$3" (trimmed) or, failing that,
+# from the same-named env var if it is already set. Never echoes the value.
+inject_key() {
+  local env_name="$1" file="$2"
+  if [[ -f "$file" ]]; then
+    key_args+=(-e "${env_name}=$(tr -d '\n' < "$file")")
+  elif [[ -n "${!env_name:-}" ]]; then
+    key_args+=(-e "${env_name}=${!env_name}")
+  fi
+}
+
+inject_key OPENAI_API_KEY    "${OPENAI_KEY_FILE:-$CONFIG_DIR/openai_api_key}"
+inject_key ANTHROPIC_API_KEY "${ANTHROPIC_KEY_FILE:-$CONFIG_DIR/anthropic_api_key}"
+inject_key GEMINI_API_KEY    "${GEMINI_KEY_FILE:-$CONFIG_DIR/gemini_api_key}"
 
 exec docker run --rm -i \
   -v "${VOLUME}:/repos" \

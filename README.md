@@ -53,8 +53,8 @@ sessions, and memory. You can read the whole loop in one sitting
 
 - **Provider-agnostic, built from scratch.** The agent talks to a single `chat`
   seam. A provider is any object that answers `chat(messages:, tools:, model:)`.
-  OpenAI Chat Completions and Anthropic Messages both ship in the box, each
-  written against the wire API directly with no client gem.
+  OpenAI Chat Completions, Anthropic Messages, and Google Gemini all ship in the
+  box, each written against the wire API directly with no client gem.
 - **A model catalog you can trust.** `Truffle.models` is a structured registry of
   every model Truffle can address, current to its provider's published docs:
   ids, context windows, max output, modalities, reasoning support, and per-token
@@ -66,9 +66,8 @@ sessions, and memory. You can read the whole loop in one sitting
 - **Observable.** Subscribe to `agent_start`, `tool_call`, `tool_result`,
   `agent_end`, and more. Build a TUI, a log stream, or a web view without the
   harness knowing how it is rendered.
-- **Dependency-free core.** The OpenAI provider uses `Net::HTTP` and the JSON
-  in the standard library. Nothing to vendor, nothing to audit but the code you
-  see.
+- **Dependency-free core.** Every provider uses `Net::HTTP` and the JSON in the
+  standard library. Nothing to vendor, nothing to audit but the code you see.
 
 ## Install
 
@@ -174,10 +173,12 @@ def chat(messages:, tools:, model: nil, **options)
 end
 ```
 
-Two providers ship in the box. `Truffle::Providers::OpenAI` talks to the Chat
-Completions API and `Truffle::Providers::Anthropic` talks to the Messages API,
-both over `Net::HTTP` with no client gem. To target another backend, subclass
-`Truffle::Providers::Base` and implement `chat`.
+Three providers ship in the box. `Truffle::Providers::OpenAI` talks to the Chat
+Completions API, `Truffle::Providers::Anthropic` talks to the Messages API, and
+`Truffle::Providers::Google` talks to the Gemini Generative Language API, all
+over `Net::HTTP` with no client gem. Each also has a streaming sibling. To
+target another backend, subclass `Truffle::Providers::Base` and implement
+`chat`.
 
 ### The model catalog
 
@@ -205,11 +206,12 @@ rake test
 ```
 
 The default suite is hermetic and offline: it drives the agent loop with a stub
-provider, so you can run it anywhere without a key. One additional test
-(`test/test_openai_integration.rb`) performs a real OpenAI round trip and is
-**skipped unless `OPENAI_API_KEY` is set**. With a key present it verifies the
-full path: prompt -> model requests a tool -> Truffle runs it -> model answers
-with the tool's result.
+provider, so you can run it anywhere without a key. A handful of live tests
+perform real round trips against each provider and are **skipped unless that
+provider's key is set** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
+With a key present each verifies the full path: prompt -> model requests a tool
+-> Truffle runs it -> model answers with the tool's result, for both the
+buffered and streaming code paths.
 
 No local Ruby? The repo ships `script/rb`, a thin wrapper that runs any command
 inside a `ruby:3.3-slim` container, so `script/rb rake test` works on a host
@@ -228,10 +230,11 @@ lib/truffle/model.rb               # a single model value object
 lib/truffle/models.rb              # the model catalog (single source of truth)
 lib/truffle/pricing.rb             # per-token pricing facade over the catalog
 lib/truffle/providers/base.rb      # the provider seam
-lib/truffle/providers/openai.rb    # OpenAI Chat Completions provider
-lib/truffle/providers/anthropic.rb # Anthropic Messages provider
+lib/truffle/providers/openai.rb    # OpenAI Chat Completions provider (+ openai_stream.rb)
+lib/truffle/providers/anthropic.rb # Anthropic Messages provider (+ anthropic_stream.rb)
+lib/truffle/providers/google.rb    # Google Gemini provider (+ google_stream.rb)
 examples/calculator.rb          # runnable multi-tool demo
-test/                           # minitest suite (offline + one live test)
+test/                           # minitest suite (offline + per-provider live tests)
 ```
 
 ## Credits
