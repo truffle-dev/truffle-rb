@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "message"
 
 module Truffle
   # The decision layer for context compaction: how many context tokens a
@@ -29,6 +30,14 @@ module Truffle
     # pi's ESTIMATED_IMAGE_CHARS: an image is charged a flat character budget,
     # since its real token cost is not in the text.
     ESTIMATED_IMAGE_CHARS = 4800
+
+    # The cut point a compaction selects: the index of the first session entry
+    # kept after the summary, plus the split-turn bookkeeping. When the cut lands
+    # inside a turn (on an assistant or tool entry rather than the user message
+    # that began the turn), turn_start_index points at that user message and
+    # split_turn is true, so the summarizer can fold the cut-off prefix of the
+    # turn into the summary. Mirrors pi's CutPointResult.
+    CutPoint = Struct.new(:first_kept_index, :turn_start_index, :split_turn, keyword_init: true)
 
     module_function
 
@@ -79,6 +88,112 @@ module Truffle
 
       context_tokens > context_window - settings.reserve_tokens
     end
+
+    # Choose where to cut the session for a compaction: keep roughly the most
+    # recent keep_recent_tokens of conversation, snapped to a turn boundary, and
+    # summarize everything before it. entries is the session path (the list #context
+    # walks); the window is entries[start_index...end_index] (end_index exclusive),
+    # so a prior compaction can be excluded by raising start_index. Port of pi's
+    # findCutPoint.
+    #
+    # The walk runs backward from the end summing estimate_tokens of each message
+    # entry until the recent budget is met, then snaps to the first valid cut point
+    # at or after that entry, never landing mid tool-result. A user message starts a
+    # turn, so cutting there is a clean boundary; cutting on an assistant or tool
+    # entry splits a turn, recorded via turn_start_index and split_turn so the
+    # summarizer can absorb the turn's cut-off prefix.
+    def find_cut_point(entries, start_index, end_index, keep_recent_tokens)
+      cut_points = valid_cut_points(entries, start_index, end_index)
+      if cut_points.empty?
+        return CutPoint.new(first_kept_index: start_index, turn_start_index: -1, split_turn: false)
+      end
+
+      recent = recent_cut_index(entries, cut_points, start_index, end_index, keep_recent_tokens)
+      cut_index = settle_cut_index(entries, recent, start_index)
+      user_cut = message_role(entries[cut_index]) == :user
+      turn_start = user_cut ? -1 : find_turn_start_index(entries, cut_index, start_index)
+      CutPoint.new(
+        first_kept_index: cut_index,
+        turn_start_index: turn_start,
+        split_turn: !user_cut && turn_start != -1
+      )
+    end
+
+    # The user-visible message that begins the turn containing entry_index, walking
+    # backward to start_index; -1 when none is found. Port of findTurnStartIndex.
+    # (pi also stops at a bashExecution message or a branch/custom-message entry;
+    # this port has only the user role until those entry kinds exist.)
+    def find_turn_start_index(entries, entry_index, start_index)
+      entry_index.downto(start_index) do |i|
+        return i if message_role(entries[i]) == :user
+      end
+      -1
+    end
+
+    # The indices in entries[start_index...end_index] a compaction may cut at: the
+    # user and assistant message boundaries. A tool result is never a cut point
+    # (cutting there would orphan it from its call), and the non-message settings
+    # entries are not turn boundaries. Port of findValidCutPoints, narrowed to this
+    # port's role set.
+    def valid_cut_points(entries, start_index, end_index)
+      (start_index...end_index).select do |i|
+        %i[user assistant].include?(message_role(entries[i]))
+      end
+    end
+    private_class_method :valid_cut_points
+
+    # Walk backward from the end of the window summing each message entry's tokens
+    # until keep_recent_tokens is reached, then return the first valid cut point at
+    # or after that entry. When the recent budget is never met (the kept tail is the
+    # whole window), the earliest cut point stands. The inner search keeps the
+    # earliest cut point when none sits at or after the stopping entry, matching pi.
+    def recent_cut_index(entries, cut_points, start_index, end_index, keep_recent_tokens)
+      accumulated = 0
+      (end_index - 1).downto(start_index) do |i|
+        next unless message_role(entries[i])
+
+        accumulated += estimate_tokens(Message.from_h(entries[i][:message]))
+        next if accumulated < keep_recent_tokens
+
+        return cut_points.find { |c| c >= i } || cut_points.first
+      end
+      cut_points.first
+    end
+    private_class_method :recent_cut_index
+
+    # Pull the cut back over any non-message, non-compaction entries that sit just
+    # before it (settings changes), so the first kept entry is a real boundary and
+    # not a bare settings line. Stops at the window start, a message, or a
+    # compaction. Port of findCutPoint's trailing while loop.
+    def settle_cut_index(entries, cut_index, start_index)
+      while cut_index > start_index
+        prev = entries[cut_index - 1]
+        break if prev[:type] == "compaction" || message_entry?(prev)
+
+        cut_index -= 1
+      end
+      cut_index
+    end
+    private_class_method :settle_cut_index
+
+    # Whether a session entry is a stored message (as opposed to a settings or
+    # compaction entry).
+    def message_entry?(entry)
+      entry[:type] == "message"
+    end
+    private_class_method :message_entry?
+
+    # The role of a message entry as a symbol, or nil for a non-message entry. The
+    # stored message hash is symbol-keyed with a symbol role in memory and
+    # string-keyed after a JSON round trip, so both forms are folded.
+    def message_role(entry)
+      return nil unless message_entry?(entry)
+
+      raw = entry[:message]
+      role = raw[:role] || raw["role"]
+      role&.to_sym
+    end
+    private_class_method :message_role
 
     # Characters one content block contributes to the token estimate. A tool call
     # is its name plus the JSON of its arguments, matching pi's

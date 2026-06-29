@@ -86,4 +86,124 @@ class TestCompaction < Minitest::Test
     assert_equal 16_384, Compaction::DEFAULT_SETTINGS.reserve_tokens
     assert_equal 20_000, Compaction::DEFAULT_SETTINGS.keep_recent_tokens
   end
+
+  # ---- cut-point selection ----
+
+  # A message entry of `chars` characters, so its estimate is ceil(chars/4).
+  def message_entry(id, role, chars)
+    { type: "message", id: id, message: Truffle::Message.new(role: role, content: "x" * chars).to_h }
+  end
+
+  def settings_entry(id, type)
+    { type: type, id: id }
+  end
+
+  def test_find_cut_point_with_no_valid_points_keeps_from_the_window_start
+    entries = [settings_entry("m", "model_change"), message_entry("t", :tool, 40)]
+
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 10)
+
+    assert_equal 0, cut.first_kept_index
+    assert_equal(-1, cut.turn_start_index)
+    refute cut.split_turn
+  end
+
+  def test_find_cut_point_splits_a_turn_when_the_cut_lands_on_an_assistant
+    entries = [
+      message_entry("0", :user, 40),      # 10
+      message_entry("1", :assistant, 40), # 10
+      message_entry("2", :user, 40),      # 10
+      message_entry("3", :assistant, 40), # 10
+      message_entry("4", :user, 40),      # 10
+      message_entry("5", :assistant, 40)  # 10
+    ]
+    # keep 25: accumulate 10+10+10 reaching index 3, the first cut point >= 3.
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 25)
+
+    assert_equal 3, cut.first_kept_index
+    assert_equal 2, cut.turn_start_index
+    assert cut.split_turn
+  end
+
+  def test_find_cut_point_on_a_user_message_is_a_clean_boundary
+    entries = [
+      message_entry("0", :user, 40),
+      message_entry("1", :assistant, 40),
+      message_entry("2", :user, 40),
+      message_entry("3", :assistant, 40),
+      message_entry("4", :user, 40),
+      message_entry("5", :assistant, 40)
+    ]
+    # keep 15: accumulate 10+10 reaching index 4 (a user message).
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 15)
+
+    assert_equal 4, cut.first_kept_index
+    assert_equal(-1, cut.turn_start_index)
+    refute cut.split_turn
+  end
+
+  def test_find_cut_point_meets_the_budget_at_exact_equality
+    entries = [
+      message_entry("0", :user, 40),
+      message_entry("1", :assistant, 40),
+      message_entry("2", :user, 40),
+      message_entry("3", :assistant, 40)
+    ]
+    # keep 20: 10 + 10 hits exactly 20 at index 2, so the cut is there, not earlier.
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 20)
+
+    assert_equal 2, cut.first_kept_index
+  end
+
+  def test_find_cut_point_snaps_past_a_tool_result
+    entries = [
+      message_entry("0", :user, 40),
+      message_entry("1", :assistant, 40),
+      message_entry("2", :tool, 40),
+      message_entry("3", :assistant, 40)
+    ]
+    # keep 15: the backward walk stops on the tool entry (index 2), but a tool
+    # result is not a valid cut point, so the cut snaps forward to the assistant.
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 15)
+
+    assert_equal 3, cut.first_kept_index
+    assert cut.split_turn
+  end
+
+  def test_find_cut_point_pulls_back_over_a_settings_entry
+    entries = [
+      message_entry("0", :user, 40),
+      message_entry("1", :assistant, 40),
+      settings_entry("m", "model_change"),
+      message_entry("3", :assistant, 40)
+    ]
+    # keep 5: the cut lands on index 3, then settles back over the model_change to
+    # index 2 so the first kept entry is the settings boundary, not a bare line
+    # after it. The turn start is the user message at index 0.
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 5)
+
+    assert_equal 2, cut.first_kept_index
+    assert_equal 0, cut.turn_start_index
+    assert cut.split_turn
+  end
+
+  def test_find_cut_point_stops_settling_at_a_compaction
+    entries = [
+      settings_entry("c", "compaction"),
+      message_entry("1", :assistant, 40)
+    ]
+    # keep 5: the cut lands on the assistant at index 1; settling stops at the
+    # compaction, and no user message precedes it, so the turn start is -1.
+    cut = Compaction.find_cut_point(entries, 0, entries.length, 5)
+
+    assert_equal 1, cut.first_kept_index
+    assert_equal(-1, cut.turn_start_index)
+    refute cut.split_turn
+  end
+
+  def test_find_turn_start_index_returns_minus_one_without_a_user_message
+    entries = [message_entry("0", :assistant, 40), message_entry("1", :assistant, 40)]
+
+    assert_equal(-1, Compaction.find_turn_start_index(entries, 1, 0))
+  end
 end

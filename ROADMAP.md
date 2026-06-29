@@ -176,9 +176,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `estimate_context_tokens` (pure estimate, or measured usage plus the
       trailing turns since), and `should_compact?` against the window-less-reserve
       threshold, with `Settings` / `DEFAULT_SETTINGS`.
-    - [ ] Cut-point selection (`findCutPoint`, the recent-token retention budget
-      and split-turn handling) and the summarizer that calls the model, writes a
-      `compaction` entry, and is driven from the agent loop.
+    - [x] **Cut-point selection.** `Compaction.find_cut_point` ports pi's
+      `findCutPoint` / `findValidCutPoints` / `findTurnStartIndex`: walk the
+      session path backward summing `estimate_tokens` until the recent-token
+      budget is met, snap to a user or assistant boundary (never mid tool-result),
+      pull back over settings entries, and record the split-turn case
+      (`turn_start_index`, `split_turn`).
+    - [ ] The summarizer that calls the model, writes a `compaction` entry, and is
+      driven from the agent loop.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,

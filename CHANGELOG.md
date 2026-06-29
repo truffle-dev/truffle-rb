@@ -14,6 +14,13 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Compaction.find_cut_point`, which chooses where to compact a session: it walks
+  the conversation path backward summing the per-message estimate until the recent
+  budget is met, then snaps the cut to a user or assistant boundary, never inside a
+  tool result, and pulls back over settings entries so the first kept entry is a
+  real boundary. When the cut lands inside a turn it reports the turn-start index
+  and a split-turn flag. Ports pi's `findCutPoint`, `findValidCutPoints`, and
+  `findTurnStartIndex`.
 - `Truffle::Compaction`, the decision layer for context compaction, ported from
   the trigger half of pi's compaction. `estimate_tokens` gives a conservative
   per-message token estimate (four characters to a token, an image charged a flat
