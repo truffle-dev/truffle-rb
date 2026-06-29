@@ -14,6 +14,19 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `find` built-in tool (`Truffle::Tools.find`), ported from pi's `find.ts`.
+  It takes a glob `pattern`, an optional `path` (default the current directory),
+  and an optional `limit` (default 1000), and returns matching file paths
+  relative to the search directory, one per line, posix-separated. pi's default
+  implementation shells out to the `fd` binary (auto-downloaded) so it can honor
+  `.gitignore`; that pulls an external Rust tool, which breaks the
+  zero-dependency and offline constraints, so this port matches the tree
+  natively with `Dir.glob` and mirrors pi's pluggable `FindOperations.glob`
+  branch: `.git` and `node_modules` are excluded and hidden files are included.
+  A bare pattern is prepended with `**/` so a basename like `*.rb` recurses, as
+  fd's basename matching does. The result limit and the shared 50KB byte ceiling
+  produce pi's bracketed notices, and an empty result returns "No files found
+  matching pattern". Full `.gitignore` respect is a planned follow-up slice.
 - The `edit` built-in tool (`Truffle::Tools.edit`), ported from pi's `edit.ts`
   and the matching core in `edit-diff.ts`. It takes a `path` and an `edits`
   array of `{oldText, newText}` replacements. Each `oldText` is matched against

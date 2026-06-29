@@ -85,7 +85,7 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 
 Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 
-10. **Built-in tools.** bash, read, write, edit, glob, grep, written from
+10. **Built-in tools.** bash, read, write, edit, find, grep, written from
     scratch, matching pi's tool contracts and safety behavior.
     - [x] **read.** `Truffle::Tools.read` ports pi's `read.ts` text path: a
       `path` resolved against a bound cwd (or absolute), a 1-indexed `offset`, an
@@ -116,7 +116,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `edits`, legacy top-level `oldText`/`newText`) is ported. The diff and
       unified-patch rendering feeds only pi's TUI and pulls in the `diff`
       package, so it is out of scope.
-    - [ ] glob, grep.
+    - [x] **find.** `Truffle::Tools.find` ports pi's `find.ts` execute path: a
+      `pattern`, an optional `path` (default `.`), and an optional `limit`
+      (default 1000). pi shells out to the `fd` binary so it can honor
+      `.gitignore`; that pulls an external Rust tool, so this port matches the
+      tree natively with `Dir.glob`, mirroring pi's pluggable
+      `FindOperations.glob` branch: `.git` and `node_modules` are excluded and
+      hidden files are included. A bare pattern is prepended with `**/` so it
+      recurses; paths are returned relative to the search root, posix-separated.
+      The result limit and the 50KB byte ceiling produce pi's bracketed
+      notices. Full `.gitignore` respect is the next slice.
+    - [ ] gitignore respect for find, grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
