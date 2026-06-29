@@ -24,6 +24,19 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Auto-compaction in the agent loop. A `Truffle::Agent` built with a `session:`
+  is session-backed: every message it appends to its running history is mirrored
+  into the session, and at the top of each turn it checks the previous response's
+  reported context against the model's window. When usage crosses the threshold
+  (`Compaction.should_compact?`), the agent summarizes the older turns into a
+  session compaction entry and rebuilds its context from the summary plus the
+  kept tail before calling the provider, so a long run stays under the window.
+  `compaction_settings:` tunes the threshold and retention budget; `auto_compact:
+  false` keeps a session-backed agent from ever compacting. A `:compaction` event
+  reports each run (with the `CompactionResult`, or the `Compaction::Error` when a
+  summarization is aborted or fails). The accumulated usage tally survives a
+  compaction. Ports the threshold path of pi's `_checkCompaction` /
+  `_runAutoCompaction`.
 - `Compaction.prepare_compaction` and `compact`, the assembly half of compaction.
   `prepare_compaction(path_entries, settings)` works out the cut from a session
   path (offline and pure): it carries forward a prior compaction's summary and

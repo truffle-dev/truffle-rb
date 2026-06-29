@@ -207,7 +207,7 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] `prepareCompaction` + `compact`: assemble the summary from a cut (the
       split-turn prefix and the file-ops tags), pure over (provider, model,
       entries). Ports pi's `prepareCompaction` / `compact`.
-    - [ ] Drive compaction from the agent loop: `should_compact?` at the top of
+    - [x] Drive compaction from the agent loop: `should_compact?` at the top of
       `Agent#run`, then `compact` and an `append_compaction` entry carrying the
       cut's `first_kept_entry_id` and file-ops `details`, then rebuild context.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
