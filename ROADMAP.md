@@ -98,7 +98,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the "bytes" label promises) and the path. Path resolution moves into the
       shared `Truffle::Tools::Path` (a port of `resolveToCwd`: unicode-space fold,
       `@`-strip, `~` expansion); `read` now resolves through it too.
-    - [ ] bash, edit, glob, grep.
+    - [x] **bash.** `Truffle::Tools.bash` ports pi's `bash.ts`: run a command
+      under bash in a bound cwd, stdout and stderr combined in order, optional
+      `timeout` (seconds) that kills the process group, nonzero exit / timeout
+      raises with output plus a status line. Tail truncation via a new
+      `Truncate.tail` (port of `truncateTail`), full output to a temp file when
+      truncated. The streaming `OutputAccumulator` is deferred; buffering the
+      full output keeps the observable contract identical.
+    - [ ] edit, glob, grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a

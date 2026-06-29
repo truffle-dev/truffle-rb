@@ -14,6 +14,21 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `bash` built-in tool (`Truffle::Tools.bash`), ported from pi's `bash.ts`.
+  It runs a command under bash in a bound working directory with stdout and
+  stderr combined in command order, and returns the raw output. An optional
+  `timeout` (seconds, no default) kills the whole process group on expiry; a
+  nonzero exit or a timeout raises with the captured output plus a status line,
+  the way pi throws. Output is tail truncated (the end, where errors and results
+  live) by the same two limits as `read` (2000 lines or 50KB, whichever hits
+  first); when truncated, the full untruncated output is written to a temp file
+  and the returned notice points at it. The notice's byte-limit branch reports
+  pi's default 50KB constant rather than any applied limit, matching `bash.ts`.
+  Truncation reuses a new `Truncate.tail` (a port of pi's `truncateTail`), which
+  keeps the last lines or bytes and, for a single line that alone exceeds the
+  byte budget, keeps the end of it on a character boundary. pi's streaming,
+  memory-bounded `OutputAccumulator` is not ported: the engine buffers the full
+  output and truncates at the end, which leaves the observable result identical.
 - The `write` built-in tool (`Truffle::Tools.write`), ported from pi's
   `write.ts`. It resolves a path against a bound working directory, creates any
   missing parent directories, and writes UTF-8 content, creating the file or

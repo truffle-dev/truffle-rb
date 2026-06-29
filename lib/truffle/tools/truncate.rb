@@ -11,8 +11,9 @@ module Truffle
     # the result is empty and `first_line_exceeds_limit` is set so the caller can
     # point the model at a byte-bounded fallback.
     #
-    # `read` is the first consumer; `bash` (tail) and `grep` (per-line) will share
-    # this module as they land, which is why the full result shape is ported now.
+    # `read` consumes `head`; `bash` consumes `tail` (keep the last lines/bytes,
+    # where errors and final results live); `grep` (per-line) will share this
+    # module as it lands, which is why the full result shape is ported once.
     module Truncate
       DEFAULT_MAX_LINES = 2000
       DEFAULT_MAX_BYTES = 50 * 1024 # 50KB
@@ -53,6 +54,30 @@ module Truffle
         Result.new(content: output, truncated: true, truncated_by: truncated_by,
                    output_lines: kept.length, output_bytes: output.bytesize,
                    last_line_partial: false, first_line_exceeds_limit: false, **totals)
+      end
+
+      # Truncate from the tail: keep the last lines/bytes that fit. Suitable for
+      # bash output where the end (errors, final results) is what matters. Unlike
+      # head, the tail can return a partial line: if the single last line already
+      # exceeds the byte limit, its end is kept and last_line_partial is set.
+      def tail(content, max_lines: DEFAULT_MAX_LINES, max_bytes: DEFAULT_MAX_BYTES)
+        total_bytes = content.bytesize
+        lines = split_for_counting(content)
+        total_lines = lines.length
+        totals = { total_lines: total_lines, total_bytes: total_bytes,
+                   max_lines: max_lines, max_bytes: max_bytes }
+
+        if total_lines <= max_lines && total_bytes <= max_bytes
+          return Result.new(content: content, truncated: false, truncated_by: nil,
+                            output_lines: total_lines, output_bytes: total_bytes,
+                            last_line_partial: false, first_line_exceeds_limit: false, **totals)
+        end
+
+        kept, _used, truncated_by, partial = collect_tail(lines, max_lines, max_bytes)
+        output = kept.join("\n")
+        Result.new(content: output, truncated: true, truncated_by: truncated_by,
+                   output_lines: kept.length, output_bytes: output.bytesize,
+                   last_line_partial: partial, first_line_exceeds_limit: false, **totals)
       end
 
       # Format a byte count the way pi's formatSize does: "512B", "1.5KB", "2.0MB".
@@ -100,6 +125,53 @@ module Truffle
 
         truncated_by = "lines" if kept.length >= max_lines && used <= max_bytes
         [kept, used, truncated_by]
+      end
+
+      # Walk the lines backwards, keeping complete ones until either limit is hit.
+      # Like collect_head, a line costs one extra byte for the joining newline
+      # once at least one line is already kept. If the very last line alone blows
+      # the byte budget, keep only the trailing bytes of it (partial) so bash
+      # output that ends in one enormous line still shows its end.
+      def collect_tail(lines, max_lines, max_bytes)
+        kept = []
+        used = 0
+        truncated_by = "lines"
+        partial = false
+
+        i = lines.length - 1
+        while i >= 0 && kept.length < max_lines
+          line = lines[i]
+          line_bytes = line.bytesize + (kept.empty? ? 0 : 1)
+          if used + line_bytes > max_bytes
+            truncated_by = "bytes"
+            if kept.empty?
+              trimmed = bytes_from_end(line, max_bytes)
+              kept.unshift(trimmed)
+              used = trimmed.bytesize
+              partial = true
+            end
+            break
+          end
+
+          kept.unshift(line)
+          used += line_bytes
+          i -= 1
+        end
+
+        truncated_by = "lines" if kept.length >= max_lines && used <= max_bytes
+        [kept, used, truncated_by, partial]
+      end
+
+      # Keep the last max_bytes bytes of a string, stepping forward off any UTF-8
+      # continuation byte so the cut lands on a character boundary (pi's
+      # truncateStringToBytesFromEnd).
+      def bytes_from_end(str, max_bytes)
+        bytes = str.b
+        return str if bytes.bytesize <= max_bytes
+
+        start = bytes.bytesize - max_bytes
+        start += 1 while start < bytes.bytesize && (bytes.getbyte(start) & 0xC0) == 0x80
+        bytes.byteslice(start..).force_encoding("UTF-8")
       end
     end
   end
