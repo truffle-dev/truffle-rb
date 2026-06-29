@@ -46,7 +46,9 @@ Metrics/ClassLength:
 
 Metrics/ModuleLength:
   Max: 250
-  CountAsOne: ["array", "hash"]
+  # A heredoc is one string literal, counted as one line the same way
+  # MethodLength counts it; the verbatim summarizer prompts are data, not logic.
+  CountAsOne: ["array", "hash", "heredoc"]
 
 Metrics/CyclomaticComplexity:
   Max: 12

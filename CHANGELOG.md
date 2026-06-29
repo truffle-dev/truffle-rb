@@ -24,6 +24,15 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The file-operation layer of compaction (`Compaction::FileOperations`,
+  `create_file_ops`, `extract_file_ops_from_message`, `compute_file_lists`,
+  `format_file_operations`). It collects the read/write/edit paths from an
+  assistant turn's tool calls, splits them into read-only and modified lists (a
+  file that was both read and modified counts only as modified), and renders them
+  as the `<read-files>` / `<modified-files>` metadata tags a compaction summary
+  carries. Pure and offline; ports pi's `compaction/utils.ts`. This is what
+  `prepareCompaction` and `compact` will append to a summary so a resumed session
+  still knows which files the dropped history touched.
 - `Compaction.generate_summary` and `generate_turn_prefix_summary`, the summarizer
   half of compaction: they build the prompt (folding in a prior summary or a custom
   focus), cap the summary's own output at a fraction of the reserve budget (0.8 for

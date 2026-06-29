@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "set"
 require_relative "message"
 
 module Truffle
@@ -40,6 +41,14 @@ module Truffle
     # split_turn is true, so the summarizer can fold the cut-off prefix of the
     # turn into the summary. Mirrors pi's CutPointResult.
     CutPoint = Struct.new(:first_kept_index, :turn_start_index, :split_turn, keyword_init: true)
+
+    # The files a stretch of compacted history touched, grouped by how a tool
+    # touched them: read holds files a read tool saw, written holds full-file
+    # writes, edited holds in-place edits. A compaction folds these into the
+    # summary as metadata tags so a resumed session still knows which files the
+    # dropped history cared about. Each field is a Set of path strings. Mirrors
+    # pi's FileOperations.
+    FileOperations = Struct.new(:read, :written, :edited, keyword_init: true)
 
     # A tool result is clipped before it goes into a summary prompt, so one noisy
     # command output cannot crowd out the conversation. pi's TOOL_RESULT_MAX_CHARS.
@@ -274,6 +283,68 @@ module Truffle
       max_tokens = max_summary_tokens(model, reserve_tokens, 0.5)
       run_summarizer(provider, model, prompt, max_tokens, signal)
     end
+
+    # An empty file-operation accumulator. Port of pi's createFileOps.
+    def create_file_ops
+      FileOperations.new(read: Set.new, written: Set.new, edited: Set.new)
+    end
+
+    # Record the file operations an assistant turn performed into file_ops. Only
+    # an assistant message carries tool calls, so other roles add nothing. Each
+    # read, write, or edit call with a non-empty string path adds that path to the
+    # matching set; other tools and missing or non-string paths are ignored. pi
+    # drops a falsey path, which includes the empty string, so an empty path is
+    # not recorded here either. Port of pi's extractFileOpsFromMessage.
+    def extract_file_ops_from_message(message, file_ops)
+      return unless message.role == :assistant
+
+      message.content.grep(ToolCall).each do |call|
+        args = call.arguments
+        next unless args.is_a?(Hash)
+
+        path = args["path"]
+        next unless path.is_a?(String) && !path.empty?
+
+        record_file_op(file_ops, call.name, path)
+      end
+    end
+
+    # Sorted read-only and modified file lists from accumulated operations. A file
+    # that was written or edited is modified; a file only ever read is read-only.
+    # A path that was both read and modified counts only as modified, so the two
+    # lists never overlap. Both are sorted. Port of pi's computeFileLists.
+    def compute_file_lists(file_ops)
+      modified = file_ops.edited | file_ops.written
+      read_only = (file_ops.read - modified).sort
+      { read_files: read_only, modified_files: modified.sort }
+    end
+
+    # Render the read-only and modified file lists as the metadata tags appended
+    # to a compaction summary. Each non-empty list becomes a <read-files> or
+    # <modified-files> block; with neither list populated the result is the empty
+    # string. The leading blank line separates the tags from the summary body.
+    # Port of pi's formatFileOperations.
+    def format_file_operations(read_files, modified_files)
+      sections = []
+      sections << "<read-files>\n#{read_files.join("\n")}\n</read-files>" unless read_files.empty?
+      unless modified_files.empty?
+        sections << "<modified-files>\n#{modified_files.join("\n")}\n</modified-files>"
+      end
+      return "" if sections.empty?
+
+      "\n\n#{sections.join("\n\n")}"
+    end
+
+    # Add one tool call's path to the set its tool name maps to. A tool that is
+    # not one of read/write/edit touches no file set.
+    def record_file_op(file_ops, name, path)
+      case name
+      when "read" then file_ops.read << path
+      when "write" then file_ops.written << path
+      when "edit" then file_ops.edited << path
+      end
+    end
+    private_class_method :record_file_op
 
     # Choose where to cut the session for a compaction: keep roughly the most
     # recent keep_recent_tokens of conversation, snapped to a turn boundary, and

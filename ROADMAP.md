@@ -197,9 +197,16 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `:summarization_failed`) on a cancelled or errored run. Ports pi's
       `generateSummary` / `generateTurnPrefixSummary`; thinking-level passthrough
       deferred until the provider seam has per-call reasoning control.
+    - [x] **File operations in summaries.** `Compaction::FileOperations` and the
+      `create_file_ops` / `extract_file_ops_from_message` / `compute_file_lists` /
+      `format_file_operations` functions collect the read/write/edit paths from an
+      assistant turn's tool calls, split them into read-only and modified lists (a
+      file both read and modified counts only as modified), and render them as the
+      `<read-files>` / `<modified-files>` tags a summary carries. Pure and offline;
+      ports pi's `compaction/utils.ts`.
     - [ ] `prepareCompaction` + `compact`: assemble the summary from a cut (the
-      split-turn prefix and the file-ops tags), then drive from the agent loop,
-      writing a `compaction` entry with the cut's `first_kept_entry_id`.
+      split-turn prefix and the file-ops tags, now available), then drive from the
+      agent loop, writing a `compaction` entry with the cut's `first_kept_entry_id`.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,
