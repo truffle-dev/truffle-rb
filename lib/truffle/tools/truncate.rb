@@ -17,6 +17,11 @@ module Truffle
     module Truncate
       DEFAULT_MAX_LINES = 2000
       DEFAULT_MAX_BYTES = 50 * 1024 # 50KB
+      GREP_MAX_LINE_LENGTH = 500 # Max chars per grep match line
+
+      # The outcome of a single-line truncation. Mirrors pi's truncateLine return
+      # shape so grep can read `text` and `truncated` without reshaping.
+      LineResult = Struct.new(:text, :truncated, keyword_init: true)
 
       # The outcome of a truncation pass. Mirrors pi's TruncationResult so later
       # tools (bash, grep) can read the same fields without reshaping.
@@ -78,6 +83,15 @@ module Truffle
         Result.new(content: output, truncated: true, truncated_by: truncated_by,
                    output_lines: kept.length, output_bytes: output.bytesize,
                    last_line_partial: partial, first_line_exceeds_limit: false, **totals)
+      end
+
+      # Truncate a single line to max characters, appending a "... [truncated]"
+      # suffix when it is cut. grep uses this so one very long line does not blow
+      # up the match output. Length is counted in characters, as pi counts it.
+      def truncate_line(line, max_chars = GREP_MAX_LINE_LENGTH)
+        return LineResult.new(text: line, truncated: false) if line.length <= max_chars
+
+        LineResult.new(text: "#{line[0, max_chars]}... [truncated]", truncated: true)
       end
 
       # Format a byte count the way pi's formatSize does: "512B", "1.5KB", "2.0MB".

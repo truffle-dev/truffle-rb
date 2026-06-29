@@ -14,6 +14,20 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `grep` built-in tool (`Truffle::Tools.grep`), ported from pi's `grep.ts`.
+  It takes a `pattern` (a regular expression, or a literal string when `literal`
+  is set), an optional `path` (a file or directory, default the current
+  directory), an optional `glob` filter, and the `ignoreCase`, `context`, and
+  `limit` switches. It returns `path:line: text` for each match and
+  `path-line- text` for context lines, the same shape as pi (and `grep -C`). pi
+  shells out to the `rg` binary (auto-downloaded) for the search and `.gitignore`
+  handling; that pulls an external Rust tool, which breaks the zero-dependency
+  and offline constraints, so this port scans the tree with Ruby's own `Regexp`
+  and reuses `find` (and through it the `.gitignore` stack) for the file walk, so
+  the same exclusions apply. Binary files (detected by a NUL byte) and unreadable
+  files are skipped, as `rg` skips them; long lines are truncated to 500
+  characters and the match count and 50KB byte ceiling produce pi's three
+  bracketed notices. An empty result returns "No matches found".
 - The `find` built-in tool (`Truffle::Tools.find`), ported from pi's `find.ts`.
   It takes a glob `pattern`, an optional `path` (default the current directory),
   and an optional `limit` (default 1000), and returns matching file paths

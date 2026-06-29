@@ -132,7 +132,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       patterns, directory-only trailing `/`, the `**` forms, and the prune rule
       (an excluded directory can't have a child re-included). Applied alongside
       the hardcoded `.git`/`node_modules` floor.
-    - [ ] gitignore respect for grep.
+    - [x] **grep.** `Truffle::Tools.grep` ports pi's `grep.ts` execute path: a
+      `pattern` (regex, or literal when `literal` is set), an optional `path`
+      (file or directory, default `.`), an optional `glob`, and the `ignoreCase`,
+      `context`, and `limit` switches. It returns `path:line: text` for matches
+      and `path-line- text` for context, as pi (and `grep -C`) do. pi shells out
+      to `rg`; that pulls an external Rust tool, so this port scans with Ruby's
+      `Regexp` and reuses `find` for the walk. Binary (NUL-byte) and unreadable
+      files are skipped, long lines truncate at 500 chars, and the match count
+      and 50KB ceiling produce pi's three notices.
+    - [x] **gitignore respect for grep.** Inherited for free: grep's file walk
+      runs through `find`, so the same `.gitignore` stack and `.git`/`node_modules`
+      floor apply.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
