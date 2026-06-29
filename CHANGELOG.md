@@ -14,6 +14,19 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- The `write` built-in tool (`Truffle::Tools.write`), ported from pi's
+  `write.ts`. It resolves a path against a bound working directory, creates any
+  missing parent directories, and writes UTF-8 content, creating the file or
+  overwriting it. It returns a short confirmation naming the byte count and the
+  path as passed. pi labels that count "bytes" while measuring `content.length`
+  (UTF-16 code units); the port reports `content.bytesize`, the real byte count
+  the label promises, which agrees with pi for ASCII and stays correct for
+  multibyte content. Path resolution moves into a shared `Truffle::Tools::Path`
+  module (a port of pi's `resolveToCwd`): unicode space variants fold to a plain
+  space, a single leading `@` is stripped, and `~`/`~/` expand to the home
+  directory before resolving against cwd. The `read` tool now resolves through
+  the same module. file:// URLs are out of scope, matching read's original
+  resolution.
 - The `read` built-in tool (`Truffle::Tools.read`), the first concrete
   coding-agent tool, ported from pi's `read.ts`. It reads a UTF-8 text file
   relative to a bound working directory (or by absolute path), with a 1-indexed

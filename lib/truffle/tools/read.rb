@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "truncate"
+require_relative "path"
 
 module Truffle
   module Tools
@@ -38,7 +39,7 @@ module Truffle
     # loop reports them back to the model.
     def self.read_file(path:, cwd:, offset: nil, limit: nil,
                        max_lines: Truncate::DEFAULT_MAX_LINES, max_bytes: Truncate::DEFAULT_MAX_BYTES)
-      absolute = File.expand_path(path, cwd)
+      absolute = Path.resolve(path, cwd)
       all_lines = File.read(absolute, encoding: "UTF-8").split("\n", -1)
 
       start_line = offset ? [0, offset - 1].max : 0

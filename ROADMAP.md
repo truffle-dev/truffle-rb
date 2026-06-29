@@ -92,7 +92,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       optional line `limit`, head truncation at 2000 lines / 50KB via the shared
       `Truffle::Tools::Truncate` (a port of `truncate.ts`), and pi's continuation
       notices. Text-first: images and macOS path variants are out of scope.
-    - [ ] bash, write, edit, glob, grep.
+    - [x] **write.** `Truffle::Tools.write` ports pi's `write.ts`: resolve the
+      `path` against cwd, mkdir -p the parent, write UTF-8 content (create or
+      overwrite), and confirm with the byte count (`content.bytesize`, the count
+      the "bytes" label promises) and the path. Path resolution moves into the
+      shared `Truffle::Tools::Path` (a port of `resolveToCwd`: unicode-space fold,
+      `@`-strip, `~` expansion); `read` now resolves through it too.
+    - [ ] bash, edit, glob, grep.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
