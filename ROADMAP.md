@@ -152,8 +152,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       built on a new `Truffle::UUID` (uuidv7 session ids, 8-hex entry ids) and
       `Message.from_h` / `Content.from_h` deserialization. Faithful to pi's
       session-manager structure; the leaf-to-root walk is the conversation.
-    - [ ] Branching (a second child off a node), settings entries (model and
-      thinking-level changes), compaction and branch-summary entries, labels,
+    - [x] **Settings and compaction entries + `Session#context`.**
+      `append_model_change` / `append_thinking_level_change` /
+      `append_compaction`, and a context reader (pi's `buildSessionContext`) that
+      recovers the live thinking level and model and, after a compaction, returns
+      the summary plus the kept tail instead of the full history.
+    - [ ] Branching (a second child off a node), branch-summary entries, labels,
       the deferred-first-flush optimization, and v1/v2 file migration.
     - [ ] `Agent#dump` / `Agent.load` wired onto the session store, persisting
       tool definitions by name so a resumed agent rebinds its toolbox.

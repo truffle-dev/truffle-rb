@@ -122,4 +122,89 @@ class TestSession < Minitest::Test
 
     assert_empty session.messages
   end
+
+  def test_context_defaults_to_off_thinking_and_no_model
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    context = session.context
+
+    assert_equal "off", context.thinking_level
+    assert_nil context.model
+    assert_empty context.messages
+  end
+
+  def test_context_recovers_the_latest_model_and_thinking_level
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_model_change(provider: "openai", model_id: "gpt-4o")
+    session.append_thinking_level_change("low")
+    session.append_message(Truffle::Message.user("hi"))
+    session.append_model_change(provider: "anthropic", model_id: "claude-opus-4-8")
+    session.append_thinking_level_change("high")
+
+    context = Truffle::Session.load(session.file).context
+
+    assert_equal "high", context.thinking_level
+    assert_equal "anthropic", context.model.provider
+    assert_equal "claude-opus-4-8", context.model.model_id
+  end
+
+  def test_context_messages_skip_settings_entries
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("one"))
+    session.append_model_change(provider: "openai", model_id: "gpt-4o")
+    session.append_message(Truffle::Message.assistant(content: "two"))
+
+    context = Truffle::Session.load(session.file).context
+
+    assert_equal %w[one two], context.messages.map(&:text)
+  end
+
+  def test_context_after_compaction_returns_summary_then_kept_tail
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("old one"))
+    session.append_message(Truffle::Message.user("old two"))
+    kept = session.append_message(Truffle::Message.user("kept"))
+    session.append_compaction(summary: "they said old things", first_kept_entry_id: kept,
+                              tokens_before: 1234)
+    session.append_message(Truffle::Message.assistant(content: "after"))
+
+    context = Truffle::Session.load(session.file).context
+    texts = context.messages.map(&:text)
+
+    assert_equal :user, context.messages.first.role
+    assert_includes texts.first, "they said old things"
+    assert_includes texts.first, "<summary>"
+    assert_equal %w[kept after], texts.drop(1)
+  end
+
+  def test_context_compaction_drops_turns_before_the_kept_id
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("dropped"))
+    kept = session.append_message(Truffle::Message.user("kept"))
+    session.append_compaction(summary: "summary", first_kept_entry_id: kept, tokens_before: 10)
+
+    texts = Truffle::Session.load(session.file).context.messages.map(&:text)
+
+    refute_includes texts, "dropped"
+    assert_includes texts, "kept"
+  end
+
+  def test_raw_messages_still_include_pre_compaction_history
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("dropped from context"))
+    kept = session.append_message(Truffle::Message.user("kept"))
+    session.append_compaction(summary: "summary", first_kept_entry_id: kept, tokens_before: 10)
+
+    raw = Truffle::Session.load(session.file).messages.map(&:text)
+
+    assert_equal ["dropped from context", "kept"], raw
+  end
+
+  def test_settings_and_compaction_entries_round_trip_through_the_file
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_thinking_level_change("medium")
+    session.append_compaction(summary: "s", first_kept_entry_id: "none", tokens_before: 5)
+    types = Truffle::Session.load(session.file).entries.map { |entry| entry[:type] }
+
+    assert_equal %w[thinking_level_change compaction], types
+  end
 end

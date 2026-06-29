@@ -14,6 +14,20 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Session settings and compaction entries, and `Session#context`, ported from
+  pi's `buildSessionContext`. Alongside message entries, a session can now record
+  `append_model_change(provider:, model_id:)`, `append_thinking_level_change`, and
+  `append_compaction(summary:, first_kept_entry_id:, tokens_before:)`.
+  `Session#context` walks the leaf-to-root path and returns what a resumed agent
+  should start from: the thinking level and model in force at the leaf (the
+  latest such entry wins), and the messages to feed the model. When the path was
+  compacted, those messages are the summary (wrapped in pi's `<summary>` framing)
+  followed by the kept tail (the entries from `first_kept_entry_id` onward plus
+  everything after the compaction), rather than the full history.
+  `Session#messages` still returns the raw history for inspection. pi also lets an
+  assistant message carry the active model; `Truffle::Message` has no provider or
+  model field yet, so only `model_change` entries set the model for now. Branch
+  summaries, labels, and v1/v2 migration remain follow-ups.
 - An append-only session store (`Truffle::Session`), ported from pi's session
   manager. A session is a JSONL file: the first line is a header (`type`,
   `version`, `id`, `cwd`, optional `parent_session`) and every line after it is
