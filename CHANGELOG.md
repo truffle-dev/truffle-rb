@@ -14,6 +14,18 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Agent#dump` and `Agent.load` to pause and resume an agent through a session
+  file. `dump(dir:)` writes a new session: the conversation (the system prompt is
+  left out, since it is regenerated from configuration on resume as in pi), a
+  `model_change` recording the active model, and the toolbox's tool names in the
+  header. `Agent.load(path, provider:, tools:, system_prompt:, model:)` reloads
+  the session, rebinds the toolbox by name (every tool the dumped agent had must
+  be supplied again, or load raises, since the model may still call it), restores
+  the model recorded in the session (overridable with `model:`), and replays the
+  history. The provider, the tool implementations, and the system prompt are
+  re-supplied because they cannot be serialized. `Session.create` gains an
+  optional `tools:` header field for this; it is omitted when empty, so a plain
+  message session is written exactly as pi writes it.
 - Session settings and compaction entries, and `Session#context`, ported from
   pi's `buildSessionContext`. Alongside message entries, a session can now record
   `append_model_change(provider:, model_id:)`, `append_thinking_level_change`, and

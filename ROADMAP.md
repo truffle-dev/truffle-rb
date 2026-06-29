@@ -159,8 +159,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the summary plus the kept tail instead of the full history.
     - [ ] Branching (a second child off a node), branch-summary entries, labels,
       the deferred-first-flush optimization, and v1/v2 file migration.
-    - [ ] `Agent#dump` / `Agent.load` wired onto the session store, persisting
-      tool definitions by name so a resumed agent rebinds its toolbox.
+    - [x] `Agent#dump` / `Agent.load` wired onto the session store, persisting
+      tool definitions by name so a resumed agent rebinds its toolbox. `dump`
+      writes the conversation (no system prompt, regenerated on resume), a
+      `model_change` for the active model, and the tool names in the header;
+      `load` rebinds the toolbox by name (raising on a missing tool), restores the
+      model, and replays the history. The provider, tools, and system prompt are
+      re-supplied since they cannot be serialized.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
     locked, non-removable head (system prompt, pinned facts), mirroring how pi
     compacts.

@@ -47,17 +47,23 @@ module Truffle
     # (compaction applied), plus the thinking level and model in force at the leaf.
     Context = Struct.new(:messages, :thinking_level, :model, keyword_init: true)
 
-    attr_reader :file, :id, :cwd, :parent_session, :leaf_id
+    attr_reader :file, :id, :cwd, :parent_session, :tools, :leaf_id
 
     # Start a new session: mint an id (a time-ordered uuidv7 unless one is given),
     # write the header, and return a Session bound to the file so messages can be
     # appended. The file name carries the timestamp and id, with the colons and
     # dots of the ISO timestamp folded to dashes so it is path-safe, matching pi.
-    def self.create(dir:, cwd:, id: nil, parent_session: nil, now: Time.now)
+    #
+    # tools records the names of the tools the producing agent had, so a resumed
+    # agent can rebind its toolbox by name (Agent.dump/load). It is a Truffle
+    # extension to pi's header and is omitted when empty, so a plain message
+    # session is written exactly as pi writes it.
+    def self.create(dir:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
       id ||= UUID.v7
       timestamp = now.utc.iso8601(3)
       header = { type: "session", version: SESSION_VERSION, id: id, timestamp: timestamp, cwd: cwd }
       header[:parent_session] = parent_session if parent_session
+      header[:tools] = tools if tools && !tools.empty?
 
       FileUtils.mkdir_p(dir)
       file = File.join(dir, "#{timestamp.gsub(/[:.]/, "-")}_#{id}.jsonl")
@@ -98,6 +104,7 @@ module Truffle
       @id = header[:id]
       @cwd = header[:cwd]
       @parent_session = header[:parent_session]
+      @tools = header[:tools]
       @entries = entries
       @by_id = {}
       @leaf_id = nil

@@ -29,6 +29,39 @@ module Truffle
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns, :usage
 
+    # Resume an agent from a session file. The session carries the conversation
+    # and, when it was dumped by #dump, the model and the names of the tools the
+    # agent had. The caller re-supplies the live pieces that cannot be serialized:
+    # the provider, the actual tool implementations, and the system prompt (pi
+    # regenerates the system prompt from config rather than storing it, so it is
+    # configuration here too). Tools are rebound by name: every tool the dumped
+    # agent had must be present in `tools`, or load raises. The model defaults to
+    # the one recorded in the session; pass model: to override it.
+    def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
+                  max_turns: DEFAULT_MAX_TURNS)
+      session = Session.load(path)
+      toolbox = rebind_toolbox(session.tools, tools)
+      context = session.context
+      agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
+                  model: model || context.model&.model_id, max_turns: max_turns)
+      agent.restore(context.messages)
+    end
+
+    # Build the toolbox a resumed agent runs with, checking that every tool the
+    # dumped agent relied on is among the ones supplied now. The session stores
+    # only names; the implementations are rebound here. A required tool that was
+    # not supplied is an error, not a silent gap, since the model may call it.
+    def self.rebind_toolbox(required_names, supplied)
+      toolbox = supplied.is_a?(Toolbox) ? supplied : Toolbox.new(supplied)
+      missing = Array(required_names) - toolbox.names
+      unless missing.empty?
+        raise Error, "session needs tool(s) not supplied to load: #{missing.join(", ")}"
+      end
+
+      toolbox
+    end
+    private_class_method :rebind_toolbox
+
     def initialize(provider:, system_prompt: nil, tools: [], model: nil,
                    max_turns: DEFAULT_MAX_TURNS)
       @provider = provider
@@ -128,7 +161,35 @@ module Truffle
       self
     end
 
+    # Write this agent's state to a new session file under `dir` and return the
+    # Session. The conversation is persisted (the system prompt is left out, since
+    # it is regenerated from config on resume, as in pi); the model is recorded as
+    # a model_change so a resumed session restarts on it; and the toolbox names go
+    # in the header so Agent.load can rebind the tools by name. cwd is metadata
+    # only, the working directory the session belongs to.
+    def dump(dir:, cwd: Dir.pwd)
+      session = Session.create(dir: dir, cwd: cwd, tools: @toolbox.names)
+      session.append_model_change(provider: @provider.name, model_id: @model) if @model
+      conversation.each { |message| session.append_message(message) }
+      session
+    end
+
+    # Replace the running history with a restored conversation, keeping the
+    # system prompt at the front. Used by Agent.load to resume a session; the
+    # restored messages are the user/assistant/tool turns, never a system message.
+    def restore(messages)
+      reset
+      @messages.concat(messages)
+      self
+    end
+
     private
+
+    # The turns to persist: the history without the system prompt, which is
+    # configuration re-supplied on resume rather than part of the conversation.
+    def conversation
+      @messages.reject { |message| message.role == :system }
+    end
 
     def run_tool_calls(tool_calls)
       tool_calls.map do |call|
