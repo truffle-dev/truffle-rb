@@ -14,6 +14,13 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- Structured tool results: a tool whose handler returns a Hash or Array (or any
+  non-String value) now serializes that return as JSON for the model, the way pi
+  stringifies a structured tool result. A String return still passes through
+  verbatim, so a tool that formats its own text is unchanged. A value JSON cannot
+  represent (Infinity, NaN) falls back to its plain string form rather than
+  raising. This replaces the prior Ruby `inspect` rendering, which emitted
+  `{:a=>1}` instead of valid JSON.
 - Provider resolution from a model reference (`Models.resolve`,
   `Models.provider_for`, `Truffle.resolve_model`), a port of pi's
   `findExactModelReferenceMatch`. A reference is a bare id (`claude-opus-4-8`), a

@@ -43,6 +43,25 @@ class TestAgentLoop < Minitest::Test
     assert_equal "10", tool_msg.text
   end
 
+  # A tool that returns structured data reaches the model as JSON in the
+  # tool-result message: the agent passes the serialized return through
+  # untouched, so the value the model reads is valid JSON, not Ruby inspect.
+  def test_structured_tool_return_reaches_history_as_json
+    record = Truffle::Tool.define("record", "Return a record") do
+      run { { city: "Berlin", capital: true } }
+    end
+    provider = StubProvider.new([
+                                  StubProvider.tool_call(id: "c1", name: "record", arguments: {}),
+                                  StubProvider.text("done")
+                                ])
+    agent = Truffle::Agent.new(provider: provider, tools: [record])
+    agent.run("look it up")
+
+    tool_msg = agent.messages.find { |m| m.role == :tool }
+
+    assert_equal '{"city":"Berlin","capital":true}', tool_msg.text
+  end
+
   def test_emits_events_in_order
     provider = StubProvider.new([
                                   StubProvider.tool_call(id: "c1", name: "add",

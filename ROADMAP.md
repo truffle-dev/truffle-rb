@@ -76,8 +76,10 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
      snapshots, case-insensitive, ambiguity rejected); `Truffle.agent` infers the
      provider from `model:` and reduces a `provider/id` reference to the bare wire
      id.
-9. **Structured tool results.** A tool may return a hash/array, serialized as
-   JSON for the model; plain strings keep working.
+9. [x] **Structured tool results.** A tool may return a hash/array, serialized
+   as JSON for the model; plain strings keep working. `Tool#call` serializes any
+   non-String return with `JSON.generate` (Infinity/NaN fall back to `to_s`),
+   mirroring pi's `JSON.stringify` of a structured result.
 
 ## Phase 3: the coding-agent surface
 

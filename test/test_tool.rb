@@ -54,4 +54,62 @@ class TestTool < Minitest::Test
     assert_equal "HELLO SAM", greet.call("name" => "sam", "loud" => true)
     refute_includes greet.to_schema[:parameters][:required], "loud"
   end
+
+  def test_string_result_passes_through_verbatim
+    # A handler that formats its own output is handed to the model as-is, not
+    # JSON-quoted, so existing string-returning tools keep working.
+    echo = Truffle::Tool.define("echo", "Echo a line") do
+      run { "plain text, not \"quoted\"" }
+    end
+
+    assert_equal "plain text, not \"quoted\"", echo.call({})
+  end
+
+  def test_hash_result_is_serialized_as_json
+    lookup = Truffle::Tool.define("lookup", "Return a record") do
+      run { { city: "Berlin", population: 3_700_000, capital: true } }
+    end
+
+    assert_equal '{"city":"Berlin","population":3700000,"capital":true}', lookup.call({})
+  end
+
+  def test_array_result_is_serialized_as_json
+    listing = Truffle::Tool.define("listing", "Return rows") do
+      run { [{ id: 1, name: "a" }, { id: 2, name: "b" }] }
+    end
+
+    assert_equal '[{"id":1,"name":"a"},{"id":2,"name":"b"}]', listing.call({})
+  end
+
+  def test_nested_structure_serializes_as_json_not_inspect
+    # Ruby's inspect would yield `{:ok=>true, ...}`; the model needs valid JSON.
+    nested = Truffle::Tool.define("nested", "Return nested data") do
+      run { { ok: true, items: [1, 2], meta: { kind: "list" } } }
+    end
+
+    assert_equal '{"ok":true,"items":[1,2],"meta":{"kind":"list"}}', nested.call({})
+    refute_includes nested.call({}), "=>"
+  end
+
+  def test_scalar_result_serializes_as_json
+    answer = Truffle::Tool.define("answer", "Return a number") do
+      run { 42 }
+    end
+    flag = Truffle::Tool.define("flag", "Return a boolean") do
+      run { false }
+    end
+
+    assert_equal "42", answer.call({})
+    assert_equal "false", flag.call({})
+  end
+
+  def test_unrepresentable_value_falls_back_to_string
+    # Infinity and NaN are not valid JSON; JSON.generate raises on them, so the
+    # result falls back to its plain string form rather than crashing the loop.
+    infinite = Truffle::Tool.define("infinite", "Return infinity") do
+      run { Float::INFINITY }
+    end
+
+    assert_equal "Infinity", infinite.call({})
+  end
 end

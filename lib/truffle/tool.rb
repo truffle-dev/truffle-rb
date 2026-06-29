@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module Truffle
   # A tool the agent can call.
   #
@@ -36,11 +38,11 @@ module Truffle
     end
 
     # Run the tool. `arguments` is a Hash with string keys (as the model emits);
-    # they are symbolized so the handler can use keyword arguments.
+    # they are symbolized so the handler can use keyword arguments. The handler's
+    # return value is serialized for the model by #serialize_result.
     def call(arguments)
       kwargs = (arguments || {}).each_with_object({}) { |(k, v), h| h[k.to_sym] = v }
-      result = handler.call(**kwargs)
-      result.is_a?(String) ? result : result.inspect
+      serialize_result(handler.call(**kwargs))
     end
 
     # JSON-Schema-shaped function spec, provider-neutral. Providers wrap this in
@@ -51,6 +53,23 @@ module Truffle
         description: description,
         parameters: parameters
       }
+    end
+
+    private
+
+    # The model reads tool output as text. A String result is already that text
+    # and passes through unchanged, so a handler that formats its own output
+    # keeps working. Any other value (a Hash or Array of structured data, or a
+    # scalar) is encoded as JSON so the model receives valid JSON rather than
+    # Ruby's inspect syntax (`{:a=>1}`), mirroring how pi stringifies a
+    # structured tool result with JSON.stringify. A value JSON cannot represent
+    # (Infinity, NaN) falls back to its plain string form.
+    def serialize_result(result)
+      return result if result.is_a?(String)
+
+      JSON.generate(result)
+    rescue JSON::GeneratorError
+      result.to_s
     end
 
     # Collects param declarations and the run block into a JSON Schema + handler.
