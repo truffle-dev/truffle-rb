@@ -86,7 +86,13 @@ module Truffle
     return name if name.is_a?(Providers::Base)
 
     extension_options = Extensions.provider_options(extensions, name)
-    return Providers::OpenAI.new(**extension_options, **options) if extension_options
+    if extension_options
+      combined_options = extension_options.merge(options)
+      if extension_options[:headers].is_a?(Hash) && options[:headers].is_a?(Hash)
+        combined_options[:headers] = extension_options[:headers].merge(options[:headers])
+      end
+      return Providers::OpenAI.new(**combined_options)
+    end
 
     klass = PROVIDERS[name.to_sym]
     if klass.nil?

@@ -399,8 +399,16 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       provider override defined values; `LoadResult` runtime unregisters are
       respected; and registered model names can infer the provider without
       mutating the global catalog.
+    - [x] **Bind provider request headers.** OpenAI-compatible provider
+      registrations honor provider-level `headers` and `auth_header` /
+      `authHeader`. Header values use the same literal and `$ENV` / `${ENV}`
+      interpolation path as api keys; `authHeader` adds a generated bearer token
+      after custom headers; `authHeader: false` lets a registration supply its
+      own `Authorization`; and caller-supplied `headers:` override registered
+      headers per key. Chat and streaming requests share the same provider
+      headers.
     - [ ] Bind provider registration reload/unregister into live agents and
-      sessions, plus non-OpenAI custom APIs, OAuth, request headers, and
+      sessions, plus non-OpenAI custom APIs, OAuth, model-specific headers, and
       `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's

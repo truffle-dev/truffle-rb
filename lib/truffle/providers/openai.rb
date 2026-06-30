@@ -22,9 +22,9 @@ module Truffle
 
       def initialize(api_key: ENV.fetch("OPENAI_API_KEY", nil), model: DEFAULT_MODEL,
                      base_url: DEFAULT_BASE_URL, open_timeout: 15, read_timeout: 120,
-                     provider_name: "openai")
+                     provider_name: "openai", headers: nil, auth_header: true)
         super()
-        if api_key.nil? || api_key.empty?
+        if auth_header && (api_key.nil? || api_key.empty?)
           raise ArgumentError,
                 "missing OpenAI API key (set OPENAI_API_KEY or pass :api_key)"
         end
@@ -33,6 +33,8 @@ module Truffle
         @model = model
         @base_url = base_url.chomp("/")
         @provider_name = provider_name.to_s
+        @headers = normalize_headers(headers)
+        @auth_header = auth_header
         @open_timeout = open_timeout
         @read_timeout = read_timeout
       end
@@ -171,8 +173,7 @@ module Truffle
         http.read_timeout = @read_timeout
 
         request = Net::HTTP::Post.new(uri)
-        request["Authorization"] = "Bearer #{@api_key}"
-        request["Content-Type"] = "application/json"
+        request_headers.each { |key, value| request[key] = value }
         request.body = JSON.generate(body)
 
         response = http.request(request)
@@ -190,12 +191,32 @@ module Truffle
 
       # Auth header for the shared SSE transport (Providers::SSE#stream_post).
       def stream_request_headers
-        { "Authorization" => "Bearer #{@api_key}" }
+        provider_headers
       end
 
       # Label the shared SSE transport puts on a non-success streaming response.
       def provider_label
         "OpenAI"
+      end
+
+      def request_headers
+        { "Content-Type" => "application/json" }.merge(provider_headers)
+      end
+
+      def provider_headers
+        headers = @headers.dup
+        headers["Authorization"] = "Bearer #{@api_key}" if @auth_header
+        headers
+      end
+
+      def normalize_headers(headers)
+        return {} unless headers.respond_to?(:each)
+
+        headers.each_with_object({}) do |(key, value), normalized|
+          next if key.nil? || value.nil?
+
+          normalized[key.to_s] = value.to_s
+        end
       end
     end
   end

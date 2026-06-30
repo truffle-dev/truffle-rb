@@ -106,6 +106,12 @@ All notable changes to Truffle are documented here. The format follows
   override defined values, `LoadResult` runtime unregisters are respected, and
   registered model references can infer the provider without mutating the global
   catalog.
+- Extension-registered OpenAI-compatible providers now carry custom request
+  headers into both chat and streaming requests. Provider-level `headers` values
+  support the same literal and `$ENV` / `${ENV}` interpolation used for api keys;
+  `auth_header` / `authHeader` controls whether Truffle generates the bearer
+  `Authorization` header; and caller-supplied `headers:` override registered
+  header defaults per key.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

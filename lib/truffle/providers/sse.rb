@@ -76,9 +76,9 @@ module Truffle
 
       def build_stream_request(uri, body)
         request = Net::HTTP::Post.new(uri)
-        stream_request_headers.each { |key, value| request[key] = value }
         request["Content-Type"] = "application/json"
         request["Accept"] = "text/event-stream"
+        stream_request_headers.each { |key, value| request[key] = value }
         request.body = JSON.generate(body)
         request
       end

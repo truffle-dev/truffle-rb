@@ -2,6 +2,7 @@
 
 require_relative "../extensions"
 require_relative "../models"
+require_relative "config_values"
 
 module Truffle
   module Extensions
@@ -49,6 +50,9 @@ module Truffle
       options[:base_url] = config[:base_url].to_s if config[:base_url]
       api_key = provider_api_key(name, config[:api_key])
       options[:api_key] = api_key if api_key
+      headers = provider_headers(name, config[:headers])
+      options[:headers] = headers if headers
+      options[:auth_header] = config[:auth_header] if config.key?(:auth_header)
       model_id = config[:model] || first_model_id(config[:models])
       options[:model] = model_id.to_s if model_id
       options
@@ -117,6 +121,10 @@ module Truffle
           normalized[:api_key] = value
         when "api"
           normalized[:api] = value
+        when "authHeader", "auth_header"
+          normalized[:auth_header] = value
+        when "headers"
+          normalized[:headers] = value
         when "model"
           normalized[:model] = value
         when "models"
@@ -139,16 +147,24 @@ module Truffle
     def provider_api_key(provider_name, value)
       return nil if value.nil?
 
-      string = value.to_s
-      if string.start_with?("!")
-        raise Error, "extension provider #{provider_name.inspect} uses command api_key values; " \
-                     "command resolution is not supported yet"
-      end
-
-      env_name = string[/\A\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?\z/, 1]
-      env_name ? ENV.fetch(env_name, nil) : string
+      ConfigValues.resolve(value, provider_name: provider_name, label: "api_key")
     end
     private_class_method :provider_api_key
+
+    def provider_headers(provider_name, headers)
+      return nil unless headers.is_a?(Hash)
+
+      resolved = headers.each_with_object({}) do |(key, value), acc|
+        resolved_value = ConfigValues.resolve(
+          value,
+          provider_name: provider_name,
+          label: "header #{key}"
+        )
+        acc[key.to_s] = resolved_value if resolved_value
+      end
+      resolved.empty? ? nil : resolved
+    end
+    private_class_method :provider_headers
 
     def provider_model_references(source)
       provider_configs(source).flat_map do |provider, config|

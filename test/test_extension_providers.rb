@@ -168,6 +168,127 @@ class TestExtensionProviders < Minitest::Test
     end
   end
 
+  def test_provider_headers_are_resolved_for_chat_and_stream_requests
+    old_value = ENV.fetch("TRUFFLE_TEST_EXTENSION_HEADER_TOKEN", nil)
+    ENV["TRUFFLE_TEST_EXTENSION_HEADER_TOKEN"] = "secret-token"
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        authHeader: false,
+        model: "llama3",
+        headers: {
+          "Authorization" => "Bearer $TRUFFLE_TEST_EXTENSION_HEADER_TOKEN",
+          "X-Tenant" => "acme",
+          "X-Escaped" => "cost $$1 $!bang"
+        }
+      })
+    RUBY
+
+    provider = Truffle.provider(:local, extensions: extensions)
+
+    chat_headers = provider.send(:request_headers)
+
+    assert_equal "application/json", chat_headers["Content-Type"]
+    assert_equal "Bearer secret-token", chat_headers["Authorization"]
+    assert_equal "acme", chat_headers["X-Tenant"]
+    assert_equal "cost $1 !bang", chat_headers["X-Escaped"]
+
+    stream_request = provider.send(:build_stream_request, URI("http://localhost:11434/v1/chat"), {})
+
+    assert_equal "text/event-stream", stream_request["Accept"]
+    assert_equal "Bearer secret-token", stream_request["Authorization"]
+    assert_equal "acme", stream_request["X-Tenant"]
+  ensure
+    if old_value.nil?
+      ENV.delete("TRUFFLE_TEST_EXTENSION_HEADER_TOKEN")
+    else
+      ENV["TRUFFLE_TEST_EXTENSION_HEADER_TOKEN"] = old_value
+    end
+  end
+
+  def test_auth_header_generates_authorization_after_custom_headers
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        api_key: "test-key",
+        auth_header: true,
+        model: "llama3",
+        headers: {
+          "Authorization" => "Bearer custom",
+          "X-Tenant" => "acme"
+        }
+      })
+    RUBY
+
+    provider = Truffle.provider(:local, extensions: extensions)
+    headers = provider.send(:request_headers)
+
+    assert_equal "Bearer test-key", headers["Authorization"]
+    assert_equal "acme", headers["X-Tenant"]
+  end
+
+  def test_caller_headers_merge_over_registered_provider_headers
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        auth_header: false,
+        model: "llama3",
+        headers: {
+          "Authorization" => "Bearer extension",
+          "X-Keep" => "extension",
+          "X-Override" => "extension"
+        }
+      })
+    RUBY
+
+    provider = Truffle.provider(
+      :local,
+      extensions: extensions,
+      headers: {
+        "Authorization" => "Bearer caller",
+        "X-Override" => "caller",
+        "X-New" => "caller"
+      }
+    )
+    headers = provider.send(:request_headers)
+
+    assert_equal "Bearer caller", headers["Authorization"]
+    assert_equal "extension", headers["X-Keep"]
+    assert_equal "caller", headers["X-Override"]
+    assert_equal "caller", headers["X-New"]
+  end
+
+  def test_missing_header_environment_reference_raises
+    old_value = ENV.fetch("TRUFFLE_TEST_MISSING_EXTENSION_HEADER", nil)
+    ENV.delete("TRUFFLE_TEST_MISSING_EXTENSION_HEADER")
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        auth_header: false,
+        model: "llama3",
+        headers: {
+          "Authorization" => "Bearer $TRUFFLE_TEST_MISSING_EXTENSION_HEADER"
+        }
+      })
+    RUBY
+
+    error = assert_raises(Truffle::Error) do
+      Truffle.provider(:local, extensions: extensions)
+    end
+
+    assert_match(/unresolved header Authorization environment reference/, error.message)
+  ensure
+    if old_value.nil?
+      ENV.delete("TRUFFLE_TEST_MISSING_EXTENSION_HEADER")
+    else
+      ENV["TRUFFLE_TEST_MISSING_EXTENSION_HEADER"] = old_value
+    end
+  end
+
   def test_load_result_runtime_registrations_respect_unregister_across_files
     extensions = load_extensions(
       <<~RUBY,
