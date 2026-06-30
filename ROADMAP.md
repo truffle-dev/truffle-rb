@@ -326,7 +326,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       direct directory scans, preserves `description` and `argument-hint`
       frontmatter, falls back to the first body line for descriptions, and
       expands `/name args` with the argument helpers.
-    - [ ] Default command/prompt directories once the Ruby config layout exists.
+    - [x] **Default command/prompt directories.** `Truffle::Config` defines the
+      Ruby config layout (`~/.truffle/agent` or `TRUFFLE_AGENT_DIR`, plus
+      project-local `.truffle`). `PromptTemplates.load_all` loads user prompts,
+      project prompts, and explicit prompt paths in pi's order, with an
+      `include_project:` escape hatch for callers that need a trust gate before
+      reading project-local instructions. Item 17 is closed.
     - [x] **Slash command registry and expansion into prompts/actions.**
       `Truffle::SlashCommands::Registry` parses `/name args`, expands prompt
       templates before the provider turn, dispatches handler commands without a

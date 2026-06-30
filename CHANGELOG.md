@@ -7,6 +7,12 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Config` defines the local config layout for command prompts:
+  `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
+  `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt
+  templates in pi's order: user prompt directory, project prompt directory, then
+  explicit prompt paths. Project prompts can be skipped with `include_project:`
+  when an embedding app wants to require trust before reading local instructions.
 - Extensions. `Truffle::EventBus` ports pi's channel-based event bus, the
   publish/subscribe seam pi hands to extensions as `pi.events` so independently
   loaded extensions communicate without direct references. `emit(channel, data)`

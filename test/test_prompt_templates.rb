@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "fileutils"
 require "tmpdir"
 
 # Prompt-template loading and expansion for slash-command style prompts, ported
@@ -94,6 +95,70 @@ class TestPromptTemplates < Minitest::Test
       )
 
       assert_equal %w[dir-template file-template], templates.map(&:name)
+    end
+  end
+
+  def test_load_all_reads_default_dirs_then_explicit_paths
+    Dir.mktmpdir("truffle-prompts") do |dir|
+      agent_dir = File.join(dir, "agent")
+      user_prompts = File.join(agent_dir, "prompts")
+      project_prompts = File.join(dir, ".truffle", "prompts")
+      explicit_prompts = File.join(dir, "extra")
+      [user_prompts, project_prompts, explicit_prompts].each { |path| FileUtils.mkdir_p(path) }
+      File.write(File.join(user_prompts, "user.md"), "User")
+      File.write(File.join(project_prompts, "project.md"), "Project")
+      File.write(File.join(explicit_prompts, "explicit.md"), "Explicit")
+
+      templates = PromptTemplates.load_all(
+        cwd: dir,
+        agent_dir: agent_dir,
+        prompt_paths: ["extra"]
+      )
+
+      assert_equal %w[user project explicit], templates.map(&:name)
+    end
+  end
+
+  def test_load_all_can_skip_project_prompt_dir
+    Dir.mktmpdir("truffle-prompts") do |dir|
+      agent_dir = File.join(dir, "agent")
+      user_prompts = File.join(agent_dir, "prompts")
+      project_prompts = File.join(dir, ".truffle", "prompts")
+      [user_prompts, project_prompts].each { |path| FileUtils.mkdir_p(path) }
+      File.write(File.join(user_prompts, "user.md"), "User")
+      File.write(File.join(project_prompts, "project.md"), "Project")
+
+      templates = PromptTemplates.load_all(cwd: dir, agent_dir: agent_dir, include_project: false)
+
+      assert_equal %w[user], templates.map(&:name)
+    end
+  end
+
+  def test_load_all_can_skip_default_prompt_dirs
+    Dir.mktmpdir("truffle-prompts") do |dir|
+      agent_dir = File.join(dir, "agent")
+      user_prompts = File.join(agent_dir, "prompts")
+      explicit_prompts = File.join(dir, "extra")
+      [user_prompts, explicit_prompts].each { |path| FileUtils.mkdir_p(path) }
+      File.write(File.join(user_prompts, "user.md"), "User")
+      File.write(File.join(explicit_prompts, "explicit.md"), "Explicit")
+
+      templates = PromptTemplates.load_all(
+        cwd: dir,
+        agent_dir: agent_dir,
+        prompt_paths: "extra",
+        include_defaults: false
+      )
+
+      assert_equal %w[explicit], templates.map(&:name)
+    end
+  end
+
+  def test_load_all_ignores_missing_default_prompt_dirs
+    Dir.mktmpdir("truffle-prompts") do |dir|
+      templates = PromptTemplates.load_all(cwd: dir, agent_dir: File.join(dir, "missing-agent"))
+
+      assert_empty templates
     end
   end
 

@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 require_relative "frontmatter"
+require_relative "config"
 
 module Truffle
   # Prompt-template helpers for slash-command style prompts, ported from pi's
   # prompt-templates.ts. They load markdown prompt files from explicit
-  # files/directories, parse the small argument language pi supports, and expand
-  # `/name args` text into prompt content. Default prompt directories and command
-  # actions live in later command slices.
+  # files/directories plus Truffle's default prompt directories, parse the small
+  # argument language pi supports, and expand `/name args` text into prompt
+  # content. Command actions live in later command slices.
   module PromptTemplates
     FALLBACK_DESCRIPTION_LENGTH = 60
 
@@ -59,7 +60,7 @@ module Truffle
     # Load prompt templates from explicit markdown files or directories. Relative
     # paths resolve from cwd; missing paths and non-markdown files are ignored.
     def load_paths(paths, cwd: Dir.pwd)
-      paths.flat_map do |path|
+      Array(paths).flat_map do |path|
         resolved = resolve_prompt_path(path, cwd)
         next [] unless resolved
 
@@ -74,6 +75,20 @@ module Truffle
       rescue StandardError
         []
       end
+    end
+
+    # Load prompt templates in pi's default order: user prompts, project prompts,
+    # then explicit paths. Project prompts can be skipped by callers that need a
+    # trust gate before reading project-local instructions.
+    def load_all(cwd: Dir.pwd, agent_dir: Config.agent_dir, prompt_paths: [],
+                 include_defaults: true, include_user: true, include_project: true)
+      templates = []
+      if include_defaults
+        templates.concat(load_dir(Config.prompts_dir(agent_dir: agent_dir))) if include_user
+        templates.concat(load_dir(Config.project_prompts_dir(cwd: cwd))) if include_project
+      end
+      templates.concat(load_paths(prompt_paths, cwd: cwd))
+      templates
     end
 
     # Parse command arguments with the same small bash-style quote handling pi
