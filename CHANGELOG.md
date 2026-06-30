@@ -7,6 +7,16 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Schema` is an immutable JSON-Schema value object for structured
+  output, built by a block DSL that mirrors `Tool::Builder`'s `param`. It
+  describes the shape a model should return: an object root with
+  `properties`/`required`, scalar fields, nested objects, and arrays with an
+  `items` schema. `#to_h` emits the provider-neutral hash (symbol structural
+  keys, string property names, matching `Tool#parameters`), and `.from_h` is its
+  inverse, folding string or symbol keys back to the canonical form so a JSON
+  round-trip survives equality. Values are deeply frozen and usable as hash keys.
+  This is the foundation for the `schema:` provider seam and a structured
+  `Response#parsed` accessor.
 - `Truffle::Mime` detects the image MIME type of a binary buffer or a file from
   its leading bytes, a port of pi's coding-agent `utils/mime.ts`. It recognizes
   JPEG, PNG, GIF, WEBP, and BMP, and returns nil for a lossless JPEG or an

@@ -80,6 +80,20 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
    as JSON for the model; plain strings keep working. `Tool#call` serializes any
    non-String return with `JSON.generate` (Infinity/NaN fall back to `to_s`),
    mirroring pi's `JSON.stringify` of a structured result.
+10. **Structured output.** Ask a model for a JSON object matching a declared
+    shape, the way pi's `ai` package wires native structured output per provider.
+    - [x] **Schema value object.** `Truffle::Schema` is an immutable
+      JSON-Schema value object built by a block DSL that mirrors
+      `Tool::Builder`'s `param`: object root with `properties`/`required`,
+      scalars, nested objects, and arrays with an `items` schema. `#to_h` emits
+      the provider-neutral hash; `.from_h` is its JSON-round-trip inverse,
+      folding string or symbol keys to the canonical form so equality survives.
+      Deeply frozen, usable as a hash key.
+    - [ ] **Provider seam.** A `schema:` option on the provider request builders,
+      wrapped in each API's envelope (OpenAI `response_format.json_schema`,
+      Anthropic `output_config.format`, Gemini `responseSchema`).
+    - [ ] **Parsed accessor.** `Response#parsed` lazily `JSON.parse`s the final
+      text, with an advisory `Schema#valid?`/`#errors` for callers that validate.
 
 ## Phase 3: the coding-agent surface
 
