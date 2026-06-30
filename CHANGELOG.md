@@ -8,13 +8,14 @@ All notable changes to Truffle are documented here. The format follows
 
 ### Added
 - The `truffle` binary now acts on `--print`/`-p`: it drives a single-shot
-  agent run and writes the final assistant turn to stdout, a faithful port of
-  pi's `runPrintMode` text branch. Piped stdin and the first message join into
-  the initial prompt; any further messages are sent in order after it. An error
-  or aborted final turn prints its message to stderr with exit 1, and an
-  unresolvable provider/model fails the same way. The builtin tools are wired by
-  default and narrowed by `--no-tools`, `--tools`, and `--exclude-tools`. JSON
-  and RPC output modes, sessions, extensions, skills, `@file` content, and the
+  agent run and writes either the final assistant turn (`--mode text`) or one
+  JSON object per agent event (`--mode json`) to stdout, faithful ports of pi's
+  `runPrintMode` text and JSON branches. Piped stdin and the first message join
+  into the initial prompt; any further messages are sent in order after it. An
+  error or aborted final text turn prints its message to stderr with exit 1, and
+  an unresolvable provider/model fails the same way. The builtin tools are wired
+  by default and narrowed by `--no-tools`, `--tools`, and `--exclude-tools`. RPC
+  output mode, sessions, extensions, skills, `@file` content, and the
   interactive REPL remain later slices.
 
 ### Fixed

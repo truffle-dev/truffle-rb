@@ -474,8 +474,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the `:agent_end` event using pi's last-assistant-message rule, and renders
       it through `render_print_text`. An unresolvable provider/model fails on
       stderr with exit 1. An injectable `agent_builder:` keeps the dispatch
-      offline-testable. JSON/RPC modes, sessions, `--continue`/`--resume`,
+      offline-testable. RPC mode, sessions, `--continue`/`--resume`,
       extensions, skills, `@file` content and images, and the interactive REPL
+      remain later slices.
+    - [x] Print-mode JSON output. `truffle --print --mode json` subscribes to
+      the agent event stream and writes one newline-delimited JSON object per
+      event, with a `type` field plus JSON-safe payload data. This ports pi's
+      JSON branch for the sessionless CLI slice; session headers and RPC mode
       remain later slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.

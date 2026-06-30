@@ -61,16 +61,24 @@ module Truffle
     end
 
     # Drive a single-shot `--print` run: build the agent, prompt it with the
-    # assembled messages in order, and render its final assistant turn. Faithful
-    # to the text branch of pi's `runPrintMode`. An unresolvable provider/model
+    # assembled messages in order, and render either the final assistant turn
+    # (`--mode text`) or each agent event as newline-delimited JSON (`--mode json`).
+    # Faithful to the text/JSON branches of pi's `runPrintMode`, narrowed to the
+    # sessionless CLI slice this harness has today. An unresolvable provider/model
     # (or any harness error) surfaces on stderr with exit 1, the analog of pi's
     # `catch`. `agent_builder` lets a test inject a stub agent; production builds
     # one with `build_print_agent`.
     def run_print(args, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
       agent = (agent_builder || method(:build_print_agent)).call(args)
       final = nil
-      agent.on(:agent_end) { |payload| final = final_print_response(payload) }
+      if args.mode == "json"
+        agent.on { |event, payload| render_print_json(event, payload, out: out) }
+      else
+        agent.on(:agent_end) { |payload| final = final_print_response(payload) }
+      end
       print_prompts(args, input).each { |prompt| agent.run(prompt) }
+      return 0 if args.mode == "json"
+
       render_print_text(final, out: out, err: err)
     rescue Truffle::Error => e
       err.puts e.message

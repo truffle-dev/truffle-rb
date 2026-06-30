@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module Truffle
   module CLI
     # The output half of pi's print mode (single-shot `truffle -p "..."`): given
@@ -40,5 +42,55 @@ module Truffle
       end
       0
     end
+
+    # Render one print-mode JSON event as newline-delimited JSON. This mirrors
+    # pi's JSON branch, which subscribes to the session stream and writes each
+    # event object as one JSON line. Truffle's agent event bus hands subscribers
+    # an event name plus a Ruby payload, so this method folds the name into a
+    # `type` field and converts Truffle value objects into plain JSON data.
+    def render_print_json(event, payload, out: $stdout)
+      out.write("#{JSON.generate(print_json_event(event, payload))}\n")
+      0
+    end
+
+    def print_json_event(event, payload)
+      json_payload = print_json_value(payload)
+      json_payload = {} unless json_payload.is_a?(Hash)
+
+      json_payload.each_with_object({ "type" => event.to_s }) do |(key, value), result|
+        next if key == "type" || value.nil?
+
+        result[key] = value
+      end
+    end
+
+    def print_json_value(value)
+      case value
+      when nil, true, false, Numeric, String
+        value
+      when Symbol
+        value.to_s
+      when Array
+        value.map { |item| print_json_value(item) }
+      when Hash
+        value.each_with_object({}) do |(key, item), result|
+          result[key.to_s] = print_json_value(item)
+        end
+      when Exception
+        { "class" => value.class.name, "message" => value.message }
+      else
+        print_json_object(value)
+      end
+    end
+
+    def print_json_object(value)
+      return print_json_value(value.to_h) if value.respond_to?(:to_h)
+
+      value.to_s
+    rescue StandardError
+      value.to_s
+    end
+
+    private_class_method :print_json_event, :print_json_value, :print_json_object
   end
 end

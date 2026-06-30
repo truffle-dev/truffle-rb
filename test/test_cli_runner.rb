@@ -13,22 +13,35 @@ class PrintStubAgent
 
   def initialize(payloads)
     @payloads = payloads
-    @listeners = []
+    @listeners = Hash.new { |h, k| h[k] = [] }
+    @all_listeners = []
     @prompts = []
     @run = 0
   end
 
-  def on(event, &block)
-    @listeners << block if event == :agent_end
+  def on(event = nil, &block)
+    if event
+      @listeners[event] << block
+    else
+      @all_listeners << block
+    end
     self
   end
 
   def run(prompt)
     @prompts << prompt
+    emit(:agent_start, input: prompt)
     payload = @payloads[@run] || @payloads.last
     @run += 1
-    @listeners.each { |listener| listener.call(payload) } if payload
+    emit(:agent_end, payload) if payload
     ""
+  end
+
+  private
+
+  def emit(event, payload)
+    @listeners[event].each { |listener| listener.call(payload) }
+    @all_listeners.each { |listener| listener.call(event, payload) }
   end
 end
 
@@ -224,6 +237,24 @@ class TestCLIRunner < Minitest::Test
     assert_equal 0, status
     assert_equal %w[one two], agent.prompts
     assert_equal "second reply\n", out
+  end
+
+  def test_print_json_mode_writes_agent_events_as_json_lines
+    agent = PrintStubAgent.new([assistant_payload("the answer")])
+
+    status, out, err = run_print_cli(["-p", "ask", "--mode", "json"], agent: agent)
+    events = out.lines.map { |line| JSON.parse(line) }
+
+    assert_equal 0, status
+    assert_empty err
+    types = events.map { |event| event["type"] }
+
+    assert_equal %w[agent_start agent_end], types
+    assert_equal "ask", events.first["input"]
+    assert_equal "the answer", events.last["output"]
+    assert_equal "assistant", events.last["messages"].last["role"]
+    assert_equal "stop", events.last["stop_reason"]
+    refute_includes events.last, "error_message"
   end
 
   def test_print_does_not_read_an_interactive_stdin

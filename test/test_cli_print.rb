@@ -119,4 +119,28 @@ class TestCLIPrint < Minitest::Test
     assert_equal 0, status
     assert_equal "trailing\n\n", out
   end
+
+  def test_json_event_renderer_serializes_truffle_values
+    out = StringIO.new
+    call = Truffle::ToolCall.new(id: "c1", name: "lookup", arguments: { "city" => nil })
+    message = Truffle::Message.assistant(content: [call])
+    usage = Truffle::Usage.new(input: 3, output: 5, cache_read: 2, reasoning: 1)
+
+    status = Truffle::CLI.render_print_json(
+      :message,
+      { message: message, usage: usage, stop_reason: :tool_use, error_message: nil },
+      out: out
+    )
+    event = JSON.parse(out.string)
+
+    assert_equal 0, status
+    assert_equal "message", event["type"]
+    assert_equal "assistant", event["message"]["role"]
+    assert_equal "tool_call", event["message"]["content"].first["type"]
+    assert_equal({ "city" => nil }, event["message"]["content"].first["arguments"])
+    assert_equal 3, event["usage"]["input"]
+    assert_equal 1, event["usage"]["reasoning"]
+    assert_equal "tool_use", event["stop_reason"]
+    refute_includes event, "error_message"
+  end
 end
