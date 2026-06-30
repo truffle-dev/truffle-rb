@@ -196,6 +196,21 @@ OpenAI-compatible endpoints. The examples above use `gpt-5.4-mini` for a fast,
 low-cost default; reach for a flagship such as `gpt-5.5`, `claude-opus-4-8`, or
 `claude-sonnet-4-6` when a task needs deeper reasoning.
 
+Register an OpenAI-compatible endpoint in-process when an app already has the
+connection details and does not need an extension file:
+
+```ruby
+Truffle.register_provider(
+  "local",
+  api: :openai_completions,
+  base_url: "http://localhost:11434/v1",
+  api_key: "$LOCAL_LLM_API_KEY",
+  model: "llama3"
+)
+
+agent = Truffle.agent(model: "local/llama3")
+```
+
 ## Testing
 
 For local Ruby:

@@ -26,6 +26,8 @@ module Truffle
         source.runtime.provider_registrations
       when Extension
         source.provider_registrations
+      when ProviderRegistration
+        [source]
       else
         Array(source).flat_map { |item| provider_registrations(item) }
       end

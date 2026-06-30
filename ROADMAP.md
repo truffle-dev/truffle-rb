@@ -76,6 +76,10 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
      snapshots, case-insensitive, ambiguity rejected); `Truffle.agent` infers the
      provider from `model:` and reduces a `provider/id` reference to the bare wire
      id.
+   - [x] **In-process OpenAI-compatible provider registry.** Apps can call
+     `Truffle.register_provider` / `unregister_provider` with the same config
+     shape extension files use, and `Truffle.provider` / `Truffle.agent` resolve
+     those providers without writing a `.truffle/extensions` file.
 9. [x] **Structured tool results.** A tool may return a hash/array, serialized
    as JSON for the model; plain strings keep working. `Tool#call` serializes any
    non-String return with `JSON.generate` (Infinity/NaN fall back to `to_s`),

@@ -34,6 +34,7 @@ require_relative "truffle/providers/google"
 require_relative "truffle/providers/google_stream"
 require_relative "truffle/extensions"
 require_relative "truffle/extensions/providers"
+require_relative "truffle/provider_registry"
 require_relative "truffle/agent"
 require_relative "truffle/agent/extensions"
 require_relative "truffle/agent/tool_execution"
@@ -85,27 +86,42 @@ module Truffle
 
   module_function
 
-  # Build a provider by symbol (:openai), an extension-registered provider, or
-  # pass a ready-made instance through.
+  # Build a provider by symbol (:openai), an extension-registered provider, an
+  # in-process registered provider, or pass a ready-made instance through.
   def provider(name, extensions: nil, **options)
     return name if name.is_a?(Providers::Base)
 
     extension_options = Extensions.provider_options(extensions, name)
-    if extension_options
-      combined_options = extension_options.merge(options)
-      if extension_options[:headers].is_a?(Hash) && options[:headers].is_a?(Hash)
-        combined_options[:headers] = extension_options[:headers].merge(options[:headers])
-      end
-      return Providers::OpenAI.new(**combined_options)
-    end
+    return openai_compatible_provider(extension_options, options) if extension_options
+
+    registered_options = ProviderRegistry.provider_options(name)
+    return openai_compatible_provider(registered_options, options) if registered_options
 
     klass = PROVIDERS[name.to_sym]
     if klass.nil?
-      known = (PROVIDERS.keys.map(&:to_s) + Extensions.provider_names(extensions)).uniq
+      known = (
+        PROVIDERS.keys.map(&:to_s) +
+        Extensions.provider_names(extensions) +
+        ProviderRegistry.provider_names
+      ).uniq
       raise Error, "unknown provider #{name.inspect}, known: #{known.inspect}"
     end
 
     klass.new(**options)
+  end
+
+  # Register an OpenAI Chat Completions-compatible provider in-process, without a
+  # `.truffle/extensions` file. The config keys match `truffle.register_provider`.
+  def register_provider(name, config)
+    ProviderRegistry.register(name, config)
+  end
+
+  def unregister_provider(name)
+    ProviderRegistry.unregister(name)
+  end
+
+  def registered_provider_names
+    ProviderRegistry.provider_names
   end
 
   # Convenience constructor: Truffle.agent(provider: :openai, tools: [...], ...).
@@ -126,6 +142,7 @@ module Truffle
       resolved = Models.resolve(model)
       if resolved.nil?
         resolved = Extensions.model_reference(extensions, model)
+        resolved ||= ProviderRegistry.model_reference(model)
         if resolved.nil?
           raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
         end
@@ -154,6 +171,15 @@ module Truffle
       extension_provider_overrides: provider_options
     )
   end
+
+  def openai_compatible_provider(registered_options, caller_options)
+    combined_options = registered_options.merge(caller_options)
+    if registered_options[:headers].is_a?(Hash) && caller_options[:headers].is_a?(Hash)
+      combined_options[:headers] = registered_options[:headers].merge(caller_options[:headers])
+    end
+    Providers::OpenAI.new(**combined_options)
+  end
+  private_class_method :openai_compatible_provider
 
   # Define a tool: Truffle.tool("name", "desc") { param ...; run { ... } }.
   def tool(name, description, execution_mode: :parallel, &)
