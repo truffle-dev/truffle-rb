@@ -1,6 +1,11 @@
 # Truffle
 
+[![CI](https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml/badge.svg)](https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/truffle-dev/truffle-rb/graph/badge.svg?branch=main)](https://codecov.io/gh/truffle-dev/truffle-rb)
 [![Gem Version](https://img.shields.io/gem/v/truffle)](https://rubygems.org/gems/truffle)
+[![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D)](truffle.gemspec)
+[![Code style: RuboCop](https://img.shields.io/badge/code_style-rubocop-brightgreen.svg)](https://github.com/rubocop/rubocop)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A complete **agent harness for Ruby**, built from scratch. Truffle gives you the
 loop that turns a language model into an agent: it sends a prompt, lets the model
@@ -201,8 +206,18 @@ the current flagships ever regress to a stale lineup.
 
 ## Testing
 
+From a local Ruby:
+
 ```sh
+bundle install
 rake test
+bundle exec rubocop
+```
+
+The one-command path is:
+
+```sh
+script/check
 ```
 
 The default suite is hermetic and offline: it drives the agent loop with a stub
@@ -213,9 +228,34 @@ With a key present each verifies the full path: prompt -> model requests a tool
 -> Truffle runs it -> model answers with the tool's result, for both the
 buffered and streaming code paths.
 
-No local Ruby? The repo ships `script/rb`, a thin wrapper that runs any command
-inside a `ruby:3.3-slim` container, so `script/rb rake test` works on a host
-with only Docker.
+For live tests, copy the example file, fill in the keys you have, and use the
+container runner. `.env.local` is ignored and must stay local.
+
+```sh
+cp .env.local.example .env.local
+script/check
+```
+
+No local Ruby? `script/rb` runs any command inside a Ruby 3.3 container:
+
+```sh
+script/rb rake test
+script/rb bundle exec rubocop
+```
+
+`script/check` uses that wrapper, installs/checks the bundle in a Docker volume,
+runs `bundle exec rake test`, then runs `bundle exec rubocop`. Set
+`TRUFFLE_RUBY_IMAGE`, `TRUFFLE_BUNDLE_VOLUME`, or `TRUFFLE_REPO_VOLUME` only
+when you need a custom container setup.
+
+Coverage is opt-in:
+
+```sh
+COVERAGE=true script/rb rake test
+```
+
+That writes SimpleCov output under `coverage/`. CI uploads the same report to
+Codecov when the repository has Codecov upload access configured.
 
 ## Project layout
 
@@ -235,6 +275,8 @@ lib/truffle/providers/anthropic.rb # Anthropic Messages provider (+ anthropic_st
 lib/truffle/providers/google.rb    # Google Gemini provider (+ google_stream.rb)
 examples/calculator.rb          # runnable multi-tool demo
 test/                           # minitest suite (offline + per-provider live tests)
+script/rb                       # Docker-backed Ruby command runner
+script/check                    # one-command test + lint verification
 ```
 
 ## Credits

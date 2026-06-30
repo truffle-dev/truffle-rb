@@ -9,9 +9,9 @@ harder to read."
 - **One focused change per PR.** Match a single roadmap item or fix one bug.
   Bundled PRs are hard to review and slow to land.
 - **Tests stay green and the offline suite stays offline.** The default
-  `rake test` must pass without any network or API key. Only
-  `test/test_openai_integration.rb` may touch the network, and it must skip when
-  `OPENAI_API_KEY` is unset.
+  `rake test` must pass without any network or API key. Live provider tests must
+  skip unless their key is present (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `GEMINI_API_KEY`).
 - **Keep the core loop readable.** `lib/truffle/agent.rb` should remain something a
   newcomer can read top to bottom and understand.
 - **Provider-agnostic above the seam.** Nothing outside `lib/truffle/providers/`
@@ -20,20 +20,41 @@ harder to read."
 ## Development
 
 ```sh
-bundle install
-rake test            # offline suite
-
-# Run the live OpenAI test and example with a key:
-export OPENAI_API_KEY=sk-...
-rake test
-ruby examples/calculator.rb "What is 6 times 7?"
+script/check
 ```
 
-No local Ruby? Use the container wrapper:
+`script/check` is the deterministic path for a clean machine with Docker. It
+uses `script/rb`, installs/checks the bundle in a Docker volume, runs
+`bundle exec rake test`, then runs `bundle exec rubocop`.
+
+With a local Ruby:
 
 ```sh
-script/rb rake test
+bundle install
+rake test            # offline suite
+bundle exec rubocop
 ```
+
+For live provider tests:
+
+```sh
+cp .env.local.example .env.local
+# Fill in any keys you have, then:
+script/rb rake test
+script/rb ruby examples/calculator.rb "What is 6 times 7?"
+```
+
+When you run through `script/rb` or `script/check`, `.env.local` is loaded for
+the container without printing the values. With local Ruby, export the keys or
+source `.env.local` in your shell first.
+
+Coverage is opt-in:
+
+```sh
+COVERAGE=true script/rb rake test
+```
+
+The report is written under `coverage/`.
 
 ## Pull requests
 

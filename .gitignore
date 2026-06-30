@@ -3,6 +3,8 @@
 /pkg/
 /tmp/
 /coverage/
+/.env.local
+/.env.*.local
 *.gem
 Gemfile.lock
 .ruby-version

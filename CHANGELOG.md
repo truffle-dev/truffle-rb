@@ -7,13 +7,16 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
-- `script/rb` now injects all three provider keys (`OPENAI_API_KEY`,
-  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) into the test container, each read from a
-  single-purpose file under the operator's config dir or, failing that, an
-  already-set env var. With all three present the suite runs real round trips
-  against every provider with zero skips. The files live outside the repo and are
-  never sourced into the host process env, so a key cannot be committed or picked
-  up by anything but a test run.
+- `script/rb` now bind-mounts the current checkout by default, uses the full
+  Ruby 3.3 image with a cached bundle volume, and passes provider keys from
+  `.env.local`, config files, or the current environment without printing them.
+  `TRUFFLE_REPO_VOLUME` remains available for volume-based setups.
+- Added `script/check` as the one-command verification path: install/check the
+  bundle, run `bundle exec rake test`, then run `bundle exec rubocop` in the
+  project container.
+- Added opt-in SimpleCov reporting with `COVERAGE=true`, a Codecov upload step in
+  CI, and public README badges for the repo's real CI, coverage, gem, Ruby,
+  style, and license signals.
 - Corrected the README provider count: OpenAI, Anthropic, and Google Gemini all
   ship in the box (each with a streaming sibling), and the live-test section now
   documents the per-provider key gating for all three.

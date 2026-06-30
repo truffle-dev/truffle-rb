@@ -23,8 +23,8 @@ dependencies; every provider is hand-written.
   single source of truth for ids, capabilities, and pricing) and its facade.
 - `lib/truffle/providers/`: the provider seam and concrete providers. Everything
   outside this directory must stay provider-agnostic.
-- `test/`: minitest. The default suite is offline; one test hits OpenAI and
-  skips without `OPENAI_API_KEY`.
+- `test/`: minitest. The default suite is offline; live provider tests skip
+  unless their provider key is present.
 
 ## Working agreement
 
@@ -39,8 +39,8 @@ dependencies; every provider is hand-written.
    it, they do not define it.
 5. **Keep the offline suite offline.** No network in the default `rake test`.
 6. **Run the suite and the linter before committing**: `rake test` and
-   `rubocop` (or `script/rb rake test` / `script/rb bundle exec rubocop` on a
-   host without local Ruby). Do not commit red, and do not leave lint offenses.
+   `rubocop`, or `script/check` on a host without local Ruby. Do not commit red,
+   and do not leave lint offenses.
 7. **Update docs in the same commit**: `CHANGELOG.md` under "Unreleased," and
    check off the `ROADMAP.md` item you finished.
 8. **Stay provider-agnostic.** New provider-specific code goes under
@@ -57,6 +57,7 @@ dependencies; every provider is hand-written.
 
 ## Secrets
 
-Never commit an API key or any secret. The OpenAI key is read from the
-`OPENAI_API_KEY` environment variable at runtime only. Tests must skip rather
-than fail when it is absent.
+Never commit an API key or any secret. Provider keys are read from environment
+variables at runtime (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`).
+For local live tests, `script/rb` also loads `.env.local`, which must remain
+untracked. Tests must skip rather than fail when a key is absent.

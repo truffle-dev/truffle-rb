@@ -1,49 +1,71 @@
 #!/usr/bin/env bash
-# Run any command against the Truffle source inside a ruby:3.3 container.
+# Run any command against the Truffle source inside a Ruby 3.3 container.
 #
-# Why: this VM has no local Ruby, so we develop on disk and execute in a
-# throwaway container. A sibling container cannot bind-mount /app/repos (that is
-# a host path it can't see), so we mount the named Docker volume by name.
-#
-# Provider API keys (OpenAI, Anthropic, Gemini) are each read from a
-# single-purpose file under the operator's config dir and injected as an env var
-# ONLY for the lifetime of the container command. These files live outside the
-# repo, so they can never be committed, and they are NOT sourced into the agent's
-# own process env (env.sh does not reference them), so the host SDK never picks
-# them up. They are never printed. Each key gates only its provider's live tests;
-# without a key, that provider's integration test skips and the offline suite
-# still runs fully.
+# Provider API keys (OpenAI, Anthropic, Gemini) are each read from a repo-local
+# .env.local file, a single-purpose file under the operator's config dir, or the
+# current environment. They are injected only for the lifetime of the container
+# command and are never printed. COVERAGE=true is also passed through for
+# SimpleCov runs.
 #
 # Usage:
-#   script/rb rake test                  # full suite (live tests run if keyed)
-#   script/rb ruby examples/calculator.rb
+#   script/rb rake test                  # full suite; live tests run if keyed
+#   script/rb bundle exec rubocop
 #   script/rb bash                       # interactive shell
 set -euo pipefail
 
-IMAGE="${TRUFFLE_RUBY_IMAGE:-ruby:3.3-slim}"
-VOLUME="${TRUFFLE_REPO_VOLUME:-phantom_phantom_repos}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+IMAGE="${TRUFFLE_RUBY_IMAGE:-ruby:3.3}"
+WORKDIR="${TRUFFLE_CONTAINER_WORKDIR:-/app}"
+BUNDLE_VOLUME="${TRUFFLE_BUNDLE_VOLUME:-truffle_rb_bundle}"
 CONFIG_DIR="${TRUFFLE_CONFIG_DIR:-$HOME/.config/truffle}"
 
-key_args=()
+env_args=()
 
-# Inject "$1" as env var "$2" from config file "$3" (trimmed) or, failing that,
-# from the same-named env var if it is already set. Never echoes the value.
-inject_key() {
+# Load local development secrets when present. This file is ignored locally and
+# should contain simple shell assignments such as OPENAI_API_KEY=...
+if [[ -f "$ROOT/.env.local" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env.local"
+  set +a
+fi
+
+load_key_file() {
   local env_name="$1" file="$2"
-  if [[ -f "$file" ]]; then
-    key_args+=(-e "${env_name}=$(tr -d '\n' < "$file")")
-  elif [[ -n "${!env_name:-}" ]]; then
-    key_args+=(-e "${env_name}=${!env_name}")
+  if [[ -z "${!env_name:-}" && -f "$file" ]]; then
+    printf -v "$env_name" '%s' "$(tr -d '\n' < "$file")"
+    export "$env_name"
   fi
 }
 
-inject_key OPENAI_API_KEY    "${OPENAI_KEY_FILE:-$CONFIG_DIR/openai_api_key}"
-inject_key ANTHROPIC_API_KEY "${ANTHROPIC_KEY_FILE:-$CONFIG_DIR/anthropic_api_key}"
-inject_key GEMINI_API_KEY    "${GEMINI_KEY_FILE:-$CONFIG_DIR/gemini_api_key}"
+pass_env_if_set() {
+  local env_name="$1"
+  if [[ -n "${!env_name:-}" ]]; then
+    env_args+=(-e "$env_name")
+  fi
+}
+
+load_key_file OPENAI_API_KEY    "${OPENAI_KEY_FILE:-$CONFIG_DIR/openai_api_key}"
+load_key_file ANTHROPIC_API_KEY "${ANTHROPIC_KEY_FILE:-$CONFIG_DIR/anthropic_api_key}"
+load_key_file GEMINI_API_KEY    "${GEMINI_KEY_FILE:-$CONFIG_DIR/gemini_api_key}"
+
+pass_env_if_set OPENAI_API_KEY
+pass_env_if_set ANTHROPIC_API_KEY
+pass_env_if_set GEMINI_API_KEY
+pass_env_if_set COVERAGE
+
+if [[ -n "${TRUFFLE_REPO_VOLUME:-}" ]]; then
+  repo_mount=(-v "${TRUFFLE_REPO_VOLUME}:/repos")
+  container_workdir="${TRUFFLE_REPO_VOLUME_WORKDIR:-/repos/truffle-rb}"
+else
+  repo_mount=(-v "${ROOT}:${WORKDIR}")
+  container_workdir="$WORKDIR"
+fi
 
 exec docker run --rm -i \
-  -v "${VOLUME}:/repos" \
-  -w /repos/truffle-rb \
-  "${key_args[@]}" \
+  "${repo_mount[@]}" \
+  -v "${BUNDLE_VOLUME}:/usr/local/bundle" \
+  -w "$container_workdir" \
+  "${env_args[@]}" \
   "$IMAGE" \
   "$@"

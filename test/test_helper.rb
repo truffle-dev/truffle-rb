@@ -2,6 +2,15 @@
 
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
+if %w[1 true yes].include?(ENV.fetch("COVERAGE", "").downcase)
+  require "simplecov"
+
+  SimpleCov.start do
+    enable_coverage :branch
+    add_filter "/test/"
+  end
+end
+
 require "minitest/autorun"
 require "minitest/mock"
 require "truffle"

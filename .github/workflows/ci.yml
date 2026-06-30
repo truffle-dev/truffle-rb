@@ -46,6 +46,30 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop --format github
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Run coverage
+        run: bundle exec rake test
+        env:
+          COVERAGE: "true"
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/.resultset.json
+          flags: ruby
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   build:
     name: Build the gem
     runs-on: ubuntu-latest

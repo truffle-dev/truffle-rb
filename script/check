@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Run the standard developer verification in the project Ruby container.
+#
+# This installs the development bundle into a Docker volume, then runs the full
+# test suite and RuboCop. If .env.local contains provider keys, the live provider
+# tests run as part of the test task.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+exec script/rb bash -lc '
+  set -euo pipefail
+  bundle check >/dev/null 2>&1 || bundle install
+  bundle exec rake test
+  bundle exec rubocop
+'
