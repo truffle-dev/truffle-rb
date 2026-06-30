@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "mime"
+
 module Truffle
   # Typed content blocks. A message's content is a list of these, not a single
   # string, which is how pi models content: text and thinking on assistant turns,
@@ -104,6 +106,20 @@ module Truffle
     # A base64-encoded image with its MIME type, on a user or tool-result turn.
     class Image
       attr_reader :data, :mime_type
+
+      def self.from_file(path)
+        mime_type = Mime.detect_supported_image_mime_type_from_file(path)
+        return nil unless mime_type
+
+        from_bytes(File.binread(path), mime_type: mime_type)
+      end
+
+      def self.from_bytes(bytes, mime: nil, mime_type: nil)
+        mime_type ||= mime
+        raise ArgumentError, "mime_type is required" if mime_type.nil? || mime_type.empty?
+
+        new(data: [bytes.b].pack("m0"), mime_type: mime_type)
+      end
 
       def initialize(data:, mime_type:)
         @data = data

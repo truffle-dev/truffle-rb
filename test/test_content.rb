@@ -2,6 +2,7 @@
 
 require_relative "test_helper"
 require "json"
+require "tempfile"
 
 # Covers the typed content blocks and the way Message normalizes a turn's
 # content into a list of them.
@@ -41,6 +42,46 @@ class TestContent < Minitest::Test
 
     assert_equal :image, img.type
     assert_equal({ type: :image, data: "abc123", mime_type: "image/png" }, img.to_h)
+  end
+
+  def test_image_from_bytes_base64_encodes_with_explicit_mime
+    img = Truffle::Content::Image.from_bytes("\x89PNG".b, mime: "image/png")
+
+    assert_equal "image/png", img.mime_type
+    assert_equal ["\x89PNG".b].pack("m0"), img.data
+  end
+
+  def test_image_from_bytes_accepts_mime_type_keyword
+    img = Truffle::Content::Image.from_bytes("GIF89a".b, mime_type: "image/gif")
+
+    assert_equal "image/gif", img.mime_type
+  end
+
+  def test_image_from_bytes_requires_a_mime_type
+    assert_raises(ArgumentError) { Truffle::Content::Image.from_bytes("raw".b) }
+  end
+
+  def test_image_from_file_sniffs_and_encodes_supported_images
+    data = [0xff, 0xd8, 0xff, 0xe0].pack("C*")
+    Tempfile.create(["fixture", ".jpg"]) do |file|
+      file.binmode
+      file.write(data)
+      file.flush
+
+      img = Truffle::Content::Image.from_file(file.path)
+
+      assert_equal "image/jpeg", img.mime_type
+      assert_equal [data].pack("m0"), img.data
+    end
+  end
+
+  def test_image_from_file_returns_nil_for_unsupported_content
+    Tempfile.create(["fixture", ".txt"]) do |file|
+      file.write("plain text")
+      file.flush
+
+      assert_nil Truffle::Content::Image.from_file(file.path)
+    end
   end
 
   def test_message_wraps_a_bare_string_as_one_text_block

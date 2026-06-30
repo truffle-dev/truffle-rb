@@ -163,6 +163,13 @@ for several tools in one turn, Truffle runs independent calls in parallel by
 default and appends results back to history in source order. Use
 `tool_execution: :sequential` when a batch must run one call at a time.
 
+For local image input, build image blocks and pass them with the prompt:
+
+```ruby
+image = Truffle::Content::Image.from_file("screenshot.png")
+answer = agent.run("What changed?", images: [image].compact)
+```
+
 ### Events
 
 ```ruby

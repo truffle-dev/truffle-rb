@@ -11,7 +11,8 @@ All notable changes to Truffle are documented here. The format follows
   its leading bytes, a port of pi's coding-agent `utils/mime.ts`. It recognizes
   JPEG, PNG, GIF, WEBP, and BMP, and returns nil for a lossless JPEG or an
   animated PNG, which a model cannot take. The checks read raw bytes, so no image
-  library is added. This is the prerequisite for `@file` image arguments.
+  library is added. `Truffle::Content::Image.from_file` and `.from_bytes` expose
+  the local bytes-to-image-block conversion used by `@file` image arguments.
 - The `truffle` binary now acts on `--print`/`-p`: it drives a single-shot
   agent run and writes either the final assistant turn (`--mode text`) or one
   JSON object per agent event (`--mode json`) to stdout, faithful ports of pi's

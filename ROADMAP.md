@@ -498,6 +498,8 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `Truffle::Content::Image` blocks, and represented in text with an empty
       `<file name="absolute/path"></file>` marker for filename context. The slice
       does not resize images or add image-processing dependencies.
+      `Truffle::Content::Image.from_file` and `.from_bytes` expose the same
+      conversion for app code.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

@@ -135,13 +135,10 @@ module Truffle
 
         next if File.empty?(path)
 
-        mime_type = Mime.detect_supported_image_mime_type_from_file(path)
-        if mime_type
+        image = Content::Image.from_file(path)
+        if image
           input.text << "<file name=\"#{path}\"></file>\n"
-          input.images << Content::Image.new(
-            data: [File.binread(path)].pack("m0"),
-            mime_type: mime_type
-          )
+          input.images << image
           next
         end
 
