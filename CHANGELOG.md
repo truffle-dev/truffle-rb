@@ -30,6 +30,17 @@ All notable changes to Truffle are documented here. The format follows
   over `CLAUDE.md`), a file reachable by more than one route appears once, and an
   unreadable candidate warns and falls through to the next name. The warning sink
   is injectable so tests stay quiet.
+- CLI argument parser. `Truffle::CLI.parse_args` ports pi's `cli/args.ts`
+  `parseArgs`: a pure function from an argv array to an `Args` struct of parsed
+  flags, messages, file arguments, captured unknown flags, and diagnostics, with no
+  side effects. It carries pi's quirks faithfully: a value-taking flag at the end of
+  argv with no value falls through to the unknown-flag branch rather than erroring,
+  `--name` with no value records an error diagnostic, `--thinking` warns on an
+  unrecognized level while `--mode` silently ignores one, `--print` captures a
+  following message unless it is a flag or `@file` (a `---`-prefixed token still
+  counts as a message), `--models` keeps blank entries after trimming while
+  `--tools` drops them, and an unknown `--flag` claims the next non-flag argument as
+  its value. The REPL, help text, and acting on the parsed flags are later slices.
 - `Truffle::Config` defines the local config layout for command prompts:
   `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
   `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt

@@ -42,6 +42,7 @@ require_relative "truffle/skills"
 require_relative "truffle/context_files"
 require_relative "truffle/system_prompt"
 require_relative "truffle/tools"
+require_relative "truffle/cli"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.
 #
