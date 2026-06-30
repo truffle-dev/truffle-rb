@@ -268,8 +268,22 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 
 ## Phase 4: self-extension (skills, commands, extensions)
 
-16. **Skills.** A skill is a folder with a manifest and instructions, loadable at
-    runtime, the way pi loads skills.
+16. **Skills.** A skill is a markdown file with frontmatter and instructions,
+    loadable at runtime, the way pi loads skills.
+    - [x] **Frontmatter parser.** `Truffle::Frontmatter` ports pi's
+      `parseFrontmatter` / `extractFrontmatter`: the YAML block between a leading
+      `---` and the next `---`, with the trimmed body, normalizing newlines and
+      treating an absent or unclosed block as all body.
+    - [x] **Single-file load + validation + prompt format.** `Truffle::Skills`
+      ports pi's `loadSkillFromFile` / `validateName` / `validateDescription` /
+      `formatSkillsForPrompt`: one markdown file into a `Skill` plus diagnostics
+      (name falls back to the parent directory, a blank description drops the
+      skill, other problems warn but load), and `format_for_prompt` renders the
+      `<available_skills>` block, hiding skills with model invocation disabled.
+    - [ ] Directory discovery (SKILL.md-root vs .md-children vs recurse) and
+      name-collision resolution across user/project/path sources.
+    - [ ] Gitignore-style ignore matching (pi's `ignore`-package matcher,
+      hand-rolled zero-dep) and symlink dedup.
 17. **Commands.** User-invocable commands that expand into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
