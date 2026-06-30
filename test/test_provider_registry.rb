@@ -121,6 +121,7 @@ class TestProviderRegistry < Minitest::Test
           config: {
             api: :openai_completions,
             base_url: "http://extension.test/v1",
+            api_key: "test-key",
             model: "extension-model"
           },
           source_path: nil
