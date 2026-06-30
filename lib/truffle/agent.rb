@@ -14,8 +14,8 @@ module Truffle
   #       response = provider.chat(messages, tools)
   #       append assistant message; emit :message
   #       if response has tool calls:
-  #         for each call: emit :tool_call, run tool, append tool result,
-  #                        emit :tool_result
+  #         preflight calls, run allowed tools in parallel by default, append
+  #         tool-result messages in assistant order
   #         emit :turn_end ; continue   # feed results back to the model
   #       else:
   #         emit :turn_end ; emit :agent_end ; return assistant text
@@ -55,8 +55,10 @@ module Truffle
     # retry up to three times with exponential backoff from a 2s base, on. A
     # caller tunes or disables this with retry_settings: at construction.
     DEFAULT_RETRY_SETTINGS = { enabled: true, max_retries: 3, base_delay_ms: 2000 }.freeze
+    TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
-    attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns, :usage, :session
+    attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns,
+                :usage, :session, :tool_execution
 
     # Resume an agent from a session file. The session carries the conversation
     # and, when it was dumped by #dump, the model and the names of the tools the
@@ -67,12 +69,13 @@ module Truffle
     # agent had must be present in `tools`, or load raises. The model defaults to
     # the one recorded in the session; pass model: to override it.
     def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
-                  max_turns: DEFAULT_MAX_TURNS)
+                  max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel)
       session = Session.load(path)
       toolbox = rebind_toolbox(session.tools, tools)
       context = session.context
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
-                  model: model || context.model&.model_id, max_turns: max_turns)
+                  model: model || context.model&.model_id, max_turns: max_turns,
+                  tool_execution: tool_execution)
       agent.restore(context.messages)
     end
 
@@ -102,7 +105,8 @@ module Truffle
                    max_turns: DEFAULT_MAX_TURNS, session: nil,
                    compaction_settings: Compaction::DEFAULT_SETTINGS, auto_compact: true,
                    retry_settings: DEFAULT_RETRY_SETTINGS,
-                   before_tool_call: nil, after_tool_call: nil)
+                   before_tool_call: nil, after_tool_call: nil,
+                   tool_execution: :parallel)
       @provider = provider
       @system_prompt = system_prompt
       @model = model
@@ -113,6 +117,7 @@ module Truffle
       @compaction_settings = compaction_settings
       @auto_compact = auto_compact
       @retry_settings = retry_settings
+      @tool_execution = normalize_tool_execution(tool_execution)
       # Optional tool-execution middleware, ported from pi's beforeToolCall /
       # afterToolCall seam. Each is a callable handed a single context Hash. The
       # before hook can veto a call ({ block: true }); the after hook can override
@@ -140,6 +145,16 @@ module Truffle
       # agent, the way pi tallies a session. #reset clears it.
       @usage = Usage.zero
     end
+
+    def normalize_tool_execution(mode)
+      mode = mode.to_sym if mode.respond_to?(:to_sym)
+      return mode if TOOL_EXECUTION_MODES.include?(mode)
+
+      expected = TOOL_EXECUTION_MODES.inspect
+      raise ArgumentError,
+            "unknown tool execution mode #{mode.inspect}, expected one of #{expected}"
+    end
+    private :normalize_tool_execution
 
     # Register a listener. `on(:tool_call) { |payload| ... }` for one event, or
     # `on { |type, payload| ... }` (no event arg) for every event.

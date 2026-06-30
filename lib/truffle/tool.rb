@@ -17,24 +17,37 @@ module Truffle
   #
   # The block runs in a small builder context so `param` and `run` read cleanly.
   class Tool
-    attr_reader :name, :description, :parameters, :handler
+    EXECUTION_MODES = %i[parallel sequential].freeze
 
-    def initialize(name:, description:, parameters:, handler:)
+    attr_reader :name, :description, :parameters, :handler, :execution_mode
+
+    def initialize(name:, description:, parameters:, handler:, execution_mode: :parallel)
       @name = name.to_s
       @description = description.to_s
       @parameters = parameters
       @handler = handler
+      @execution_mode = self.class.normalize_execution_mode(execution_mode)
     end
 
-    def self.define(name, description, &block)
+    def self.define(name, description, execution_mode: :parallel, &block)
       builder = Builder.new
       builder.instance_eval(&block) if block
       new(
         name: name,
         description: description,
         parameters: builder.schema,
-        handler: builder.handler
+        handler: builder.handler,
+        execution_mode: execution_mode
       )
+    end
+
+    def self.normalize_execution_mode(mode)
+      mode = mode.to_sym if mode.respond_to?(:to_sym)
+      return mode if EXECUTION_MODES.include?(mode)
+
+      expected = EXECUTION_MODES.inspect
+      raise ArgumentError,
+            "unknown tool execution mode #{mode.inspect}, expected one of #{expected}"
     end
 
     # Run the tool. `arguments` is a Hash with string keys (as the model emits);

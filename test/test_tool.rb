@@ -103,6 +103,36 @@ class TestTool < Minitest::Test
     assert_equal "false", flag.call({})
   end
 
+  def test_tool_defaults_to_parallel_execution_mode
+    tool = Truffle::Tool.define("noop", "Noop") { run { "ok" } }
+
+    assert_equal :parallel, tool.execution_mode
+  end
+
+  def test_tool_accepts_sequential_execution_mode
+    tool = Truffle::Tool.define("write", "Write a file", execution_mode: :sequential) do
+      run { "ok" }
+    end
+
+    assert_equal :sequential, tool.execution_mode
+  end
+
+  def test_tool_rejects_unknown_execution_mode
+    error = assert_raises(ArgumentError) do
+      Truffle::Tool.define("noop", "Noop", execution_mode: :sideways) { run { "ok" } }
+    end
+
+    assert_match(/unknown tool execution mode :sideways/, error.message)
+  end
+
+  def test_tool_rejects_nil_execution_mode
+    error = assert_raises(ArgumentError) do
+      Truffle::Tool.define("noop", "Noop", execution_mode: nil) { run { "ok" } }
+    end
+
+    assert_match(/unknown tool execution mode nil/, error.message)
+  end
+
   def test_unrepresentable_value_falls_back_to_string
     # Infinity and NaN are not valid JSON; JSON.generate raises on them, so the
     # result falls back to its plain string form rather than crashing the loop.

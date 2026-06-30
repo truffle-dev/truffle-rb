@@ -258,8 +258,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     resolves; the after hook runs on an executed result; an unknown tool skips
     both; a raising hook becomes an error result. Narrowed to this port's
     single-string tool result (no structured content/details/isError/terminate).
-15. **Parallel tool dispatch.** Run independent tool calls in one turn
-    concurrently while preserving result ordering in the history.
+15. [x] **Parallel tool dispatch.** Run independent tool calls in one turn
+    concurrently while preserving result ordering in the history. The agent now
+    defaults to `tool_execution: :parallel`: it preflights tool calls in source
+    order, runs allowed tool bodies concurrently, and appends tool-result
+    messages in source order. `tool_execution: :sequential` on the agent, or
+    `execution_mode: :sequential` on any tool in the batch, keeps the historical
+    one-at-a-time behavior.
 
 ## Phase 4: self-extension (skills, commands, extensions)
 

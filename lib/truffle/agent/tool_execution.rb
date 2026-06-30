@@ -9,32 +9,97 @@ module Truffle
   class Agent
     private
 
-    # Run each tool call the assistant requested, append its result to the
-    # history as a tool message, and return the list of result strings.
+    # Run each tool call the assistant requested, append its result to history as
+    # a tool message, and return the result strings. Ports pi's default execution
+    # mode: preflight calls in assistant order, run allowed tool bodies
+    # concurrently, then append tool-result messages in assistant order. A
+    # sequential agent mode or any sequential tool keeps the historical
+    # one-at-a-time behavior for stateful tools.
     def run_tool_calls(tool_calls)
-      tool_calls.map do |call|
+      return run_tool_calls_sequential(tool_calls) if sequential_batch?(tool_calls)
+
+      run_tool_calls_parallel(tool_calls)
+    end
+
+    def run_tool_calls_sequential(tool_calls)
+      tool_calls.map { |call| append_tool_result(call, execute(call)) }
+    end
+
+    def run_tool_calls_parallel(tool_calls)
+      prepared = tool_calls.map do |call|
         emit(:tool_call, call: call)
-        result = execute(call)
-        message = Message.tool(content: result, tool_call_id: call.id, name: call.name)
-        append(message)
-        emit(:tool_result, call: call, result: result, message: message)
-        result
+        prepare_tool_call(call)
+      end
+
+      results = Array.new(prepared.length)
+      threads = []
+
+      prepared.each_with_index do |entry, index|
+        if entry[:kind] == :immediate
+          results[index] = entry[:result]
+        else
+          threads << Thread.new do
+            results[index] = execute_prepared_tool_call(entry)
+          rescue StandardError => e
+            results[index] = "Error running tool '#{entry[:call].name}': #{e.class}: #{e.message}"
+          end
+        end
+      end
+
+      threads.each(&:join)
+      prepared.each_with_index.map do |entry, index|
+        append_tool_result(entry[:call], results[index])
       end
     end
 
     def execute(call)
+      emit(:tool_call, call: call)
+      prepared = prepare_tool_call(call)
+      return prepared[:result] if prepared[:kind] == :immediate
+
+      execute_prepared_tool_call(prepared)
+    end
+
+    def prepare_tool_call(call)
       tool = @toolbox[call.name]
       # An unknown tool is reported immediately, before either hook runs, the way
       # pi returns a not-found result before reaching beforeToolCall.
-      return "Error: unknown tool '#{call.name}'" if tool.nil?
+      if tool.nil?
+        return { kind: :immediate, call: call,
+                 result: "Error: unknown tool '#{call.name}'" }
+      end
 
       args = call.arguments
       blocked = before_hook(call, args)
       # A vetoed call skips execution and the after hook, matching pi's immediate
       # block path: the reason becomes the tool result the model reads.
-      return blocked if blocked
+      return { kind: :immediate, call: call, result: blocked } if blocked
 
-      after_hook(call, args, run_tool(tool, call, args))
+      { kind: :prepared, call: call, tool: tool, args: args }
+    rescue StandardError => e
+      { kind: :immediate, call: call,
+        result: "Error in before_tool_call for '#{call.name}': #{e.class}: #{e.message}" }
+    end
+
+    def execute_prepared_tool_call(prepared)
+      call = prepared[:call]
+      args = prepared[:args]
+      after_hook(call, args, run_tool(prepared[:tool], call, args))
+    end
+
+    def append_tool_result(call, result)
+      message = Message.tool(content: result, tool_call_id: call.id, name: call.name)
+      append(message)
+      emit(:tool_result, call: call, result: result, message: message)
+      result
+    end
+
+    def sequential_batch?(tool_calls)
+      return true if @tool_execution == :sequential
+
+      tool_calls.any? do |call|
+        @toolbox[call.name]&.execution_mode == :sequential
+      end
     end
 
     # The before-tool-call hook. Returns the block reason string when the hook

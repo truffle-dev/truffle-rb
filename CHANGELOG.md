@@ -66,6 +66,14 @@ All notable changes to Truffle are documented here. The format follows
   manual preload.
 
 ### Added
+- `Truffle::Agent` now runs multiple tool calls from the same assistant turn in
+  parallel by default, while appending tool-result messages back to history in
+  the assistant's source order. This ports pi's `toolExecution: "parallel"`
+  behavior for the current Ruby surface: before hooks preflight calls in order,
+  allowed tool bodies run concurrently, after hooks finalize each result, and
+  result messages stay ordered for the next model turn. Use
+  `tool_execution: :sequential` on an agent, or `execution_mode: :sequential` on
+  a tool, for stateful tools that must run one at a time.
 - `Truffle::Agent` now auto-retries a turn that failed with a transient error.
   When the `Retry` classifier deems a failed turn transient (a load spike, a 5xx,
   a throttle, a dropped socket) and it is not a context overflow, the agent drops

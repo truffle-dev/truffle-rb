@@ -1,48 +1,63 @@
-# Truffle
+<h1 align="center">Truffle</h1>
 
-[![CI](https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml/badge.svg)](https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/truffle-dev/truffle-rb/graph/badge.svg?branch=main)](https://codecov.io/gh/truffle-dev/truffle-rb)
-[![Gem Version](https://img.shields.io/gem/v/truffle)](https://rubygems.org/gems/truffle)
-[![Ruby](https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D)](truffle.gemspec)
-[![Code style: RuboCop](https://img.shields.io/badge/code_style-rubocop-brightgreen.svg)](https://github.com/rubocop/rubocop)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>A dependency-free Ruby agent harness, built from scratch.</strong><br>
+  Tool calls, providers, sessions, compaction, streaming, and events in plain Ruby.
+</p>
 
-A complete **agent harness for Ruby**, built from scratch. Truffle gives you the
-loop that turns a language model into an agent: it sends a prompt, lets the model
-ask for tools, runs those tools, feeds the results back, and repeats until the
-model answers. It is a faithful port of
-[pi](https://github.com/earendil-works/pi) to idiomatic Ruby. No framework, no
-service, no runtime gem dependencies. Plain Ruby and the standard library.
+<p align="center">
+  <a href="https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/truffle-dev/truffle-rb/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://codecov.io/gh/truffle-dev/truffle-rb"><img alt="Coverage" src="https://codecov.io/gh/truffle-dev/truffle-rb/graph/badge.svg?branch=main"></a>
+  <a href="https://rubygems.org/gems/truffle"><img alt="Gem Version" src="https://img.shields.io/gem/v/truffle"></a>
+  <a href="truffle.gemspec"><img alt="Ruby >= 3.1" src="https://img.shields.io/badge/ruby-%3E%3D%203.1-CC342D"></a>
+  <a href="https://github.com/rubocop/rubocop"><img alt="Code style: RuboCop" src="https://img.shields.io/badge/code_style-rubocop-brightgreen.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+</p>
+
+<p align="center">
+  Truffle gives Ruby applications the loop that turns a language model into a
+  tool-using agent: ask, call tools, feed results back, and repeat until the
+  model answers. It is a faithful port of
+  <a href="https://github.com/earendil-works/pi">pi</a> to idiomatic Ruby. No
+  framework, no service, no runtime gem dependencies.
+</p>
 
 ```ruby
 require "truffle"
 
-weather = Truffle.tool("get_weather", "Look up the weather for a city") do
-  param :city, :string, "city name", required: true
-  run { |city:| "It is 22C and sunny in #{city}." }
+weather = Truffle.tool(
+  "get_weather",
+  "Look up city weather"
+) do
+  param :city, :string, "city name",
+        required: true
+
+  run do |city:|
+    "22C and sunny in #{city}."
+  end
 end
 
 agent = Truffle.agent(
   provider: :openai,
-  model: "gpt-4o-mini",
-  system_prompt: "You are a concise assistant. Use tools when they help.",
+  model: "gpt-5-mini",
   tools: [weather]
 )
 
-puts agent.run("What's the weather in Lisbon?")
-# => "It's 22C and sunny in Lisbon right now."
+question = "Weather in Lisbon?"
+puts agent.run(question)
 ```
 
 The model decided to call `get_weather(city: "Lisbon")`, Truffle ran your Ruby
 block, handed the result back, and the model wrote the final answer. That whole
 round trip is the agent loop, and it is the thing Truffle exists to give you.
 
-![The calculator example running: the model calls add, then multiply, and Truffle returns 140](docs/calculator-demo.png)
+<p align="center">
+  <img src="docs/calculator-demo.png" alt="The calculator example running: the model calls add, then multiply, and Truffle returns 140">
+</p>
 
-*The bundled calculator example. The model called `add(12, 8)`, Truffle ran the
-Ruby block and fed back `20`, the model called `multiply(20, 7)`, and the loop
-returned the final answer. Every arrow is a real tool call printed through the
-event API.*
+<p align="center">
+  <em>The bundled calculator example: every arrow is a real tool call printed through the event API.</em>
+</p>
 
 ## Why Truffle
 
@@ -142,7 +157,7 @@ end
 ```ruby
 agent = Truffle.agent(
   provider: :openai,
-  model: "gpt-4o-mini",
+  model: "gpt-5-mini",
   system_prompt: "You are a precise calculator.",
   tools: [add],
   max_turns: 12
@@ -155,6 +170,12 @@ agent.reset   # clears history, keeps the system prompt and tools
 `run` drives the loop to completion and returns the final assistant text.
 `max_turns` guards against a model that never settles; exceeding it raises
 `Truffle::Error`.
+
+When a model asks for several tools in one turn, Truffle preflights them in order
+and runs allowed tool bodies in parallel by default. Tool result messages are
+still appended in the model's source order. Use `tool_execution: :sequential` on
+the agent, or `execution_mode: :sequential` on a tool, when a batch must run one
+call at a time.
 
 ### Events
 

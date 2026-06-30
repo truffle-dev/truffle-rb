@@ -84,7 +84,8 @@ module Truffle
   # expects. An explicit `provider:` is left untouched, so an unlisted or custom
   # model id still works when the provider is named.
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
-            max_turns: Agent::DEFAULT_MAX_TURNS, **provider_options)
+            max_turns: Agent::DEFAULT_MAX_TURNS, tool_execution: :parallel,
+            **provider_options)
     if provider.nil?
       raise Error, "pass provider:, or a model: that names one" if model.nil?
 
@@ -103,13 +104,14 @@ module Truffle
       system_prompt: system_prompt,
       tools: tools,
       model: model,
-      max_turns: max_turns
+      max_turns: max_turns,
+      tool_execution: tool_execution
     )
   end
 
   # Define a tool: Truffle.tool("name", "desc") { param ...; run { ... } }.
-  def tool(name, description, &)
-    Tool.define(name, description, &)
+  def tool(name, description, execution_mode: :parallel, &)
+    Tool.define(name, description, execution_mode: execution_mode, &)
   end
 
   # The model catalog. `Truffle.models` lists every known model;
