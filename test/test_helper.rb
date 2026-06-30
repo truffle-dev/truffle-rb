@@ -3,6 +3,7 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 require "minitest/autorun"
+require "minitest/mock"
 require "truffle"
 
 # A deterministic provider for unit tests. You hand it a script of responses

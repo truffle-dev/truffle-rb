@@ -23,6 +23,11 @@ All notable changes to Truffle are documented here. The format follows
   [pi](https://github.com/earendil-works/pi) with no runtime gem dependencies.
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
+### Fixed
+- The shared test helper now loads Minitest's stub/mock support, so the provider
+  error-turn tests run under a clean `rake test` without requiring a separate
+  manual preload.
+
 ### Added
 - `Truffle::Agent` now auto-retries a turn that failed with a transient error.
   When the `Retry` classifier deems a failed turn transient (a load spike, a 5xx,
