@@ -7,6 +7,20 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- System prompt assembly. `Truffle::SystemPrompt.build` ports pi's
+  `core/system-prompt.ts` `buildSystemPrompt`: the string an agent runs under,
+  in either the custom-prompt branch or the default coding-agent branch. The
+  tools list shows a tool only when the caller supplies a non-empty one-line
+  snippet (and reads `(none)` otherwise); the guidelines are deduplicated in
+  insertion order (the bash-only `ls`/`rg`/`find` heuristic first, then caller
+  guidelines trimmed with blanks dropped, then the two always-on lines); the
+  optional `<project_context>` block wraps each pre-loaded file; and the
+  read-tool-gated `<available_skills>` block is appended through
+  `Skills.format_for_prompt`. The default prompt names Truffle and points at the
+  gem's bundled README and `examples/`, now shipped in the gem. The current date
+  is injectable so the assembly stays deterministic in tests; it defaults to the
+  wall clock. Produces the system-prompt string the agent already accepts;
+  wiring the builder into the agent constructor is a later slice.
 - `Truffle::Config` defines the local config layout for command prompts:
   `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
   `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt

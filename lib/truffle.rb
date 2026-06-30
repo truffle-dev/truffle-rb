@@ -36,6 +36,7 @@ require_relative "truffle/agent/slash_commands"
 require_relative "truffle/compaction"
 require_relative "truffle/ignore"
 require_relative "truffle/skills"
+require_relative "truffle/system_prompt"
 require_relative "truffle/extensions"
 require_relative "truffle/tools"
 

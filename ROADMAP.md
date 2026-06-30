@@ -278,6 +278,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     messages in source order. `tool_execution: :sequential` on the agent, or
     `execution_mode: :sequential` on any tool in the batch, keeps the historical
     one-at-a-time behavior.
+    - [x] **System prompt assembly.** `Truffle::SystemPrompt.build` ports pi's
+      `core/system-prompt.ts` `buildSystemPrompt`: the pure string the agent runs
+      under, in either the custom-prompt branch or the default coding-agent branch,
+      with the tools list (a tool shows only when the caller supplies a non-empty
+      one-line snippet), deduplicated insertion-ordered guidelines (the bash-only
+      exploration heuristic, caller guidelines trimmed, the two always-on lines),
+      the `<project_context>` block, the read-tool-gated `<available_skills>` block
+      via `Skills.format_for_prompt`, and the trailing date and cwd. The default
+      prompt names Truffle and its documentation pointer references the gem's
+      bundled README and examples; the date is injectable so tests stay
+      deterministic.
 
 ## Phase 4: self-extension (skills, commands, extensions)
 
