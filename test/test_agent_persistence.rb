@@ -69,6 +69,34 @@ class TestAgentPersistence < Minitest::Test
     end
   end
 
+  def test_load_can_rebind_required_tools_from_extensions
+    Dir.mktmpdir("truffle-agent") do |dir|
+      extension_path = File.join(dir, "math_ext.rb")
+      File.write(extension_path, <<~RUBY)
+        truffle.register_tool(
+          Truffle.tool("multiply", "Multiply two integers") do
+            param :a, :integer, required: true
+            param :b, :integer, required: true
+            run { |a:, b:| a * b }
+          end
+        )
+      RUBY
+      extensions = Truffle::Extensions.load_files([extension_path])
+      session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("ok")]),
+                                  extensions: extensions)
+
+      provider = StubProvider.new([
+                                    StubProvider.tool_call(id: "c1", name: "multiply",
+                                                           arguments: { "a" => 3, "b" => 4 }),
+                                    StubProvider.text("12")
+                                  ])
+      agent = Truffle::Agent.load(session.file, provider: provider, extensions: extensions)
+
+      assert_equal "12", agent.run("multiply 3 and 4")
+      assert_equal %w[multiply], agent.toolbox.names
+    end
+  end
+
   def test_load_raises_when_a_required_tool_is_not_supplied
     Dir.mktmpdir("truffle-agent") do |dir|
       session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("ok")]),

@@ -7,10 +7,13 @@ module Truffle
   class Agent
     private
 
-    def slash_registry_for(prompt_templates)
-      return nil if Array(prompt_templates).empty?
+    def slash_registry_for(prompt_templates, slash_commands: nil, extensions: nil)
+      commands = []
+      commands.concat(slash_commands.commands.map(&:dup)) if slash_commands
+      commands.concat(Extensions.command_definitions(extensions).map(&:dup))
+      return nil if Array(prompt_templates).empty? && commands.empty?
 
-      SlashCommands::Registry.new(prompt_templates: prompt_templates)
+      SlashCommands::Registry.new(prompt_templates: prompt_templates, commands: commands)
     end
 
     def resolve_slash_command(user_input)

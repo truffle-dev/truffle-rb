@@ -323,6 +323,40 @@ module Truffle
       load_files(paths, cwd: cwd, runtime: runtime)
     end
 
+    # Normalize a loaded extension source. Callers may pass one Extension, one
+    # LoadResult, or an array mixing both. This keeps agent binding code small
+    # while preserving the loader's result object for diagnostics.
+    def loaded(source)
+      case source
+      when nil
+        []
+      when LoadResult
+        source.extensions
+      when Extension
+        [source]
+      else
+        Array(source).flat_map { |item| loaded(item) }
+      end
+    end
+
+    # Tool definitions registered by loaded extensions. The first extension to
+    # register a tool name wins, matching pi's ExtensionRunner.
+    def tool_definitions(source)
+      by_name = {}
+      loaded(source).each do |extension|
+        extension.tools.each_value do |registered|
+          by_name[registered.definition.name] ||= registered.definition
+        end
+      end
+      by_name.values
+    end
+
+    # Slash commands registered by loaded extensions, in extension load order.
+    # Duplicate invocation names are resolved by SlashCommands::Registry.
+    def command_definitions(source)
+      loaded(source).flat_map { |extension| extension.commands.values }
+    end
+
     def build_extension(path, resolved_path)
       Extension.new(
         path: path,

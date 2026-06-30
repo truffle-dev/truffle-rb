@@ -371,8 +371,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `.truffle/extensions`, user `agent_dir/extensions`, then explicit paths.
       Explicit directories resolve as a package/index first and fall back to
       direct discovery; entries are de-duplicated by expanded path before load.
-    - [ ] Bind loaded extension registrations into agents and sessions: tools,
-      commands, event-handler dispatch, and reload.
+    - [x] **Bind tools and commands into agents.** `Agent` and `Truffle.agent`
+      accept loaded extensions from `Extensions.load_file`, `load_files`, or
+      `load_all`. Extension tools join the toolbox (application tools override a
+      same-name extension tool), extension slash commands join the command
+      registry, duplicate command names keep pi's `:1`, `:2` suffixing, and
+      `Agent.load` can rebind session-required tools from extensions.
+    - [ ] Bind extension event-handler dispatch, provider registrations, and
+      reload into agents and sessions.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

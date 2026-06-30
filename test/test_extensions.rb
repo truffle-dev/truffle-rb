@@ -312,6 +312,40 @@ class TestExtensions < Minitest::Test
     assert_equal "stale runtime", error.message
   end
 
+  def test_loaded_normalizes_extensions_and_load_results
+    extension = Truffle::Extensions.load_file(
+      write_file("normal.rb", "truffle.register_command('normal') { 'ok' }")
+    )
+    result_path = write_file("result.rb", "truffle.register_command('result') { 'ok' }")
+    result = Truffle::Extensions.load_files([result_path])
+
+    loaded = Truffle::Extensions.loaded([extension, result, nil])
+
+    assert_equal [extension, result.extensions.first], loaded
+  end
+
+  def test_tool_definitions_keep_first_extension_tool_by_name
+    first = Truffle::Extensions.load_file(write_file("first.rb", <<~RUBY))
+      truffle.register_tool(
+        Truffle.tool("same", "First") do
+          run { "first" }
+        end
+      )
+    RUBY
+    second = Truffle::Extensions.load_file(write_file("second.rb", <<~RUBY))
+      truffle.register_tool(
+        Truffle.tool("same", "Second") do
+          run { "second" }
+        end
+      )
+    RUBY
+
+    tools = Truffle::Extensions.tool_definitions([first, second])
+
+    assert_equal ["same"], tools.map(&:name)
+    assert_equal "first", tools.first.call({})
+  end
+
   # --- load_all ---------------------------------------------------------------
 
   def test_load_all_loads_project_user_and_explicit_paths_in_order

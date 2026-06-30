@@ -30,14 +30,15 @@ require_relative "truffle/providers/anthropic"
 require_relative "truffle/providers/anthropic_stream"
 require_relative "truffle/providers/google"
 require_relative "truffle/providers/google_stream"
+require_relative "truffle/extensions"
 require_relative "truffle/agent"
+require_relative "truffle/agent/extensions"
 require_relative "truffle/agent/tool_execution"
 require_relative "truffle/agent/slash_commands"
 require_relative "truffle/compaction"
 require_relative "truffle/ignore"
 require_relative "truffle/skills"
 require_relative "truffle/system_prompt"
-require_relative "truffle/extensions"
 require_relative "truffle/tools"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.
@@ -95,7 +96,7 @@ module Truffle
   # model id still works when the provider is named.
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
             max_turns: Agent::DEFAULT_MAX_TURNS, tool_execution: :parallel,
-            prompt_templates: [], slash_commands: nil,
+            prompt_templates: [], slash_commands: nil, extensions: nil,
             **provider_options)
     if provider.nil?
       raise Error, "pass provider:, or a model: that names one" if model.nil?
@@ -118,7 +119,8 @@ module Truffle
       max_turns: max_turns,
       tool_execution: tool_execution,
       prompt_templates: prompt_templates,
-      slash_commands: slash_commands
+      slash_commands: slash_commands,
+      extensions: extensions
     )
   end
 

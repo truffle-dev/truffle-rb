@@ -64,7 +64,7 @@ module Truffle
     TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns,
-                :usage, :session, :tool_execution
+                :usage, :session, :tool_execution, :extensions
 
     # Resume an agent from a session file. The session carries the conversation
     # and, when it was dumped by #dump, the model and the names of the tools the
@@ -76,31 +76,16 @@ module Truffle
     # the one recorded in the session; pass model: to override it.
     def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
                   max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel,
-                  prompt_templates: [], slash_commands: nil)
+                  prompt_templates: [], slash_commands: nil, extensions: nil)
       session = Session.load(path)
-      toolbox = rebind_toolbox(session.tools, tools)
+      toolbox = rebind_toolbox(session.tools, tools, extensions: extensions)
       context = session.context
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
                   model: model || context.model&.model_id, max_turns: max_turns,
                   tool_execution: tool_execution, prompt_templates: prompt_templates,
-                  slash_commands: slash_commands)
+                  slash_commands: slash_commands, extensions: extensions)
       agent.restore(context.messages)
     end
-
-    # Build the toolbox a resumed agent runs with, checking that every tool the
-    # dumped agent relied on is among the ones supplied now. The session stores
-    # only names; the implementations are rebound here. A required tool that was
-    # not supplied is an error, not a silent gap, since the model may call it.
-    def self.rebind_toolbox(required_names, supplied)
-      toolbox = supplied.is_a?(Toolbox) ? supplied : Toolbox.new(supplied)
-      missing = Array(required_names) - toolbox.names
-      unless missing.empty?
-        raise Error, "session needs tool(s) not supplied to load: #{missing.join(", ")}"
-      end
-
-      toolbox
-    end
-    private_class_method :rebind_toolbox
 
     # session, when given, makes the agent session-backed: appended messages are
     # mirrored into it and the run auto-compacts against the model's window. The
@@ -115,19 +100,21 @@ module Truffle
                    retry_settings: DEFAULT_RETRY_SETTINGS,
                    before_tool_call: nil, after_tool_call: nil,
                    tool_execution: :parallel,
-                   prompt_templates: [], slash_commands: nil)
+                   prompt_templates: [], slash_commands: nil, extensions: nil)
       @provider = provider
       @system_prompt = system_prompt
       @model = model
       @max_turns = max_turns
-      @toolbox = tools.is_a?(Toolbox) ? tools : Toolbox.new(tools)
+      @extensions = Extensions.loaded(extensions)
+      @toolbox = toolbox_for(tools, @extensions)
       @listeners = Hash.new { |h, k| h[k] = [] }
       @session = session
       @compaction_settings = compaction_settings
       @auto_compact = auto_compact
       @retry_settings = DEFAULT_RETRY_SETTINGS.merge(retry_settings || {})
       @tool_execution = normalize_tool_execution(tool_execution)
-      @slash_commands = slash_commands || slash_registry_for(prompt_templates)
+      @slash_commands = slash_registry_for(prompt_templates, slash_commands: slash_commands,
+                                                             extensions: @extensions)
       # Optional tool-execution middleware, ported from pi's beforeToolCall /
       # afterToolCall seam. Each is a callable handed a single context Hash. The
       # before hook can veto a call ({ block: true }); the after hook can override

@@ -59,6 +59,12 @@ All notable changes to Truffle are documented here. The format follows
   `agent_dir/extensions`, then explicit paths. Explicit directories resolve as a
   package/index first and otherwise discover direct entries inside the directory,
   with expanded-path deduplication before loading.
+- Extension tools and commands now bind into agents. `Agent` and `Truffle.agent`
+  accept loaded extensions from `Extensions.load_file`, `load_files`, or
+  `load_all`; extension tools join the toolbox, app-supplied tools override a
+  same-name extension tool, extension slash commands join the command registry,
+  duplicate command names keep the existing `:1`, `:2` suffixing, and
+  `Agent.load` can rebind session-required tools from extensions.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct
