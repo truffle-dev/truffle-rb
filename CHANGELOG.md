@@ -7,6 +7,8 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Extension loading now collects syntax-errored Ruby extension files as per-file
+  load errors instead of letting `SyntaxError` abort the whole load.
 - The `read` tool now handles empty files as one empty line, matching pi's
   JavaScript split behavior instead of raising "offset beyond end of file."
 - OpenAI reasoning-model calls now send `max_completion_tokens` instead of the

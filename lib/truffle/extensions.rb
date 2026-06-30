@@ -271,7 +271,7 @@ module Truffle
 
       Array(paths).each do |path|
         extensions << load_file(path, cwd: cwd, runtime: runtime)
-      rescue StandardError => e
+      rescue StandardError, ScriptError => e
         errors << LoadError.new(path: path, error: "Failed to load extension: #{e.message}")
       end
 

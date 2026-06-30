@@ -304,6 +304,21 @@ class TestExtensions < Minitest::Test
     assert_match(/Failed to load extension: boom/, result.errors.first.error)
   end
 
+  def test_load_files_collects_syntax_errors_without_aborting
+    write_file("good.rb", <<~RUBY)
+      truffle.register_command("good") { "ok" }
+    RUBY
+    write_file("syntax.rb", "truffle.register_command(")
+
+    result = Truffle::Extensions.load_files(["good.rb", "syntax.rb"], cwd: @dir)
+
+    assert_equal ["good.rb"], result.extensions.map(&:path)
+    assert_equal 1, result.errors.length
+    assert_equal "syntax.rb", result.errors.first.path
+    assert_match(/Failed to load extension:/, result.errors.first.error)
+    assert_match(/syntax/i, result.errors.first.error)
+  end
+
   def test_runtime_invalidation_marks_api_state_stale
     runtime = Truffle::Extensions::Runtime.new
     runtime.invalidate("stale runtime")
