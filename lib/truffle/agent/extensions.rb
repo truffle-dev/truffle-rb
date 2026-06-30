@@ -30,5 +30,10 @@ module Truffle
       supplied.each { |tool| toolbox.add(tool) }
       toolbox
     end
+
+    def dispatch_extension_handlers(event, payload)
+      errors = Extensions.dispatch_handlers(@extensions, event, payload)
+      @extension_errors.concat(errors)
+    end
   end
 end

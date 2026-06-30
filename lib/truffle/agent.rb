@@ -64,7 +64,7 @@ module Truffle
     TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns,
-                :usage, :session, :tool_execution, :extensions
+                :usage, :session, :tool_execution, :extensions, :extension_errors
 
     # Resume an agent from a session file. The session carries the conversation
     # and, when it was dumped by #dump, the model and the names of the tools the
@@ -106,6 +106,7 @@ module Truffle
       @model = model
       @max_turns = max_turns
       @extensions = Extensions.loaded(extensions)
+      @extension_errors = []
       @toolbox = toolbox_for(tools, @extensions)
       @listeners = Hash.new { |h, k| h[k] = [] }
       @session = session
@@ -474,6 +475,7 @@ module Truffle
     end
 
     def emit(event, **payload)
+      dispatch_extension_handlers(event, payload)
       @listeners[event].each { |l| l.call(payload) }
       @listeners[:_all].each { |l| l.call(event, payload) }
     end

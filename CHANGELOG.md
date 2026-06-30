@@ -65,6 +65,10 @@ All notable changes to Truffle are documented here. The format follows
   same-name extension tool, extension slash commands join the command registry,
   duplicate command names keep the existing `:1`, `:2` suffixing, and
   `Agent.load` can rebind session-required tools from extensions.
+- Extension event handlers now bind into agents. Handlers registered with
+  `truffle.on(...)` observe the agent events Truffle already emits, in extension
+  load order and registration order. A raising handler is captured on
+  `agent.extension_errors` and does not stop later handlers or the agent run.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

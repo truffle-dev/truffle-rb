@@ -37,6 +37,7 @@ module Truffle
     RegisteredTool = Struct.new(:definition, :source_path, keyword_init: true)
     ProviderRegistration = Struct.new(:name, :config, :source_path, keyword_init: true)
     LoadError = Struct.new(:path, :error, keyword_init: true)
+    HandlerError = Struct.new(:extension_path, :event, :error, :exception, keyword_init: true)
     LoadResult = Struct.new(:extensions, :errors, :runtime, keyword_init: true)
 
     STALE_CONTEXT_MESSAGE =
@@ -357,6 +358,31 @@ module Truffle
       loaded(source).flat_map { |extension| extension.commands.values }
     end
 
+    # Dispatch one event to handlers registered by loaded extensions. Handlers
+    # run in extension load order, and in registration order within each
+    # extension. A raising handler is returned as a HandlerError and does not stop
+    # later handlers, matching pi's ExtensionRunner error isolation.
+    def dispatch_handlers(source, event, payload = {}, context: nil)
+      event_name = event.to_s
+      event_payload = payload.merge(type: event_name)
+      errors = []
+
+      loaded(source).each do |extension|
+        Array(extension.handlers[event_name]).each do |handler|
+          call_handler(handler, event_payload.dup, context)
+        rescue StandardError => e
+          errors << HandlerError.new(
+            extension_path: extension.path,
+            event: event_name,
+            error: "#{e.class}: #{e.message}",
+            exception: e
+          )
+        end
+      end
+
+      errors
+    end
+
     def build_extension(path, resolved_path)
       Extension.new(
         path: path,
@@ -368,5 +394,17 @@ module Truffle
       )
     end
     private_class_method :build_extension
+
+    def call_handler(handler, event_payload, context)
+      arity = handler.arity
+      if arity.zero?
+        handler.call
+      elsif arity == 1 || [-1, -2].include?(arity)
+        handler.call(event_payload)
+      else
+        handler.call(event_payload, context)
+      end
+    end
+    private_class_method :call_handler
   end
 end

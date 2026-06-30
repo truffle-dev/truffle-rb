@@ -377,8 +377,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       same-name extension tool), extension slash commands join the command
       registry, duplicate command names keep pi's `:1`, `:2` suffixing, and
       `Agent.load` can rebind session-required tools from extensions.
-    - [ ] Bind extension event-handler dispatch, provider registrations, and
-      reload into agents and sessions.
+    - [x] **Bind event handlers into agents.** Loaded extension handlers
+      registered with `truffle.on(...)` now observe the agent events Truffle
+      already emits. Handlers run in extension load order, then registration
+      order within each extension; a raising handler is recorded on
+      `agent.extension_errors` and does not stop later handlers or the agent run.
+    - [ ] Bind extension provider registrations and reload into agents and
+      sessions.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

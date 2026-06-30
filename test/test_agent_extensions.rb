@@ -115,4 +115,117 @@ class TestAgentExtensions < Minitest::Test
 
     assert_equal "pong", agent.run("/ping")
   end
+
+  def test_extension_handlers_observe_agent_events_in_order
+    log_path = File.join(@dir, "events.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.on("agent_start") do |event, ctx|
+        File.open(log_path, "a") do |file|
+          file.puts "agent_start:\#{event[:type]}:\#{event[:input]}:\#{ctx.nil?}"
+        end
+      end
+
+      truffle.on("turn_start") do |event|
+        File.open(log_path, "a") { |file| file.puts "turn_start:\#{event[:turn]}" }
+      end
+
+      truffle.on("message") do |event|
+        File.open(log_path, "a") { |file| file.puts "message:\#{event[:message].text}" }
+      end
+
+      truffle.on("turn_end") do |event|
+        File.open(log_path, "a") { |file| file.puts "turn_end:\#{event[:turn]}" }
+      end
+
+      truffle.on("agent_end") do |event, ctx|
+        File.open(log_path, "a") do |file|
+          file.puts "agent_end:\#{event[:output]}:\#{ctx.nil?}"
+        end
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("done")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    assert_equal "done", agent.run("hello")
+    assert_equal(
+      [
+        "agent_start:agent_start:hello:true",
+        "turn_start:1",
+        "message:done",
+        "turn_end:1",
+        "agent_end:done:true"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
+  def test_extension_handlers_observe_tool_events
+    log_path = File.join(@dir, "tool_events.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      tool = Truffle.tool("echo", "Echo") do
+        param :value, :string, required: true
+        run { |value:| value }
+      end
+      truffle.register_tool(tool)
+
+      truffle.on("tool_call") do |event|
+        File.open(log_path, "a") { |file| file.puts "call:\#{event[:call].name}" }
+      end
+
+      truffle.on("tool_result") do |event|
+        File.open(log_path, "a") { |file| file.puts "result:\#{event[:result]}" }
+      end
+    RUBY
+    provider = StubProvider.new([
+                                  StubProvider.tool_call(id: "c1", name: "echo",
+                                                         arguments: { "value" => "seen" }),
+                                  StubProvider.text("done")
+                                ])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    agent.run("echo")
+
+    assert_equal ["call:echo", "result:seen"], File.readlines(log_path, chomp: true)
+  end
+
+  def test_extension_handler_errors_are_isolated_and_recorded
+    log_path = File.join(@dir, "errors.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.on("agent_start") { raise "boom" }
+      truffle.on("agent_start") do |event|
+        File.write(log_path, event[:input])
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("done")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    assert_equal "done", agent.run("hello")
+    assert_equal "hello", File.read(log_path)
+
+    error = agent.extension_errors.fetch(0)
+
+    assert_equal "agent_start", error.event
+    assert_equal extensions.extensions.first.path, error.extension_path
+    assert_match(/RuntimeError: boom/, error.error)
+  end
+
+  def test_extension_handler_accepts_one_arg_lambdas
+    log_path = File.join(@dir, "lambda.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+      truffle.on("agent_start", ->(event) { File.write(log_path, event[:input]) })
+    RUBY
+    provider = StubProvider.new([StubProvider.text("done")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    assert_equal "done", agent.run("hello")
+    assert_equal "hello", File.read(log_path)
+    assert_empty agent.extension_errors
+  end
 end
