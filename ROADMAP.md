@@ -218,10 +218,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       folds a transport fault into `Providers::Error` first. Matches the streaming
       paths and ports pi's never-throw-out-of-a-provider contract. This carries the
       overflow signal the recovery branch reads.
-    - [ ] Drive overflow recovery from the agent loop: on an overflowed turn,
+    - [x] Drive overflow recovery from the agent loop: on an overflowed turn,
       run a one-shot emergency compaction and retry (pi's overflow branch +
-      `_overflowRecoveryAttempted`). The provider error surface is in place; this is
-      now unblocked.
+      `_overflowRecoveryAttempted`). Compact-only on a completed over-window
+      answer; give up after one attempt or when nothing can be compacted. The
+      gate resets only on non-overflow turns, so a repeated length-stop overflow
+      cannot loop forever.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,

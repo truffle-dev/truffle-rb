@@ -3,40 +3,6 @@
 require "test_helper"
 require "tmpdir"
 
-# A provider that plays scripted responses for the agent loop and, separately,
-# answers the summarizer's calls with a canned checkpoint summary. The loop
-# calls chat with tools and no max_tokens; the summarizer calls it with
-# max_tokens and no tools, so the max_tokens key tells the two apart. This lets
-# a wiring test drive the loop and its compaction summary through one provider
-# with no network call, the way the real agent reuses its provider to summarize.
-class CompactingStub < Truffle::Providers::Base
-  attr_reader :loop_calls, :summary_calls
-
-  def initialize(script, summary: "## Goal\nContinue the work.")
-    super()
-    @script = script.dup
-    @summary = summary
-    @loop_calls = []
-    @summary_calls = []
-  end
-
-  def name
-    "stub"
-  end
-
-  def chat(messages:, tools: [], model: nil, **options)
-    if options.key?(:max_tokens)
-      @summary_calls << { model: model, max_tokens: options[:max_tokens] }
-      return StubProvider.text(@summary)
-    end
-
-    @loop_calls << { messages: messages.map(&:to_h), tools: tools, model: model }
-    raise "CompactingStub ran out of scripted responses" if @script.empty?
-
-    @script.shift
-  end
-end
-
 # The agent loop auto-compacts a session-backed run: at the top of a turn, if
 # the previous response's reported context crossed the model's threshold, the
 # older turns are summarized into a session compaction entry and the running

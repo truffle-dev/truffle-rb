@@ -24,6 +24,18 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A session-backed `Truffle::Agent` now recovers from context overflow. When a
+  turn fails (an error turn whose message matches an overflow phrase) or is
+  length-stopped over the window, the agent compacts and, if compaction fired,
+  drops the failed turn and runs the turn again on the smaller context. A
+  completed answer that overran the window compacts for hygiene but is not
+  retried, since the answer is already final. Recovery is attempted once per
+  overflow: a second consecutive overflow ends the run with an
+  `:overflow_unrecovered` compaction error rather than looping, and an overflow
+  that nothing can compact away ends the run too. Recovery is off without a
+  session and off when `auto_compact:` is false. Ports pi's `_checkCompaction`
+  overflow branch, with the recovery gate reset only on non-overflow turns so a
+  repeated length-stop overflow cannot loop forever.
 - A failed non-streaming `#chat` now returns an error turn instead of raising:
   a `Response` whose `stop_reason` is `:error` carrying the failure text, with an
   empty message and zero usage. The transport (`#post`) folds a connection or read

@@ -54,3 +54,38 @@ class StubProvider < Truffle::Providers::Base
     )
   end
 end
+
+# A provider that plays scripted responses for the agent loop and, separately,
+# answers the summarizer's calls with a canned checkpoint summary. The loop
+# calls chat with tools and no max_tokens; the summarizer calls it with
+# max_tokens and no tools, so the max_tokens key tells the two apart. This lets
+# a compaction or overflow-recovery test drive the loop and its compaction
+# summary through one provider with no network call, the way the real agent
+# reuses its provider to summarize.
+class CompactingStub < Truffle::Providers::Base
+  attr_reader :loop_calls, :summary_calls
+
+  def initialize(script, summary: "## Goal\nContinue the work.")
+    super()
+    @script = script.dup
+    @summary = summary
+    @loop_calls = []
+    @summary_calls = []
+  end
+
+  def name
+    "stub"
+  end
+
+  def chat(messages:, tools: [], model: nil, **options)
+    if options.key?(:max_tokens)
+      @summary_calls << { model: model, max_tokens: options[:max_tokens] }
+      return StubProvider.text(@summary)
+    end
+
+    @loop_calls << { messages: messages.map(&:to_h), tools: tools, model: model }
+    raise "CompactingStub ran out of scripted responses" if @script.empty?
+
+    @script.shift
+  end
+end

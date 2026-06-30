@@ -31,6 +31,12 @@ module Truffle
   # calling the provider, so a long run stays under the model's window. This is
   # the port of pi's _checkCompaction/_runAutoCompaction, checked at the same
   # boundary pi checks (after an assistant turn, before the next provider call).
+  #
+  # A session-backed agent also recovers from context overflow: when a turn fails
+  # (or silently degrades) because the prompt exceeded the model's window, the
+  # agent compacts and, if the failed turn can be retried, drops it and runs the
+  # turn again on the smaller context. Recovery is attempted once per overflow; a
+  # second consecutive overflow ends the run rather than looping.
   class Agent
     DEFAULT_MAX_TURNS = 12
 
@@ -96,6 +102,10 @@ module Truffle
       # response, and cleared once a usage reading has triggered a compaction so
       # the same reading cannot trigger another.
       @last_usage = nil
+      # Whether the current overflow situation has already had its one
+      # compact-and-retry attempt. Reset at the start of each run and after any
+      # turn that did not overflow, so each distinct overflow gets one recovery.
+      @overflow_recovery_attempted = false
 
       @messages = []
       @messages << Message.system(system_prompt) if system_prompt
@@ -134,6 +144,7 @@ module Truffle
     def run(user_input, signal: nil)
       emit(:agent_start, input: user_input)
       append(Message.user(user_input))
+      @overflow_recovery_attempted = false
 
       final_text = nil
       final_response = nil
@@ -158,6 +169,11 @@ module Truffle
         @usage += response.usage
         @last_usage = response.usage
         emit(:message, message: response.message, usage: response.usage)
+
+        case maybe_recover_from_overflow(response, signal)
+        when :retry then next
+        when :none then @overflow_recovery_attempted = false
+        end
 
         unless response.tool_calls?
           final_text = response.text
@@ -247,13 +263,16 @@ module Truffle
 
     # Compact the session's branch: prepare a cut, summarize the dropped history
     # through the provider, append the compaction entry, and rebuild the running
-    # context from it. A prepare that finds nothing to do (an empty branch or one
-    # already ending in a compaction) is a no-op. A Compaction::Error (aborted or
-    # a summarizer failure) ends compaction without touching the session, and the
-    # turn proceeds on the un-compacted context. Port of pi's _runAutoCompaction.
+    # context from it. Returns true when a compaction entry was written, false on
+    # a no-op (an empty branch or one already ending in a compaction) or when a
+    # Compaction::Error (aborted or a summarizer failure) ends compaction without
+    # touching the session, leaving the turn on the un-compacted context. The
+    # boolean lets overflow recovery decide whether a retry is worth attempting:
+    # retrying without having shrunk the context would just overflow again. Port
+    # of pi's _runAutoCompaction.
     def run_compaction(model, signal)
       preparation = Compaction.prepare_compaction(@session.entries, @compaction_settings)
-      return unless preparation
+      return false unless preparation
 
       result = Compaction.compact(preparation, @provider, model, signal: signal)
       @session.append_compaction(
@@ -262,8 +281,65 @@ module Truffle
       )
       rebuild_messages_from_session
       emit(:compaction, result: result)
+      true
     rescue Compaction::Error => e
       emit(:compaction, result: nil, error: e)
+      false
+    end
+
+    # After a turn, decide whether it overflowed the context window and what to do
+    # about it. Returns :retry when the turn was compacted away and the loop should
+    # run the turn again on the smaller context; :none when the turn did not
+    # overflow (the caller clears the recovery gate); and :done or :exhausted when
+    # the run should end on this turn. Port of pi's overflow branch of
+    # _checkCompaction.
+    #
+    # The three end states mirror pi:
+    #   - A completed answer that still overran the window (:done): compact so a
+    #     future prompt starts clean, but the answer is finished, so do not retry.
+    #   - A retryable overflow (an error or a length stop) on the first attempt:
+    #     compact, drop the failed turn from the live context, and retry once.
+    #   - The same overflow a second time, or one that could not be compacted away
+    #     (:exhausted): give up rather than loop, and let the failed turn end the
+    #     run.
+    def maybe_recover_from_overflow(response, signal)
+      model = @auto_compact && @session && @model && Models.find(@model)
+      return :none unless model
+      return :none unless Overflow.context_overflow?(response, context_window: model.context_window)
+
+      return overflow_compact_only(model, signal) if response.stop_reason == StopReason::STOP
+
+      overflow_retry(model, signal)
+    end
+
+    # A successful answer that overran the window: compact for the next prompt,
+    # but the turn is complete and an assistant answer cannot be continued, so the
+    # run ends here.
+    def overflow_compact_only(model, signal)
+      run_compaction(model, signal)
+      :done
+    end
+
+    # A retryable overflow (an error or length-truncated turn). The first time,
+    # compact and retry once; drop the failed turn from the live context (it stays
+    # in the session for history) so the retry runs on the compacted messages
+    # alone. A second consecutive overflow, or one that could not be compacted, is
+    # unrecoverable.
+    def overflow_retry(model, signal)
+      if @overflow_recovery_attempted
+        emit(:compaction, result: nil, error: Compaction::Error.new(
+          :overflow_unrecovered,
+          "context overflow recovery failed after one compact-and-retry attempt"
+        ))
+        return :exhausted
+      end
+
+      @overflow_recovery_attempted = true
+      return :exhausted unless run_compaction(model, signal)
+
+      @messages.pop if @messages.last&.role == :assistant
+      @last_usage = nil
+      :retry
     end
 
     # Replace the running history with the session's current context (compaction
