@@ -16,13 +16,17 @@ All notable changes to Truffle are documented here. The format follows
   holding a `SKILL.md` is a skill root loaded as one skill with no further
   recursion, while any other directory has its direct `.md` children loaded and its
   subdirectories recursed into for more `SKILL.md` roots; dotfiles and
-  `node_modules` are skipped and entries walk in sorted order. `Skills.format_for_prompt`
-  renders the `<available_skills>` block a system prompt advertises, hiding skills
-  with model invocation disabled. Ports pi's `parseFrontmatter`,
-  `loadSkillFromFile`, `validateName`, `validateDescription`, `loadSkillsFromDir`,
-  and `formatSkillsForPrompt`; the multi-source `loadSkills` orchestration
-  (name-collision resolution, symlink realpath dedup) and gitignore-style ignore
-  matching stay deferred to later slices.
+  `node_modules` are skipped and entries walk in sorted order. `Skills.load_skills`
+  merges skills from a list of explicit paths (files or directories), deduplicating
+  the same underlying file reached through a symlink by `File.realpath` and
+  resolving name collisions first-wins, where a later skill of an already-taken name
+  is dropped and recorded as a `collision` diagnostic naming the winning and losing
+  files. `Skills.format_for_prompt` renders the `<available_skills>` block a system
+  prompt advertises, hiding skills with model invocation disabled. Ports pi's
+  `parseFrontmatter`, `loadSkillFromFile`, `validateName`, `validateDescription`,
+  `loadSkillsFromDir`, `loadSkills`, and `formatSkillsForPrompt`; pi's
+  `includeDefaults` config-directory resolution (the port has no config subsystem
+  yet) and gitignore-style ignore matching stay deferred to later slices.
 - Branch summaries. `Session#branch_with_summary` branches like `Session#branch`
   but also drops a `branch_summary` entry on the new path carrying a digest of the
   turns it came back past. The digest folds into `Session#context` as a user

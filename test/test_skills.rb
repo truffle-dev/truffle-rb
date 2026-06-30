@@ -224,4 +224,100 @@ class TestSkills < Minitest::Test
 
     assert_equal %w[calendar calendar], names(skills)
   end
+
+  def test_load_skills_merges_skills_from_several_paths
+    write_skill("a/deploy/SKILL.md", "---\nname: deploy\ndescription: ship\n---\n")
+    write_skill("b/format/SKILL.md", "---\nname: format\ndescription: tidy\n---\n")
+
+    skills, diagnostics = Truffle::Skills.load_skills(
+      [File.join(@dir, "a"), File.join(@dir, "b")]
+    )
+
+    assert_empty diagnostics
+    assert_equal %w[deploy format], names(skills)
+  end
+
+  def test_load_skills_loads_an_explicit_markdown_file
+    path = write_skill("loose/top.md", "---\nname: top\ndescription: a root skill\n---\n")
+
+    skills, diagnostics = Truffle::Skills.load_skills([path])
+
+    assert_empty diagnostics
+    assert_equal ["top"], names(skills)
+  end
+
+  def test_load_skills_warns_when_a_path_does_not_exist
+    skills, diagnostics = Truffle::Skills.load_skills([File.join(@dir, "nope")])
+
+    assert_empty skills
+    assert_equal 1, diagnostics.length
+    assert_equal "warning", diagnostics.first.type
+    assert_includes diagnostics.first.message, "does not exist"
+  end
+
+  def test_load_skills_warns_when_a_path_is_not_a_markdown_file
+    path = write_skill("notes/readme.txt", "not a skill")
+
+    skills, diagnostics = Truffle::Skills.load_skills([path])
+
+    assert_empty skills
+    assert_includes diagnostics.map(&:message), "skill path is not a markdown file"
+  end
+
+  def test_load_skills_keeps_the_first_skill_of_a_colliding_name
+    write_skill("first/calendar/SKILL.md", "---\nname: calendar\ndescription: the first\n---\n")
+    write_skill("second/calendar/SKILL.md", "---\nname: calendar\ndescription: the second\n---\n")
+
+    skills, = Truffle::Skills.load_skills(
+      [File.join(@dir, "first"), File.join(@dir, "second")]
+    )
+
+    assert_equal ["calendar"], names(skills)
+    assert_equal "the first", skills.first.description
+  end
+
+  def test_load_skills_records_a_collision_diagnostic_for_the_loser
+    winner = write_skill("first/calendar/SKILL.md",
+                         "---\nname: calendar\ndescription: the first\n---\n")
+    loser = write_skill("second/calendar/SKILL.md",
+                        "---\nname: calendar\ndescription: the second\n---\n")
+
+    _skills, diagnostics = Truffle::Skills.load_skills(
+      [File.join(@dir, "first"), File.join(@dir, "second")]
+    )
+
+    collisions = diagnostics.select { |d| d.type == "collision" }
+
+    assert_equal 1, collisions.length
+    detail = collisions.first.collision
+
+    assert_equal "skill", detail.resource_type
+    assert_equal "calendar", detail.name
+    assert_equal winner, detail.winner_path
+    assert_equal loser, detail.loser_path
+  end
+
+  def test_load_skills_collision_diagnostics_follow_the_load_warnings
+    write_skill("first/calendar/SKILL.md", "---\nname: calendar\ndescription: the first\n---\n")
+    write_skill("second/calendar/SKILL.md", "---\nname: calendar\ndescription: the second\n---\n")
+
+    _skills, diagnostics = Truffle::Skills.load_skills(
+      [File.join(@dir, "missing"),
+       File.join(@dir, "first"),
+       File.join(@dir, "second")]
+    )
+
+    assert_equal %w[warning collision], diagnostics.map(&:type)
+  end
+
+  def test_load_skills_deduplicates_the_same_file_reached_through_a_symlink
+    target = write_skill("real/deploy/SKILL.md", "---\nname: deploy\ndescription: ship\n---\n")
+    link = File.join(@dir, "link.md")
+    File.symlink(target, link)
+
+    skills, diagnostics = Truffle::Skills.load_skills([target, link])
+
+    assert_equal ["deploy"], names(skills)
+    refute(diagnostics.any? { |d| d.type == "collision" })
+  end
 end

@@ -30,9 +30,17 @@ module Truffle
     Skill = Struct.new(:name, :description, :file_path, :base_dir, :disable_model_invocation,
                        keyword_init: true)
 
-    # A problem found while loading: a type ("warning"), a human message, and the
-    # path it concerns. Ports the warning shape of pi's ResourceDiagnostic.
-    Diagnostic = Struct.new(:type, :message, :path, keyword_init: true)
+    # A problem found while loading: a type ("warning" or "collision"), a human
+    # message, the path it concerns, and (for a collision) the detail of which
+    # skill won and which lost. Ports the warning and collision shapes of pi's
+    # ResourceDiagnostic; the "error" type and pi's source-scoped fields are not
+    # ported. The :collision member is nil for an ordinary warning.
+    Diagnostic = Struct.new(:type, :message, :path, :collision, keyword_init: true)
+
+    # The detail carried by a collision diagnostic: the resource kind (always
+    # "skill" here), the colliding name, and the winning and losing file paths.
+    # Ports pi's ResourceCollision minus its optional source fields.
+    Collision = Struct.new(:resource_type, :name, :winner_path, :loser_path, keyword_init: true)
 
     module_function
 
@@ -72,6 +80,38 @@ module Truffle
     # slice; ordinary symlinks resolve naturally through File.file?/File.directory?.
     def load_dir(dir)
       load_dir_internal(dir, include_root_files: true)
+    end
+
+    # Load skills from a list of explicit paths and merge them into one set,
+    # returning the merged skills and the diagnostics gathered. Each path is a
+    # markdown file or a directory walked by load_dir; a path that does not exist
+    # or is not a markdown file becomes a warning. Two merge rules port pi's
+    # loadSkills:
+    #
+    # - realpath dedup: the same underlying file, reached twice (for instance via
+    #   a symlink), is loaded only once. Files are compared by File.realpath so a
+    #   symlink and its target count as one.
+    # - name collision, first-wins: the first skill seen for a given name wins;
+    #   any later skill of that name is dropped and recorded as a "collision"
+    #   diagnostic naming the winning and losing files. The dedup check runs
+    #   first, so a duplicate file never produces a spurious self-collision.
+    #
+    # Collision diagnostics are appended after the load warnings, matching pi's
+    # ordering. pi's includeDefaults branch (resolving user and project config
+    # directories through getAgentDir/CONFIG_DIR_NAME) and its ~ expansion are
+    # deferred until the port grows a config subsystem; callers thread the paths
+    # in explicitly for now. Ports pi's loadSkills.
+    def load_skills(paths)
+      skill_map = {}
+      real_paths = {}
+      warning_diags = []
+      collision_diags = []
+      paths.each do |path|
+        skills, diags = resolve_path_skills(path)
+        warning_diags.concat(diags)
+        skills.each { |skill| merge_skill(skill, skill_map, real_paths, collision_diags) }
+      end
+      [skill_map.values, warning_diags + collision_diags]
     end
 
     # Format skills into the <available_skills> block a system prompt carries,
@@ -145,6 +185,66 @@ module Truffle
       [skill ? [skill] : [], diagnostics]
     end
     private_class_method :load_from
+
+    # Resolve one path from load_skills to its [skills, diagnostics]: a missing
+    # path warns, a directory is walked, a markdown file is loaded, and anything
+    # else warns. A read error along the way becomes a warning rather than raising.
+    def resolve_path_skills(path)
+      return [[], [warning("skill path does not exist", path)]] unless File.exist?(path)
+      return load_dir_internal(path, include_root_files: true) if File.directory?(path)
+      return load_from(path) if path.end_with?(".md")
+
+      [[], [warning("skill path is not a markdown file", path)]]
+    rescue StandardError => e
+      [[], [warning(e.message, path)]]
+    end
+    private_class_method :resolve_path_skills
+
+    # Fold one loaded skill into the running merge: skip it silently when its
+    # underlying file was already loaded (realpath dedup), record a collision
+    # diagnostic when its name is already taken (first-wins), or otherwise keep it
+    # and remember its realpath. Mutates skill_map, real_paths, and collisions.
+    def merge_skill(skill, skill_map, real_paths, collisions)
+      real = real_path(skill.file_path)
+      return if real_paths.key?(real)
+
+      if skill_map.key?(skill.name)
+        collisions << collision_for(skill, skill_map[skill.name])
+      else
+        skill_map[skill.name] = skill
+        real_paths[real] = true
+      end
+    end
+    private_class_method :merge_skill
+
+    # Build the collision diagnostic for a losing skill against the winner that
+    # already holds its name.
+    def collision_for(loser, winner)
+      Diagnostic.new(
+        type: "collision",
+        message: %(name "#{loser.name}" collision),
+        path: loser.file_path,
+        collision: Collision.new(resource_type: "skill", name: loser.name,
+                                 winner_path: winner.file_path, loser_path: loser.file_path)
+      )
+    end
+    private_class_method :collision_for
+
+    # The canonical path of a file with symlinks resolved, used to detect the
+    # same underlying file reached by two routes. Falls back to the given path if
+    # it cannot be resolved.
+    def real_path(path)
+      File.realpath(path)
+    rescue StandardError
+      path
+    end
+    private_class_method :real_path
+
+    # Wrap a single message as a warning diagnostic tied to a path.
+    def warning(message, path)
+      Diagnostic.new(type: "warning", message: message, path: path)
+    end
+    private_class_method :warning
 
     # The spec errors for a name: too long, characters outside lowercase a-z, 0-9
     # and hyphen, a leading or trailing hyphen, or consecutive hyphens. Ports pi's

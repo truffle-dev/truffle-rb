@@ -288,8 +288,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `loadSkillsFromDir`: a `SKILL.md` makes a directory a skill root and stops
       recursion; otherwise direct `.md` children load and subdirectories recurse
       for more `SKILL.md` roots, skipping dotfiles and `node_modules`.
-    - [ ] Multi-source `loadSkills` orchestration: name-collision resolution
-      across user/project/path sources and symlink realpath dedup.
+    - [x] **Multi-source merge.** `Skills.load_skills` ports pi's `loadSkills`:
+      it merges skills from a list of explicit paths, deduplicating the same file
+      reached via a symlink by `File.realpath` and resolving name collisions
+      first-wins (a later same-name skill becomes a `collision` diagnostic). pi's
+      `includeDefaults` config-directory resolution is deferred until the port
+      grows a config subsystem.
     - [ ] Gitignore-style ignore matching (pi's `ignore`-package matcher,
       hand-rolled zero-dep).
 17. **Commands.** User-invocable commands that expand into prompts/actions.
