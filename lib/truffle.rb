@@ -29,6 +29,7 @@ require_relative "truffle/providers/google_stream"
 require_relative "truffle/agent"
 require_relative "truffle/agent/tool_execution"
 require_relative "truffle/compaction"
+require_relative "truffle/ignore"
 require_relative "truffle/skills"
 require_relative "truffle/tools"
 

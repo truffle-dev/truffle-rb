@@ -303,8 +303,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       first-wins (a later same-name skill becomes a `collision` diagnostic). pi's
       `includeDefaults` config-directory resolution is deferred until the port
       grows a config subsystem.
-    - [ ] Gitignore-style ignore matching (pi's `ignore`-package matcher,
-      hand-rolled zero-dep).
+    - [x] **Gitignore-style matcher.** `Truffle::Ignore` hand-rolls pi's
+      `ignore`-package matcher zero-dep: `add(patterns)` compiles gitignore lines
+      and `ignores?(path)` tests a posix relative path with last-match-wins
+      negation, `/` anchoring, `*`/`**`/`?`/`[...]` globbing, directory-only
+      trailing `/`, and ancestor-directory exclusion, case-insensitive like pi's
+      default. Validated by a 1450-comparison differential against the real
+      `ignore` package.
+    - [ ] Wire `Truffle::Ignore` into the discovery walk (pi's `addIgnoreRules`/
+      `prefixIgnorePattern`/`toPosixPath` per-directory prefixing in `load_dir`).
 17. **Commands.** User-invocable commands that expand into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.

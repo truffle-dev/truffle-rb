@@ -26,7 +26,15 @@ All notable changes to Truffle are documented here. The format follows
   `parseFrontmatter`, `loadSkillFromFile`, `validateName`, `validateDescription`,
   `loadSkillsFromDir`, `loadSkills`, and `formatSkillsForPrompt`; pi's
   `includeDefaults` config-directory resolution (the port has no config subsystem
-  yet) and gitignore-style ignore matching stay deferred to later slices.
+  yet) stays deferred to a later slice. `Truffle::Ignore` is the standalone
+  gitignore-style matcher pi layers over that walk: `add(patterns)` compiles
+  `.gitignore`/`.ignore`/`.fdignore` lines (comments, blank lines, trailing-space
+  handling, `!` negation with last-match-wins, leading and embedded `/` anchoring,
+  trailing `/` directory-only, `*`/`**`/`?`/`[...]` globbing, and match-at-any-depth
+  for unanchored names) and `ignores?(path)` tests a posix relative path, excluding
+  any child of an excluded directory. A faithful zero-dependency port of the
+  `ignore` npm package's gitignore-to-regex pipeline, case-insensitive like pi's
+  default; wiring it into the skills discovery walk stays for the next slice.
 - Branch summaries. `Session#branch_with_summary` branches like `Session#branch`
   but also drops a `branch_summary` entry on the new path carrying a digest of the
   turns it came back past. The digest folds into `Session#context` as a user
