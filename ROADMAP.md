@@ -335,8 +335,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `pi.events`, with `on` returning an unsubscribe closure, raising handlers
       isolated and logged rather than propagated, snapshot dispatch so handlers may
       (un)subscribe mid-emit, and a `Monitor` for cross-thread use.
-    - [ ] Extension manifest and loader (discover, validate, and load extension
-      modules; pi's `core/extensions/loader.ts`).
+    - [x] **Discovery.** `Truffle::Extensions` ports the pure filesystem layer of
+      pi's `core/extensions/loader.ts`: `extension_file?`, `read_manifest`,
+      `resolve_entries`, and a one-level `discover_in_dir` walk that finds extension
+      entry points (direct `.rb` files, subdirectory manifests, `index.rb`) before
+      anything is loaded, following symlinks and tolerating broken packages.
+    - [ ] Extension loading (load and validate a discovered module; the
+      require-versus-registration host decision and the rest of pi's
+      `core/extensions/loader.ts`).
     - [ ] Extension runtime context (the `pi` object extensions register tools,
       providers, and commands through; pi's `core/extensions/runner.ts`).
 

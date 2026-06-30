@@ -33,6 +33,7 @@ require_relative "truffle/agent/tool_execution"
 require_relative "truffle/compaction"
 require_relative "truffle/ignore"
 require_relative "truffle/skills"
+require_relative "truffle/extensions"
 require_relative "truffle/tools"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.

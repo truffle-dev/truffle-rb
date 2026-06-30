@@ -18,6 +18,16 @@ All notable changes to Truffle are documented here. The format follows
   snapshot of the channel so subscribing or unsubscribing mid-handler is safe. The
   bus is guarded by a `Monitor` for cross-thread use. This is the first slice of
   the extensions plugin seam (item 18); the loader and runner build on it later.
+- Extension discovery. `Truffle::Extensions` ports the pure filesystem layer of
+  pi's `core/extensions/loader.ts`: the seam that finds extension entry points on
+  disk before anything is loaded. `extension_file?` recognizes a `.rb` module (pi's
+  `.ts`/`.js` analog), `read_manifest` reads a `package.json` `pi` field, and
+  `resolve_entries` resolves a directory to its manifest-declared extensions or an
+  `index.rb`. `discover_in_dir` walks a directory one level deep, taking each direct
+  `.rb` file and each subdirectory's resolved entries, following symlinks the way pi
+  reads a symbolic-link dirent and staying error-tolerant so a single broken package
+  cannot abort discovery. Module loading itself (require versus registration) is a
+  later slice.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct
