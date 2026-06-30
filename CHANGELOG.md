@@ -32,8 +32,14 @@ All notable changes to Truffle are documented here. The format follows
   `index.rb`. `discover_in_dir` walks a directory one level deep, taking each direct
   `.rb` file and each subdirectory's resolved entries, following symlinks the way pi
   reads a symbolic-link dirent and staying error-tolerant so a single broken package
-  cannot abort discovery. Module loading itself (require versus registration) is a
-  later slice.
+  cannot abort discovery. Loading and runtime binding build on this discovery
+  layer.
+- Extension loading foundation. `Extensions.load_file` evaluates a Ruby extension
+  entry with a `truffle` API object, mirroring pi's factory-call shape while
+  staying Ruby-native. Extensions can register tools, slash commands, event
+  handlers, and provider configs as data; `load_files` returns loaded extensions
+  plus per-file errors so one broken extension does not stop the rest. Binding
+  those registrations into an agent/session remains a later item-18 slice.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

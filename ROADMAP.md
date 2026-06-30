@@ -349,11 +349,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `resolve_entries`, and a one-level `discover_in_dir` walk that finds extension
       entry points (direct `.rb` files, subdirectory manifests, `index.rb`) before
       anything is loaded, following symlinks and tolerating broken packages.
-    - [ ] Extension loading (load and validate a discovered module; the
-      require-versus-registration host decision and the rest of pi's
-      `core/extensions/loader.ts`).
-    - [ ] Extension runtime context (the `pi` object extensions register tools,
-      providers, and commands through; pi's `core/extensions/runner.ts`).
+    - [x] **Ruby extension loading foundation.** `Extensions.load_file` evaluates
+      a discovered `.rb` extension entry with a `truffle` API object, the Ruby
+      analogue of pi calling a default extension factory with `ExtensionAPI`.
+      Extensions can register tools, slash commands, event handlers, and
+      provider configs as data; `load_files` collects per-file errors so one
+      broken extension does not stop the rest.
+    - [ ] Bind loaded extension registrations into agents and sessions: tools,
+      commands, event-handler dispatch, default extension directories, and reload.
+    - [ ] Bound extension runtime context: session/UI actions, model access,
+      compaction, project trust, command contexts, and event dispatch from pi's
+      `core/extensions/runner.ts`.
 
 ## Phase 5: adoption + the CLI
 

@@ -6,8 +6,9 @@ require "fileutils"
 
 # Extension discovery, a port of the pure filesystem layer in pi's extension
 # loader (core/extensions/loader.ts): isExtensionFile, readPiManifest,
-# resolveExtensionEntries, discoverExtensionsInDir. Everything runs against a
-# temp tree so the suite stays hermetic and offline.
+# resolveExtensionEntries, discoverExtensionsInDir, and the Ruby registration
+# loader foundation. Everything runs against a temp tree so the suite stays
+# hermetic and offline.
 class TestExtensions < Minitest::Test
   def setup
     @dir = Dir.mktmpdir("truffle-extensions")
@@ -207,5 +208,107 @@ class TestExtensions < Minitest::Test
     discovered = Truffle::Extensions.discover_in_dir(File.join(@dir, "ext"))
 
     assert_equal [File.join(@dir, "ext/link.rb")], discovered
+  end
+
+  # --- load_file / load_files -------------------------------------------------
+
+  def test_load_file_exposes_registration_api
+    path = write_file("hello.rb", <<~RUBY)
+      tool = Truffle.tool("hello", "Say hello") do
+        param :name, :string, required: true
+        run { |name:| "Hello, \#{name}!" }
+      end
+
+      truffle.register_tool(tool)
+      truffle.register_command("greet", description: "Greet someone") do |args|
+        "Greetings, \#{args}"
+      end
+      truffle.register_command("noop") { "ok" }
+      truffle.register_command("future_ctx") do |args, ctx|
+        "\#{args} / \#{ctx.nil?}"
+      end
+      truffle.on("session_start") do |event, _ctx|
+        event[:seen] = true
+      end
+      truffle.register_provider("demo", { models: ["demo-model"] })
+    RUBY
+
+    extension = Truffle::Extensions.load_file(path)
+
+    assert_equal path, extension.path
+    assert_equal File.expand_path(path), extension.resolved_path
+
+    registered_tool = extension.tools.fetch("hello").definition
+
+    assert_equal "Hello, Ada!", registered_tool.call("name" => "Ada")
+
+    registry = Truffle::SlashCommands::Registry.new(commands: extension.commands.values)
+    result = registry.resolve("/greet Ada")
+
+    assert_equal :action, result.type
+    assert_equal "Greetings, Ada", result.content
+    assert_equal "ok", registry.resolve("/noop").content
+    assert_equal "Ada / true", registry.resolve("/future_ctx Ada").content
+
+    event = {}
+    extension.handlers.fetch("session_start").first.call(event, nil)
+
+    assert_equal({ seen: true }, event)
+
+    registration = extension.provider_registrations.fetch(0)
+
+    assert_equal "demo", registration.name
+    assert_equal({ models: ["demo-model"] }, registration.config)
+    assert_equal path, registration.source_path
+  end
+
+  def test_load_file_shares_event_bus_through_runtime
+    event_file = File.join(@dir, "event.txt")
+    path = write_file("events.rb", <<~RUBY)
+      truffle.events.on("ping") do |data|
+        File.write(#{event_file.inspect}, data)
+      end
+    RUBY
+
+    runtime = Truffle::Extensions::Runtime.new
+    Truffle::Extensions.load_file(path, runtime: runtime)
+    runtime.events.emit("ping", "seen")
+
+    assert_equal "seen", File.read(event_file)
+  end
+
+  def test_load_file_can_unregister_a_provider
+    path = write_file("provider.rb", <<~RUBY)
+      truffle.register_provider("demo", { models: ["demo-model"] })
+      truffle.unregister_provider("demo")
+    RUBY
+
+    runtime = Truffle::Extensions::Runtime.new
+    extension = Truffle::Extensions.load_file(path, runtime: runtime)
+
+    assert_empty extension.provider_registrations
+    assert_empty runtime.provider_registrations
+  end
+
+  def test_load_files_resolves_relative_paths_and_collects_errors
+    write_file("good.rb", <<~RUBY)
+      truffle.on("ready") { |_event| }
+    RUBY
+    write_file("bad.rb", "raise 'boom'")
+
+    result = Truffle::Extensions.load_files(["good.rb", "bad.rb"], cwd: @dir)
+
+    assert_equal ["good.rb"], result.extensions.map(&:path)
+    assert_equal 1, result.errors.length
+    assert_equal "bad.rb", result.errors.first.path
+    assert_match(/Failed to load extension: boom/, result.errors.first.error)
+  end
+
+  def test_runtime_invalidation_marks_api_state_stale
+    runtime = Truffle::Extensions::Runtime.new
+    runtime.invalidate("stale runtime")
+
+    error = assert_raises(Truffle::Error) { runtime.assert_active }
+    assert_equal "stale runtime", error.message
   end
 end
