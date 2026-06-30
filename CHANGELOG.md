@@ -102,6 +102,9 @@ All notable changes to Truffle are documented here. The format follows
   tool result.
 
 ### Changed
+- Reworked the README into a shorter public front door: removed the internal
+  project layout section, tightened the first screen, and added a runnable
+  support-triage example that exercises multiple application-style tools.
 - New sessions now defer writing their JSONL file until the first assistant
   message arrives, matching pi's first-flush behavior and avoiding files for
   abandoned one-user-turn starts. `Session#flush` forces a partial write for
