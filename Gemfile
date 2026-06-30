@@ -11,4 +11,5 @@ group :development, :test do
   gem "rubocop-minitest", "~> 0.36", require: false
   gem "rubocop-rake", "~> 0.6", require: false
   gem "simplecov", "~> 0.22", require: false
+  gem "simplecov-lcov", "~> 0.9", require: false
 end

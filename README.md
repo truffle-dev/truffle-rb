@@ -307,7 +307,8 @@ COVERAGE=true script/rb rake test
 ```
 
 That writes SimpleCov output under `coverage/`. CI uploads the same report to
-Codecov when the repository has Codecov upload access configured.
+Codecov as `coverage/lcov.info` when the repository has Codecov upload access
+configured.
 
 ## Project layout
 

@@ -54,7 +54,8 @@ Coverage is opt-in:
 COVERAGE=true script/rb rake test
 ```
 
-The report is written under `coverage/`.
+The HTML report is written under `coverage/`, and the LCOV report uploaded by CI
+is written to `coverage/lcov.info`.
 
 ## Pull requests
 

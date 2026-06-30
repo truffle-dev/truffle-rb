@@ -59,9 +59,9 @@ All notable changes to Truffle are documented here. The format follows
 - Added `script/check` as the one-command verification path: install/check the
   bundle, run `bundle exec rake test`, then run `bundle exec rubocop` in the
   project container.
-- Added opt-in SimpleCov reporting with `COVERAGE=true`, a Codecov upload step in
-  CI, and public README badges for the repo's real CI, coverage, gem, Ruby,
-  style, and license signals.
+- Added opt-in SimpleCov reporting with `COVERAGE=true`, LCOV output for
+  Codecov, a Codecov upload step in CI, and public README badges for the repo's
+  real CI, coverage, gem, Ruby, style, and license signals.
 - Corrected the README provider count: OpenAI, Anthropic, and Google Gemini all
   ship in the box (each with a streaming sibling), and the live-test section now
   documents the per-provider key gating for all three.
