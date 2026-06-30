@@ -29,7 +29,9 @@ weather = Truffle.tool(
   "get_weather",
   "Look up city weather"
 ) do
-  param :city, :string, "city name",
+  param :city,
+        :string,
+        "city name",
         required: true
 
   run do |city:|
