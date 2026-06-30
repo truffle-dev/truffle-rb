@@ -123,8 +123,22 @@ module Truffle
         gen = {}
         gen[:temperature] = options[:temperature] if options.key?(:temperature)
         gen[:maxOutputTokens] = options[:max_tokens] if options.key?(:max_tokens)
+        apply_response_schema(gen, options)
         body[:generationConfig] = gen unless gen.empty?
         body
+      end
+
+      # Wire a structured-output request from a schema: option into Gemini's
+      # generationConfig. Uses responseJsonSchema (full JSON Schema) rather than
+      # responseSchema (the OpenAPI-3.0 subset) to match this file's
+      # parametersJsonSchema tool precedent and the lowercase-typed Schema#to_h.
+      # responseMimeType must be application/json for the schema to take effect.
+      def self.apply_response_schema(gen, options)
+        schema = options[:schema]
+        return unless schema
+
+        gen[:responseMimeType] = "application/json"
+        gen[:responseJsonSchema] = Providers.schema_definition(schema)
       end
 
       # Split the system message(s) off the front of the history. Gemini takes the

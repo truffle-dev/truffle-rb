@@ -89,9 +89,10 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       the provider-neutral hash; `.from_h` is its JSON-round-trip inverse,
       folding string or symbol keys to the canonical form so equality survives.
       Deeply frozen, usable as a hash key.
-    - [ ] **Provider seam.** A `schema:` option on the provider request builders,
+    - [x] **Provider seam.** A `schema:` option on the provider request builders,
       wrapped in each API's envelope (OpenAI `response_format.json_schema`,
-      Anthropic `output_config.format`, Gemini `responseSchema`).
+      Anthropic `output_config.format`, Gemini `generationConfig.responseJsonSchema`
+      plus `responseMimeType`). OpenAI drops it for a non-native base URL.
     - [x] **Parsed accessor.** `Response#parsed` lazily `JSON.parse`s the final
       text, with an advisory `Schema#valid?`/`#errors` for callers that validate.
 

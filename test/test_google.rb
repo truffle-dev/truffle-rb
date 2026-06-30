@@ -401,4 +401,31 @@ class TestGoogle < Minitest::Test
   def test_missing_api_key_raises
     assert_raises(ArgumentError) { Truffle::Providers::Google.new(api_key: "") }
   end
+
+  # --- structured output: responseJsonSchema seam ------------------------
+
+  def schema_fixture
+    Truffle::Schema.build { param :city, :string, "City name", required: true }
+  end
+
+  def test_schema_emits_response_json_schema_and_mime_type
+    body = Google.build_body([Truffle::Message.user("hi")], [], { schema: schema_fixture })
+    gen = body[:generationConfig]
+
+    assert_equal "application/json", gen[:responseMimeType]
+    assert_equal schema_fixture.to_h, gen[:responseJsonSchema]
+  end
+
+  def test_schema_accepts_a_plain_hash
+    raw = { type: "object", properties: { "n" => { type: "number" } }, required: ["n"] }
+    body = Google.build_body([Truffle::Message.user("hi")], [], { schema: raw })
+
+    assert_equal raw, body[:generationConfig][:responseJsonSchema]
+  end
+
+  def test_no_schema_omits_response_json_schema
+    body = Google.build_body([Truffle::Message.user("hi")], [])
+
+    refute body.key?(:generationConfig)
+  end
 end

@@ -126,7 +126,29 @@ module Truffle
         end
         body[:temperature] = options[:temperature] if options.key?(:temperature)
         apply_token_limit(body, model, options)
+        apply_response_format(body, options)
         body
+      end
+
+      # Wire a structured-output request from a schema: option into OpenAI's
+      # response_format.json_schema. Only the native api.openai.com endpoint is
+      # sent the field: an OpenAI-compatible base URL (Ollama, vLLM, ...) may not
+      # support json_schema, so the schema is dropped there rather than risking a
+      # 400. strict is opt-in (schema_name and strict options) and defaults off,
+      # because strict mode also demands additionalProperties:false and every
+      # property in required, which is the caller's schema to satisfy.
+      def apply_response_format(body, options)
+        schema = options[:schema]
+        return unless schema && native_openai_endpoint?
+
+        body[:response_format] = {
+          type: "json_schema",
+          json_schema: {
+            name: options.fetch(:schema_name, "response"),
+            schema: Providers.schema_definition(schema),
+            strict: options.fetch(:strict, false)
+          }
+        }
       end
 
       def apply_token_limit(body, model, options)

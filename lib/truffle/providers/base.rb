@@ -4,6 +4,16 @@ require "time"
 
 module Truffle
   module Providers
+    # Normalize a `schema:` option into the provider-neutral JSON-schema hash that
+    # each provider wraps in its own structured-output envelope. The option is a
+    # Truffle::Schema (whose #to_h is the frozen definition) or a plain Hash; both
+    # answer #to_h, so this is the single coercion every provider shares. Defined
+    # at module level so the instance-method builder (OpenAI) and the class-method
+    # builders (Anthropic, Google) can all reach it.
+    def self.schema_definition(schema)
+      schema.respond_to?(:to_h) ? schema.to_h : schema
+    end
+
     # The contract every provider implements. This single seam is what makes
     # Truffle provider-agnostic: the agent loop only ever calls #chat and reads a
     # Truffle::Response back. Swapping OpenAI for Anthropic or a local model is a

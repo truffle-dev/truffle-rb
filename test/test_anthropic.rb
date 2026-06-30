@@ -406,4 +406,35 @@ class TestAnthropic < Minitest::Test
   def test_missing_api_key_raises
     assert_raises(ArgumentError) { Truffle::Providers::Anthropic.new(api_key: "") }
   end
+
+  # --- structured output: output_config seam -----------------------------
+
+  def schema_fixture
+    Truffle::Schema.build { param :city, :string, "City name", required: true }
+  end
+
+  def test_schema_emits_output_config_json_schema_format
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 1024,
+                                { schema: schema_fixture })
+    fmt = body[:output_config][:format]
+
+    assert_equal "json_schema", fmt[:type]
+    assert_equal schema_fixture.to_h, fmt[:schema]
+  end
+
+  def test_schema_strips_top_level_strict_from_format_schema
+    # Anthropic uses strict only for tool definitions, not JSON output, and
+    # rejects it inside format.schema, so it is dropped.
+    raw = { type: "object", strict: true, properties: { "n" => { type: "number" } } }
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 1024,
+                                { schema: raw })
+
+    refute_includes body[:output_config][:format][:schema], :strict
+  end
+
+  def test_no_schema_omits_output_config
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "claude-sonnet-4-5", 1024)
+
+    refute body.key?(:output_config)
+  end
 end

@@ -17,6 +17,13 @@ All notable changes to Truffle are documented here. The format follows
   round-trip survives equality. Values are deeply frozen and usable as hash keys.
   This is the foundation for the `schema:` provider seam and a structured
   `Response#parsed` accessor.
+- A `schema:` option on `#chat` and `#chat_stream` requests native structured
+  output from each provider. OpenAI wires it into `response_format.json_schema`
+  (with `schema_name` and opt-in `strict`), Anthropic into `output_config.format`
+  (stripping the tool-only `strict` key), and Gemini into
+  `generationConfig.responseJsonSchema` plus `responseMimeType`. The option takes
+  a `Truffle::Schema` or a plain JSON-Schema hash. OpenAI drops the field for a
+  non-native base URL (Ollama, vLLM, ...) that may not support it.
 - `Response#parsed` lazily parses the final assistant text as JSON without
   changing `#text`. `Truffle::Schema#valid?` and `#errors` provide advisory
   validation for the JSON-Schema subset Truffle emits: type, enum, required

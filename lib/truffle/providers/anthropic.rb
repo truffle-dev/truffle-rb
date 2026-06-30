@@ -121,7 +121,22 @@ module Truffle
           end
         end
         body[:temperature] = options[:temperature] if options.key?(:temperature)
+        apply_output_config(body, options)
         body
+      end
+
+      # Wire a structured-output request from a schema: option into Anthropic's
+      # output_config.format. The feature is generally available, so no beta
+      # header is needed. A top-level strict key is stripped: Anthropic uses
+      # strict only for tool definitions, not for JSON output, and rejects it
+      # inside format.schema.
+      def self.apply_output_config(body, options)
+        schema = options[:schema]
+        return unless schema
+
+        definition = Providers.schema_definition(schema)
+        definition = definition.reject { |k, _| k.to_s == "strict" } if definition.is_a?(Hash)
+        body[:output_config] = { format: { type: "json_schema", schema: definition } }
       end
 
       # Split the system message(s) off the front of the history. Anthropic takes
