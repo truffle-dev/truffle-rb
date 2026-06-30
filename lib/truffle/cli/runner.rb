@@ -102,18 +102,44 @@ module Truffle
                    error_message: payload[:error_message])
     end
 
-    # The ordered prompts a print run sends. Piped stdin and the first CLI
-    # message join into one initial prompt (pi's `buildInitialMessage`, minus the
-    # deferred @file text); the remaining CLI messages follow as their own
-    # prompts. A run with neither stdin nor messages sends nothing.
+    # The ordered prompts a print run sends. Piped stdin, @file text, and the
+    # first CLI message join into one initial prompt (pi's `buildInitialMessage`);
+    # the remaining CLI messages follow as their own prompts. A run with none of
+    # those sends nothing.
     def print_prompts(args, input)
       messages = args.messages.dup
       parts = []
       stdin = piped_stdin(input)
       parts << stdin unless stdin.nil?
+      file_text = print_file_text(args.file_args)
+      parts << file_text unless file_text.empty?
       parts << messages.shift unless messages.empty?
       initial = parts.empty? ? nil : parts.join
       [initial, *messages].compact
+    end
+
+    # The text half of pi's @file processing. Each non-empty file becomes a
+    # `<file name="absolute/path">` block appended to the initial prompt. Image
+    # attachments are a later slice because the current Agent#run accepts only a
+    # text prompt; fail clearly instead of feeding binary data as text.
+    def print_file_text(file_args, cwd: Dir.pwd)
+      Array(file_args).each_with_object(+"") do |file_arg, text|
+        path = Tools::Path.resolve(file_arg, cwd)
+        raise Truffle::Error, "Error: File not found: #{path}" unless File.exist?(path)
+
+        next if File.empty?(path)
+
+        if Mime.detect_supported_image_mime_type_from_file(path)
+          raise Truffle::Error, "Error: @file image arguments are not implemented yet: #{path}"
+        end
+
+        content = File.binread(path).force_encoding(Encoding::UTF_8).scrub
+        text << "<file name=\"#{path}\">\n#{content}\n</file>\n"
+      rescue Truffle::Error
+        raise
+      rescue StandardError => e
+        raise Truffle::Error, "Error: Could not read file #{path}: #{e.message}"
+      end
     end
 
     # The piped stdin content, or nil when stdin is a terminal or empty. Mirrors
@@ -171,7 +197,7 @@ module Truffle
     end
 
     private_class_method :run_print, :final_print_response, :print_prompts,
-                         :piped_stdin, :build_print_agent, :print_tools,
+                         :print_file_text, :piped_stdin, :build_print_agent, :print_tools,
                          :report_diagnostics, :color?, :print_mode?
   end
 end

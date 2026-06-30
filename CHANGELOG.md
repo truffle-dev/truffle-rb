@@ -22,8 +22,10 @@ All notable changes to Truffle are documented here. The format follows
   by default and narrowed by `--no-tools`, `--tools`, and `--exclude-tools`.
   `--mode json` also works without `--print`, matching pi's print-mode shortcut.
   RPC output mode now reports that it is not implemented instead of falling
-  through to print or interactive mode. Sessions, extensions, skills, `@file`
-  content, and the interactive REPL remain later slices.
+  through to print or interactive mode. Text `@file` arguments are spliced into
+  the initial prompt after piped stdin and before the first message, wrapped in
+  pi's `<file name="...">` block. Sessions, extensions, skills, image `@file`
+  attachments, and the interactive REPL remain later slices.
 
 ### Fixed
 - The `bash` tool now fails a command killed by a signal (an OOM kill, an

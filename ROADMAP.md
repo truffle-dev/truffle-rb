@@ -490,6 +490,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       lossless JPEG and an animated PNG, reading raw bytes from a binary String
       with no image library pulled in. This is the prerequisite for the `@file`
       image arguments that still remain a later slice.
+    - [x] Print-mode text `@file` input. Text file arguments are resolved through
+      the same path normalizer as the file tools, skipped when empty, wrapped as
+      pi's `<file name="absolute/path">` blocks, and inserted into the initial
+      prompt after piped stdin and before the first CLI message. Image
+      attachments still remain a later slice.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

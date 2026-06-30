@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "stringio"
+require "tmpdir"
 
 # A stand-in for the agent a `--print` run drives, with no provider and no
 # network. It records the prompts it is sent and replays a scripted `:agent_end`
@@ -84,6 +85,12 @@ class TestCLIRunner < Minitest::Test
   def assistant_payload(text, stop_reason: Truffle::StopReason::STOP, error_message: nil)
     message = Truffle::Message.assistant(content: text)
     { output: text, messages: [message], stop_reason: stop_reason, error_message: error_message }
+  end
+
+  def in_tmpdir
+    Dir.mktmpdir do |dir|
+      Dir.chdir(dir) { yield dir }
+    end
   end
 
   def test_version_flag_prints_version_text_and_exits_zero
@@ -237,6 +244,77 @@ class TestCLIRunner < Minitest::Test
     assert_equal 0, status
     assert_equal %w[one two], agent.prompts
     assert_equal "second reply\n", out
+  end
+
+  def test_print_splices_text_file_arguments_into_the_initial_prompt
+    in_tmpdir do |dir|
+      path = File.join(dir, "note.txt")
+      File.write(path, "alpha\nbeta")
+      agent = PrintStubAgent.new([assistant_payload("ok")])
+
+      status, = run_print_cli(["-p", "@note.txt"], agent: agent)
+
+      assert_equal 0, status
+      assert_equal ["<file name=\"#{path}\">\nalpha\nbeta\n</file>\n"], agent.prompts
+    end
+  end
+
+  def test_print_orders_stdin_files_and_the_first_message_like_pi
+    in_tmpdir do |dir|
+      path = File.join(dir, "context.txt")
+      File.write(path, "from file")
+      agent = PrintStubAgent.new([assistant_payload("ok")])
+
+      status, = run_print_cli(
+        ["-p", "@context.txt", "ask", "followup"],
+        input: StringIO.new("from stdin\n"),
+        agent: agent
+      )
+      expected = "from stdin\n<file name=\"#{path}\">\nfrom file\n</file>\nask"
+
+      assert_equal 0, status
+      assert_equal [expected, "followup"], agent.prompts
+    end
+  end
+
+  def test_print_skips_empty_file_arguments
+    in_tmpdir do
+      File.write("empty.txt", "")
+      agent = PrintStubAgent.new([assistant_payload("ok")])
+
+      status, = run_print_cli(["-p", "@empty.txt", "ask"], agent: agent)
+
+      assert_equal 0, status
+      assert_equal ["ask"], agent.prompts
+    end
+  end
+
+  def test_print_reports_a_missing_file_argument
+    in_tmpdir do |dir|
+      agent = PrintStubAgent.new([assistant_payload("unused")])
+
+      status, out, err = run_print_cli(["-p", "@missing.txt"], agent: agent)
+
+      assert_equal 1, status
+      assert_empty out
+      assert_equal "Error: File not found: #{File.join(dir, "missing.txt")}\n", err
+      assert_empty agent.prompts
+    end
+  end
+
+  def test_print_reports_image_file_arguments_until_image_input_lands
+    in_tmpdir do |dir|
+      path = File.join(dir, "image.jpg")
+      File.binwrite(path, [0xff, 0xd8, 0xff, 0xe0].pack("C*"))
+      agent = PrintStubAgent.new([assistant_payload("unused")])
+
+      status, out, err = run_print_cli(["-p", "@image.jpg"], agent: agent)
+
+      assert_equal 1, status
+      assert_empty out
+      assert_equal "Error: @file image arguments are not implemented yet: #{path}\n", err
+      assert_empty agent.prompts
+    end
   end
 
   def test_print_json_mode_writes_agent_events_as_json_lines
