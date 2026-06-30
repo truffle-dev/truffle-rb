@@ -311,4 +311,102 @@ class TestExtensions < Minitest::Test
     error = assert_raises(Truffle::Error) { runtime.assert_active }
     assert_equal "stale runtime", error.message
   end
+
+  # --- load_all ---------------------------------------------------------------
+
+  def test_load_all_loads_project_user_and_explicit_paths_in_order
+    project_path = write_file(".truffle/extensions/project.rb", <<~RUBY)
+      truffle.register_command("project") { "project" }
+    RUBY
+    agent_dir = File.join(@dir, "agent")
+    user_path = File.join(agent_dir, "extensions/user.rb")
+    FileUtils.mkdir_p(File.dirname(user_path))
+    File.write(user_path, <<~RUBY)
+      truffle.register_command("user") { "user" }
+    RUBY
+    explicit_path = write_file("extra/explicit.rb", <<~RUBY)
+      truffle.register_command("explicit") { "explicit" }
+    RUBY
+
+    result = Truffle::Extensions.load_all(
+      cwd: @dir,
+      agent_dir: agent_dir,
+      extension_paths: ["extra/explicit.rb"]
+    )
+
+    assert_empty result.errors
+    assert_equal [project_path, user_path, explicit_path].map { |path| File.expand_path(path) },
+                 result.extensions.map(&:resolved_path)
+  end
+
+  def test_load_all_can_skip_default_extension_dirs
+    write_file(".truffle/extensions/project.rb",
+               "truffle.register_command('project') { 'project' }")
+    explicit_path = write_file("explicit.rb", "truffle.register_command('explicit') { 'explicit' }")
+
+    result = Truffle::Extensions.load_all(
+      cwd: @dir,
+      extension_paths: "explicit.rb",
+      include_defaults: false
+    )
+
+    assert_empty result.errors
+    assert_equal [File.expand_path(explicit_path)], result.extensions.map(&:resolved_path)
+  end
+
+  def test_load_all_can_skip_project_extension_dir
+    write_file(".truffle/extensions/project.rb",
+               "truffle.register_command('project') { 'project' }")
+    agent_dir = File.join(@dir, "agent")
+    user_path = File.join(agent_dir, "extensions/user.rb")
+    FileUtils.mkdir_p(File.dirname(user_path))
+    File.write(user_path, "truffle.register_command('user') { 'user' }")
+
+    result = Truffle::Extensions.load_all(cwd: @dir, agent_dir: agent_dir, include_project: false)
+
+    assert_empty result.errors
+    assert_equal [File.expand_path(user_path)], result.extensions.map(&:resolved_path)
+  end
+
+  def test_load_all_resolves_explicit_directories_as_package_then_discovery
+    manifest_entry = write_file("pkg/lib/entry.rb", "truffle.register_command('pkg') { 'pkg' }")
+    write_file("pkg/index.rb", "raise 'index should not load'")
+    write_file("pkg/package.json", JSON.generate({ "pi" => { "extensions" => ["lib/entry.rb"] } }))
+    child_entry = write_file("loose/child.rb", "truffle.register_command('child') { 'child' }")
+
+    result = Truffle::Extensions.load_all(
+      cwd: @dir,
+      extension_paths: %w[pkg loose],
+      include_defaults: false
+    )
+
+    assert_empty result.errors
+    assert_equal [manifest_entry, child_entry].map { |path| File.expand_path(path) },
+                 result.extensions.map(&:resolved_path)
+  end
+
+  def test_load_all_deduplicates_by_expanded_path
+    path = write_file(".truffle/extensions/one.rb", "truffle.register_command('one') { 'one' }")
+
+    result = Truffle::Extensions.load_all(
+      cwd: @dir,
+      extension_paths: [path, ".truffle/extensions/one.rb"]
+    )
+
+    assert_empty result.errors
+    assert_equal [File.expand_path(path)], result.extensions.map(&:resolved_path)
+  end
+
+  def test_load_all_collects_errors_for_missing_explicit_files
+    result = Truffle::Extensions.load_all(
+      cwd: @dir,
+      extension_paths: "missing.rb",
+      include_defaults: false
+    )
+
+    assert_empty result.extensions
+    assert_equal 1, result.errors.length
+    assert_equal File.join(@dir, "missing.rb"), result.errors.first.path
+    assert_match(/Failed to load extension:/, result.errors.first.error)
+  end
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "config"
 require_relative "event_bus"
 require_relative "slash_commands"
 require_relative "tool"
@@ -9,9 +10,9 @@ module Truffle
   # Extension discovery, the Ruby port of the pure filesystem layer in pi's
   # extension loader (packages/coding-agent/src/core/extensions/loader.ts). This
   # is the seam that finds extension *entry points* on disk before anything is
-  # loaded or executed. Loading a discovered module (pi imports a TS module; the
-  # Ruby host will either `require` a file or take a registration block) is a
-  # separate, later concern and lives nowhere in here.
+  # bound into the agent. A discovered Ruby entry can also be evaluated with a
+  # load-time registration API; binding those registrations into live sessions
+  # is a later runtime concern.
   #
   # The discovery rules carry over from pi exactly:
   #
@@ -274,6 +275,52 @@ module Truffle
       end
 
       LoadResult.new(extensions: extensions, errors: errors, runtime: runtime)
+    end
+
+    # Discover and load extension entries in pi's standard order: project
+    # `.truffle/extensions`, user `agent_dir/extensions`, then explicit paths.
+    # Explicit directories first resolve as an extension package/index; otherwise
+    # their direct children are discovered. Paths are de-duplicated after
+    # expansion, matching pi's path.resolve-based `seen` set.
+    def load_all(extension_paths: [], cwd: Dir.pwd, agent_dir: Config.agent_dir,
+                 runtime: Runtime.new, include_defaults: true,
+                 include_project: true, include_user: true)
+      paths = []
+      seen = {}
+      add_paths = lambda do |candidates|
+        Array(candidates).each do |candidate|
+          expanded = File.expand_path(candidate)
+          next if seen[expanded]
+
+          seen[expanded] = true
+          paths << expanded
+        end
+      end
+
+      if include_defaults
+        if include_project
+          add_paths.call(discover_in_dir(File.join(Config.project_dir(cwd: cwd), "extensions")))
+        end
+        if include_user
+          add_paths.call(discover_in_dir(File.join(File.expand_path(agent_dir), "extensions")))
+        end
+      end
+
+      Array(extension_paths).each do |path|
+        raw_path = path.to_s.strip
+        next if raw_path.empty?
+
+        resolved = File.expand_path(raw_path, cwd)
+
+        if File.directory?(resolved)
+          entries = resolve_entries(resolved)
+          add_paths.call(entries || discover_in_dir(resolved))
+        else
+          add_paths.call([resolved])
+        end
+      end
+
+      load_files(paths, cwd: cwd, runtime: runtime)
     end
 
     def build_extension(path, resolved_path)

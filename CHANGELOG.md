@@ -54,6 +54,11 @@ All notable changes to Truffle are documented here. The format follows
   handlers, and provider configs as data; `load_files` returns loaded extensions
   plus per-file errors so one broken extension does not stop the rest. Binding
   those registrations into an agent/session remains a later item-18 slice.
+- Default extension directories. `Extensions.load_all` now loads extension
+  entries in pi's order: project `.truffle/extensions`, user
+  `agent_dir/extensions`, then explicit paths. Explicit directories resolve as a
+  package/index first and otherwise discover direct entries inside the directory,
+  with expanded-path deduplication before loading.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

@@ -366,8 +366,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       Extensions can register tools, slash commands, event handlers, and
       provider configs as data; `load_files` collects per-file errors so one
       broken extension does not stop the rest.
+    - [x] **Default extension directories.** `Extensions.load_all` ports pi's
+      `discoverAndLoadExtensions` path order for Ruby: project
+      `.truffle/extensions`, user `agent_dir/extensions`, then explicit paths.
+      Explicit directories resolve as a package/index first and fall back to
+      direct discovery; entries are de-duplicated by expanded path before load.
     - [ ] Bind loaded extension registrations into agents and sessions: tools,
-      commands, event-handler dispatch, default extension directories, and reload.
+      commands, event-handler dispatch, and reload.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.
