@@ -44,7 +44,7 @@ end
 
 agent = Truffle.agent(
   provider: :openai,
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   system_prompt: "Triage tickets. Use tools first.",
   tools: [lookup_customer]
 )
@@ -146,7 +146,7 @@ raises, Truffle feeds the error back as the tool result so the model can recover
 ```ruby
 agent = Truffle.agent(
   provider: :openai,
-  model: "gpt-4o-mini",
+  model: "gpt-5.4-mini",
   system_prompt: "You are precise. Use tools for arithmetic.",
   tools: [add],
   max_turns: 12
@@ -175,14 +175,16 @@ results, retries, compaction, and the final `agent_end`.
 
 ```ruby
 Truffle.models
-Truffle.model("gpt-4o-mini")
-Truffle.model("claude-sonnet-4-5")
+Truffle.model("gpt-5.5")
+Truffle.model("claude-sonnet-4-6")
 ```
 
 The model catalog records provider, model id, context window, max output,
 modalities, reasoning support, and pricing. `Truffle.agent(model: "...")` can
 infer the provider for catalog models; pass `provider:` explicitly for custom or
-OpenAI-compatible endpoints.
+OpenAI-compatible endpoints. The examples above use `gpt-5.4-mini` for a fast,
+low-cost default; reach for a flagship such as `gpt-5.5`, `claude-opus-4-8`, or
+`claude-sonnet-4-6` when a task needs deeper reasoning.
 
 ## Testing
 

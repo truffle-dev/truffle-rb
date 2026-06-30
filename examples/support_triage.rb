@@ -71,7 +71,7 @@ end
 
 agent = Truffle.agent(
   provider: :openai,
-  model: ENV.fetch("TRUFFLE_MODEL", "gpt-4o-mini"),
+  model: ENV.fetch("TRUFFLE_MODEL", "gpt-5.4-mini"),
   system_prompt: <<~PROMPT,
     You triage ecommerce support tickets.
     Always look up the customer and their recent orders before deciding.

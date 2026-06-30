@@ -27,7 +27,7 @@ end
 
 agent = Truffle.agent(
   provider: :openai,
-  model: ENV.fetch("TRUFFLE_MODEL", "gpt-4o-mini"),
+  model: ENV.fetch("TRUFFLE_MODEL", "gpt-5.4-mini"),
   system_prompt: "You are a precise calculator. Use the tools for every " \
                  "arithmetic step. Show the final result clearly.",
   tools: [add, multiply]
