@@ -479,9 +479,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       remain later slices.
     - [x] Print-mode JSON output. `truffle --print --mode json` subscribes to
       the agent event stream and writes one newline-delimited JSON object per
-      event, with a `type` field plus JSON-safe payload data. This ports pi's
-      JSON branch for the sessionless CLI slice; session headers and RPC mode
-      remain later slices.
+      event, with a `type` field plus JSON-safe payload data. `--mode json`
+      also triggers the one-shot print path without `--print`, matching pi's
+      top-level dispatch. RPC mode is parsed but reports not implemented until a
+      real `runRpcMode` port lands. Session headers and the RPC runtime remain
+      later slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

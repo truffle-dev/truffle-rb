@@ -86,10 +86,10 @@ Truffle targets Ruby 3.1 and newer.
 
 Installing the gem also adds a `truffle` command. Today it answers
 `truffle --version`, `truffle --help`, `truffle --list-models`, and one-shot
-`truffle --print` runs. Use `--mode json` when an app wants newline-delimited
-agent events instead of only the final text. The interactive REPL is in
-progress, so running it with no flags reports that interactive mode is not
-implemented yet.
+`truffle --print` runs. Use `truffle --mode json "..."` when an app wants
+newline-delimited agent events instead of only the final text. The interactive
+REPL is in progress, so running it with no flags reports that interactive mode
+is not implemented yet.
 
 ## A Real Example
 

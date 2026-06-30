@@ -5,10 +5,10 @@ module Truffle
     # The thin entry point behind the `truffle` executable. It parses argv,
     # surfaces the parser's diagnostics, and acts on the terminal flags the
     # harness supports today: `--version`, `--help`, `--list-models`, and the
-    # `--print` single-shot run. This is the Ruby counterpart of the top of pi's
-    # `main.ts` dispatcher, narrowed to the slices that exist. The interactive
-    # REPL and `--export` are later slices of roadmap item 19, so any other
-    # invocation reports that and exits.
+    # single-shot print run (`--print` or `--mode json`). This is the Ruby
+    # counterpart of the top of pi's `main.ts` dispatcher, narrowed to the slices
+    # that exist. RPC, the interactive REPL, and `--export` are later slices of
+    # roadmap item 19, so those invocations report that and exit.
     #
     # `run` takes injectable out/err/input streams and RETURNS an exit status
     # rather than calling `exit`, so the whole dispatch is testable offline with
@@ -52,7 +52,12 @@ module Truffle
         return 0
       end
 
-      if args.print
+      if args.mode == "rpc"
+        err.puts "#{APP_NAME}: rpc mode is not implemented yet"
+        return EXIT_NOT_IMPLEMENTED
+      end
+
+      if print_mode?(args)
         return run_print(args, out: out, err: err, input: input, agent_builder: agent_builder)
       end
 
@@ -161,8 +166,12 @@ module Truffle
       out.respond_to?(:tty?) && out.tty?
     end
 
+    def print_mode?(args)
+      args.print || args.mode == "json"
+    end
+
     private_class_method :run_print, :final_print_response, :print_prompts,
                          :piped_stdin, :build_print_agent, :print_tools,
-                         :report_diagnostics, :color?
+                         :report_diagnostics, :color?, :print_mode?
   end
 end

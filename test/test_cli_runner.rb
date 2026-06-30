@@ -257,6 +257,37 @@ class TestCLIRunner < Minitest::Test
     refute_includes events.last, "error_message"
   end
 
+  def test_json_mode_without_print_also_runs_single_shot_json_output
+    agent = PrintStubAgent.new([assistant_payload("the answer")])
+
+    status, out, err = run_print_cli(["--mode", "json", "ask"], agent: agent)
+    events = out.lines.map { |line| JSON.parse(line) }
+    types = events.map { |event| event["type"] }
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal ["ask"], agent.prompts
+    assert_equal %w[agent_start agent_end], types
+  end
+
+  def test_rpc_mode_reports_not_implemented_without_building_a_print_agent
+    out = StringIO.new
+    err = StringIO.new
+    built = false
+
+    status = Truffle::CLI.run(
+      ["--print", "--mode", "rpc", "ask"],
+      out: out,
+      err: err,
+      agent_builder: ->(_args) { built = true }
+    )
+
+    assert_equal Truffle::CLI::EXIT_NOT_IMPLEMENTED, status
+    assert_equal "truffle: rpc mode is not implemented yet\n", err.string
+    assert_empty out.string
+    refute built
+  end
+
   def test_print_does_not_read_an_interactive_stdin
     agent = PrintStubAgent.new([assistant_payload("ok")])
 

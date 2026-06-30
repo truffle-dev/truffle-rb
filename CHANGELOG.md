@@ -14,9 +14,11 @@ All notable changes to Truffle are documented here. The format follows
   into the initial prompt; any further messages are sent in order after it. An
   error or aborted final text turn prints its message to stderr with exit 1, and
   an unresolvable provider/model fails the same way. The builtin tools are wired
-  by default and narrowed by `--no-tools`, `--tools`, and `--exclude-tools`. RPC
-  output mode, sessions, extensions, skills, `@file` content, and the
-  interactive REPL remain later slices.
+  by default and narrowed by `--no-tools`, `--tools`, and `--exclude-tools`.
+  `--mode json` also works without `--print`, matching pi's print-mode shortcut.
+  RPC output mode now reports that it is not implemented instead of falling
+  through to print or interactive mode. Sessions, extensions, skills, `@file`
+  content, and the interactive REPL remain later slices.
 
 ### Fixed
 - The `bash` tool now fails a command killed by a signal (an OOM kill, an
