@@ -24,6 +24,17 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Truffle::Retry.retryable_assistant_error?(response)` classifies whether a
+  failed turn reads as a transient provider or transport error worth restarting:
+  a load spike, an HTTP 5xx, a throttle, a network or stream transport failure,
+  or explicit provider guidance to retry. Only an error turn carrying a message
+  qualifies, and an account or billing limit (a spent quota or budget) is never
+  retryable even when it also matches a transient pattern, so a "429 quota
+  exceeded" stays non-retryable. `Retry.retryable_patterns` and
+  `non_retryable_patterns` return copies of the phrase lists. Ports pi's
+  `isRetryableAssistantError`. This is classification, not policy: the companion
+  to overflow detection, it tells a future retry policy which failures are worth
+  trying again.
 - A session-backed `Truffle::Agent` now recovers from context overflow. When a
   turn fails (an error turn whose message matches an overflow phrase) or is
   length-stopped over the window, the agent compacts and, if compaction fired,

@@ -226,6 +226,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       cannot loop forever.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
+    - [x] `Retry.retryable_assistant_error?`: classify whether a failed error turn
+      reads as a transient provider/transport error (load, 5xx, throttle, network,
+      premature stream end, explicit retry guidance) vs a non-retryable account or
+      billing limit. Ports pi's `isRetryableAssistantError`. Classification only;
+      the policy below consumes it.
+    - [ ] Configurable HTTP open/read timeout per provider call.
+    - [ ] Bounded backoff retry policy: restart a turn that `Retry` deems
+      transient, capped by a retry budget, honoring a provider retry-after.
 14. **Tool middleware.** before/after hooks around tool execution (logging,
     auth, rate limiting) without changing tool definitions.
 15. **Parallel tool dispatch.** Run independent tool calls in one turn
