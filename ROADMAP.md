@@ -321,8 +321,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       pure prompt-template argument layer: bash-style quoted arg parsing and
       single-pass substitution for `$1`, `$@`, `$ARGUMENTS`, `${N:-default}`,
       `${@:N}`, and `${@:N:L}` placeholders.
-    - [ ] Prompt markdown loading from explicit paths and default command/prompt
-      directories.
+    - [x] **Prompt markdown loading from explicit paths.**
+      `Truffle::PromptTemplates` loads prompt `.md` files from named files and
+      direct directory scans, preserves `description` and `argument-hint`
+      frontmatter, falls back to the first body line for descriptions, and
+      expands `/name args` with the argument helpers.
+    - [ ] Default command/prompt directories once the Ruby config layout exists.
     - [ ] Slash command registry and expansion into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
