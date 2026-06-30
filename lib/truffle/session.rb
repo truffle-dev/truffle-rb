@@ -19,8 +19,11 @@ module Truffle
   # and a compaction entry (a summary that stands in for the turns before it).
   # #context walks the path and applies them: it recovers the live model and
   # thinking level and, when the path was compacted, returns the summary followed
-  # by the kept tail instead of the full history. Old v1/v2 files are migrated to
-  # the current tree shape on load.
+  # by the kept tail instead of the full history. New sessions buffer their first
+  # entries until an assistant message arrives, so abandoned one-user-turn starts
+  # do not leave files behind; .flush forces the write when a caller explicitly
+  # wants a partial session persisted. Old v1/v2 files are migrated to the current
+  # tree shape on load.
   #
   # Because entries form a tree, the leaf can be moved back to an earlier entry
   # (#branch / #reset_leaf) so the next append opens a second child, a new branch
@@ -28,8 +31,7 @@ module Truffle
   # but drops a branch_summary entry on the new path, a digest of the turns it
   # came back past that folds into #context as a user message. Any entry can carry
   # a user label (#append_label_change / #label), a bookmark that rides along as
-  # its own entry and never enters the model's context. The deferred-first-flush
-  # optimization remains a faithful follow-up.
+  # its own entry and never enters the model's context.
   #
   #   session = Truffle::Session.create(dir: "/tmp/sessions", cwd: Dir.pwd)
   #   session.append_message(Truffle::Message.user("hello"))
@@ -83,11 +85,9 @@ module Truffle
       header[:parent_session] = parent_session if parent_session
       header[:tools] = tools if tools && !tools.empty?
 
-      FileUtils.mkdir_p(dir)
       file = File.join(dir, "#{timestamp.gsub(/[:.]/, "-")}_#{id}.jsonl")
-      File.open(file, "wx") { |handle| handle.write("#{JSON.generate(header)}\n") }
 
-      new(file: file, header: header, entries: [])
+      new(file: file, header: header, entries: [], flushed: false)
     end
 
     # Read a session file back: parse each JSONL line, skipping any that do not
@@ -105,7 +105,7 @@ module Truffle
         SessionMigration.rewrite_file(path, parsed)
       end
 
-      new(file: path, header: header, entries: parsed.drop(1))
+      new(file: path, header: header, entries: parsed.drop(1), flushed: true)
     end
 
     # Parse one JSONL line into an entry with symbol top-level keys. The nested
@@ -120,7 +120,7 @@ module Truffle
     end
     private_class_method :parse_line
 
-    def initialize(file:, header:, entries:)
+    def initialize(file:, header:, entries:, flushed: true)
       @file = file
       @header = header
       @id = header[:id]
@@ -131,6 +131,7 @@ module Truffle
       @by_id = {}
       @labels_by_id = {}
       @leaf_id = nil
+      @flushed = flushed
       entries.each { |entry| index(entry) }
     end
 
@@ -142,6 +143,17 @@ module Truffle
     # The entries after the header, in file order (a defensive copy).
     def entries
       @entries.dup
+    end
+
+    # Force any buffered header/entries to disk. This keeps the pi optimization
+    # for normal runs while letting explicit persistence paths (Agent#dump, tests,
+    # host apps) save a partial conversation.
+    def flush
+      return self if @flushed
+
+      write_all_entries
+      @flushed = true
+      self
     end
 
     # Append a message as a child of the current leaf, then advance the leaf.
@@ -311,8 +323,36 @@ module Truffle
     def append_entry(entry)
       @entries << entry
       index(entry)
-      File.open(@file, "a") { |handle| handle.write("#{JSON.generate(entry)}\n") }
+      persist(entry)
       entry[:id]
+    end
+
+    def persist(entry)
+      unless assistant_entry_seen?
+        append_line(entry) if @flushed
+        return
+      end
+
+      @flushed ? append_line(entry) : flush
+    end
+
+    def assistant_entry_seen?
+      @entries.any? do |entry|
+        entry[:type] == "message" &&
+          Message.from_h(entry[:message]).role == :assistant
+      end
+    end
+
+    def append_line(entry)
+      File.open(@file, "a") { |handle| handle.write("#{JSON.generate(entry)}\n") }
+    end
+
+    def write_all_entries
+      FileUtils.mkdir_p(File.dirname(@file))
+      File.open(@file, "wx") do |handle|
+        handle.write("#{JSON.generate(@header)}\n")
+        @entries.each { |entry| handle.write("#{JSON.generate(entry)}\n") }
+      end
     end
 
     # Walk from a leaf back to the root via parent_id, then reverse into

@@ -171,7 +171,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `#context` as a wrapped user message while the abandoned entries stay out of
       context. Ports pi's `branchWithSummary` and the branch_summary arm of the
       context walk.
-    - [ ] The deferred-first-flush optimization.
+    - [x] **Deferred-first-flush optimization.** New sessions buffer their header
+      and early entries until the first assistant message arrives, avoiding files
+      for abandoned one-user-turn starts. `Session#flush` forces a partial write
+      for explicit persistence paths such as `Agent#dump`.
     - [x] **v1/v2 file migration.** `Session.load` upgrades older JSONL files
       to the current v3 tree shape: missing entry ids/parents are filled in
       linearly, compaction `first_kept_entry_index` values become

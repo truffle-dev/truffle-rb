@@ -23,6 +23,11 @@ class TestSessionBranching < Minitest::Test
     messages.map(&:text)
   end
 
+  def load_session(session)
+    session.flush
+    Truffle::Session.load(session.file)
+  end
+
   def test_branch_moves_the_leaf_to_an_earlier_entry
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     first = session.append_message(Truffle::Message.user("a"))
@@ -124,7 +129,7 @@ class TestSessionBranching < Minitest::Test
     target = session.append_message(Truffle::Message.user("a"))
     session.append_label_change(target, "kept")
 
-    reloaded = Truffle::Session.load(session.file)
+    reloaded = load_session(session)
 
     assert_equal "kept", reloaded.label(target)
   end
@@ -135,7 +140,7 @@ class TestSessionBranching < Minitest::Test
     session.append_label_change(target, "temp")
     session.append_label_change(target, nil)
 
-    reloaded = Truffle::Session.load(session.file)
+    reloaded = load_session(session)
 
     assert_nil reloaded.label(target)
   end
@@ -204,7 +209,7 @@ class TestSessionBranching < Minitest::Test
     session.branch_with_summary(first, "kept digest")
     session.append_message(Truffle::Message.user("b"))
 
-    reloaded = Truffle::Session.load(session.file)
+    reloaded = load_session(session)
 
     assert_includes reloaded.context.messages[1].text, "kept digest"
     assert_equal %w[a b], [reloaded.context.messages[0].text, reloaded.context.messages[2].text]

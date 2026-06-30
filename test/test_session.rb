@@ -27,8 +27,21 @@ class TestSession < Minitest::Test
     path
   end
 
-  def test_create_writes_a_header_line
+  def load_session(session)
+    session.flush
+    Truffle::Session.load(session.file)
+  end
+
+  def test_create_defers_writing_until_the_first_assistant_message
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
+
+    refute_path_exists session.file
+
+    session.append_message(Truffle::Message.user("hello"))
+
+    refute_path_exists session.file
+
+    session.append_message(Truffle::Message.assistant(content: "hi"))
     header = JSON.parse(File.read(session.file).each_line.first)
 
     assert_equal "session", header["type"]
@@ -47,6 +60,7 @@ class TestSession < Minitest::Test
 
   def test_create_records_an_optional_parent_session
     session = Truffle::Session.create(dir: @dir, cwd: "/work", parent_session: "abc123")
+    session.flush
     header = JSON.parse(File.read(session.file).each_line.first)
 
     assert_equal "abc123", header["parent_session"]
@@ -64,6 +78,9 @@ class TestSession < Minitest::Test
   def test_append_message_persists_one_line_per_message
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     session.append_message(Truffle::Message.user("first"))
+
+    refute_path_exists session.file
+
     session.append_message(Truffle::Message.assistant(content: "second"))
     lines = File.read(session.file).each_line.to_a
 
@@ -75,7 +92,7 @@ class TestSession < Minitest::Test
     session.append_message(Truffle::Message.user("hello"))
     session.append_message(Truffle::Message.assistant(content: "hi there"))
 
-    reloaded = Truffle::Session.load(session.file)
+    reloaded = load_session(session)
     messages = reloaded.messages
 
     assert_equal %i[user assistant], messages.map(&:role)
@@ -87,7 +104,7 @@ class TestSession < Minitest::Test
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     5.times { |i| session.append_message(Truffle::Message.user("m#{i}")) }
 
-    reloaded = Truffle::Session.load(session.file)
+    reloaded = load_session(session)
 
     assert_equal %w[m0 m1 m2 m3 m4], reloaded.messages.map(&:text)
   end
@@ -98,7 +115,7 @@ class TestSession < Minitest::Test
     session.append_message(Truffle::Message.assistant(tool_calls: [call]))
     session.append_message(Truffle::Message.tool(content: "3", tool_call_id: "c1", name: "add"))
 
-    messages = Truffle::Session.load(session.file).messages
+    messages = load_session(session).messages
     restored_call = messages[0].tool_calls.first
 
     assert_equal "add", restored_call.name
@@ -117,6 +134,7 @@ class TestSession < Minitest::Test
   def test_load_tolerates_a_truncated_final_line
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     session.append_message(Truffle::Message.user("kept"))
+    session.flush
     File.open(session.file, "a") { |handle| handle.write('{"type":"message",') }
 
     reloaded = Truffle::Session.load(session.file)
@@ -220,7 +238,7 @@ class TestSession < Minitest::Test
     session.append_model_change(provider: "anthropic", model_id: "claude-opus-4-8")
     session.append_thinking_level_change("high")
 
-    context = Truffle::Session.load(session.file).context
+    context = load_session(session).context
 
     assert_equal "high", context.thinking_level
     assert_equal "anthropic", context.model.provider
@@ -233,7 +251,7 @@ class TestSession < Minitest::Test
     session.append_model_change(provider: "openai", model_id: "gpt-4o")
     session.append_message(Truffle::Message.assistant(content: "two"))
 
-    context = Truffle::Session.load(session.file).context
+    context = load_session(session).context
 
     assert_equal %w[one two], context.messages.map(&:text)
   end
@@ -247,7 +265,7 @@ class TestSession < Minitest::Test
                               tokens_before: 1234)
     session.append_message(Truffle::Message.assistant(content: "after"))
 
-    context = Truffle::Session.load(session.file).context
+    context = load_session(session).context
     texts = context.messages.map(&:text)
 
     assert_equal :user, context.messages.first.role
@@ -262,7 +280,7 @@ class TestSession < Minitest::Test
     kept = session.append_message(Truffle::Message.user("kept"))
     session.append_compaction(summary: "summary", first_kept_entry_id: kept, tokens_before: 10)
 
-    texts = Truffle::Session.load(session.file).context.messages.map(&:text)
+    texts = load_session(session).context.messages.map(&:text)
 
     refute_includes texts, "dropped"
     assert_includes texts, "kept"
@@ -274,7 +292,7 @@ class TestSession < Minitest::Test
     kept = session.append_message(Truffle::Message.user("kept"))
     session.append_compaction(summary: "summary", first_kept_entry_id: kept, tokens_before: 10)
 
-    raw = Truffle::Session.load(session.file).messages.map(&:text)
+    raw = load_session(session).messages.map(&:text)
 
     assert_equal ["dropped from context", "kept"], raw
   end
@@ -283,7 +301,7 @@ class TestSession < Minitest::Test
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     session.append_thinking_level_change("medium")
     session.append_compaction(summary: "s", first_kept_entry_id: "none", tokens_before: 5)
-    types = Truffle::Session.load(session.file).entries.map { |entry| entry[:type] }
+    types = load_session(session).entries.map { |entry| entry[:type] }
 
     assert_equal %w[thinking_level_change compaction], types
   end

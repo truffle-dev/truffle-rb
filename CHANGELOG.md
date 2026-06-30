@@ -61,6 +61,10 @@ All notable changes to Truffle are documented here. The format follows
   tool result.
 
 ### Changed
+- New sessions now defer writing their JSONL file until the first assistant
+  message arrives, matching pi's first-flush behavior and avoiding files for
+  abandoned one-user-turn starts. `Session#flush` forces a partial write for
+  explicit persistence paths, and `Agent#dump` calls it before returning.
 - Provider HTTP failures now carry parsed retry-delay hints. OpenAI, Anthropic,
   and Google parse `retry-after-ms` and `retry-after` headers on failed
   non-streaming calls, expose the delay on the returned error response, and let
@@ -90,8 +94,7 @@ All notable changes to Truffle are documented here. The format follows
 - `Session.load` now migrates older JSONL session files to the current v3 tree
   shape. It fills missing entry ids and parent links, converts compaction
   `first_kept_entry_index` values to `first_kept_entry_id`, normalizes legacy
-  field names, and rewrites the file once after migration. The
-  deferred-first-flush optimization remains the only open item-11 follow-up.
+  field names, and rewrites the file once after migration.
 - The shared test helper now loads Minitest's stub/mock support, so the provider
   error-turn tests run under a clean `rake test` without requiring a separate
   manual preload.

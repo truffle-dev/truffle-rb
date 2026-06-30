@@ -262,6 +262,7 @@ module Truffle
       session = Session.create(dir: dir, cwd: cwd, tools: @toolbox.names)
       session.append_model_change(provider: @provider.name, model_id: @model) if @model
       conversation.each { |message| session.append_message(message) }
+      session.flush
       session
     end
 
