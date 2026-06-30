@@ -67,6 +67,18 @@ class TestToolsBash < Minitest::Test
     assert_equal "before\n\n\nCommand exited with code 2", error.message
   end
 
+  def test_signal_killed_command_raises_with_the_signal
+    # A command whose shell is killed by a signal (here SIGKILL on its own pid)
+    # has a nil exit status, so the exit-code guard alone would let it pass as a
+    # success. The kept output is preserved and the status names the signal and
+    # the 128 + signal exit code (137 for SIGKILL).
+    error = assert_raises(RuntimeError) do
+      bash_tool.call("command" => "echo before; kill -KILL $$")
+    end
+
+    assert_equal "before\n\n\nCommand terminated by signal 9 (exit code 137)", error.message
+  end
+
   def test_missing_working_directory_raises
     tool = Truffle::Tools.bash(cwd: File.join(@dir, "does", "not", "exist"))
 

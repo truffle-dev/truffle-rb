@@ -7,6 +7,12 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- The `bash` tool now fails a command killed by a signal (an OOM kill, an
+  external `SIGKILL`) instead of returning its partial output as success. Such a
+  command has no exit code, so the exit-code guard alone let it pass; the signal
+  is now surfaced with the shell's `128 + signal` convention. pi cannot see this
+  because its `waitForChildProcess` keeps only Node's exit-code argument and
+  drops the signal; Ruby's `Process::Status` carries it.
 - Extension loading now collects syntax-errored Ruby extension files as per-file
   load errors instead of letting `SyntaxError` abort the whole load.
 - The `read` tool now handles empty files as one empty line, matching pi's

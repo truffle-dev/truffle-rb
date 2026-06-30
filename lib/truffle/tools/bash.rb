@@ -64,6 +64,20 @@ module Truffle
         end
 
         text = format_output(truncation, full_output_path, last_line_bytes, "(no output)")
+
+        # A command killed by a signal (OOM killer, an external SIGKILL) is not a
+        # success, even though it produced partial output. pi cannot see this: its
+        # waitForChildProcess keeps only Node's exit-code argument and drops the
+        # signal, so a signaled child reports a null code and slips through as
+        # clean. Ruby's Process::Status does carry the signal, so surface it with
+        # the shell's 128 + signal convention. The timeout branch above already
+        # returned, so this only fires for signals we did not send ourselves.
+        if status&.signaled?
+          signal = status.termsig
+          status_line = "Command terminated by signal #{signal} (exit code #{128 + signal})"
+          raise append_status(text, status_line)
+        end
+
         code = status&.exitstatus
         raise append_status(text, "Command exited with code #{code}") if !code.nil? && code != 0
 
