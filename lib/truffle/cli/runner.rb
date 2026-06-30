@@ -28,6 +28,8 @@ module Truffle
       "bash" => Tools.method(:bash), "edit" => Tools.method(:edit),
       "find" => Tools.method(:find), "grep" => Tools.method(:grep)
     }.freeze
+    FileInput = Struct.new(:text, :images, keyword_init: true)
+    PrintInput = Struct.new(:prompts, :images, keyword_init: true)
 
     module_function
 
@@ -81,7 +83,10 @@ module Truffle
       else
         agent.on(:agent_end) { |payload| final = final_print_response(payload) }
       end
-      print_prompts(args, input).each { |prompt| agent.run(prompt) }
+      print_input = print_input(args, input)
+      print_input.prompts.each_with_index do |prompt, index|
+        agent.run(prompt, images: index.zero? ? print_input.images : [])
+      end
       return 0 if args.mode == "json"
 
       render_print_text(final, out: out, err: err)
@@ -106,35 +111,42 @@ module Truffle
     # first CLI message join into one initial prompt (pi's `buildInitialMessage`);
     # the remaining CLI messages follow as their own prompts. A run with none of
     # those sends nothing.
-    def print_prompts(args, input)
+    def print_input(args, input)
       messages = args.messages.dup
       parts = []
       stdin = piped_stdin(input)
       parts << stdin unless stdin.nil?
-      file_text = print_file_text(args.file_args)
-      parts << file_text unless file_text.empty?
+      file_input = print_file_input(args.file_args)
+      parts << file_input.text unless file_input.text.empty?
       parts << messages.shift unless messages.empty?
       initial = parts.empty? ? nil : parts.join
-      [initial, *messages].compact
+      PrintInput.new(prompts: [initial, *messages].compact, images: file_input.images)
     end
 
-    # The text half of pi's @file processing. Each non-empty file becomes a
-    # `<file name="absolute/path">` block appended to the initial prompt. Image
-    # attachments are a later slice because the current Agent#run accepts only a
-    # text prompt; fail clearly instead of feeding binary data as text.
-    def print_file_text(file_args, cwd: Dir.pwd)
-      Array(file_args).each_with_object(+"") do |file_arg, text|
+    # Pi's @file processing for the print-mode slice. Text files are spliced
+    # into the initial prompt as `<file name="absolute/path">` blocks. Supported
+    # images attach as typed image blocks and leave an empty file marker in the
+    # text prompt so the model still sees the filename. No resizing is done here;
+    # this stays dependency-free and lets providers enforce their own limits.
+    def print_file_input(file_args, cwd: Dir.pwd)
+      Array(file_args).each_with_object(FileInput.new(text: +"", images: [])) do |file_arg, input|
         path = Tools::Path.resolve(file_arg, cwd)
         raise Truffle::Error, "Error: File not found: #{path}" unless File.exist?(path)
 
         next if File.empty?(path)
 
-        if Mime.detect_supported_image_mime_type_from_file(path)
-          raise Truffle::Error, "Error: @file image arguments are not implemented yet: #{path}"
+        mime_type = Mime.detect_supported_image_mime_type_from_file(path)
+        if mime_type
+          input.text << "<file name=\"#{path}\"></file>\n"
+          input.images << Content::Image.new(
+            data: [File.binread(path)].pack("m0"),
+            mime_type: mime_type
+          )
+          next
         end
 
         content = File.binread(path).force_encoding(Encoding::UTF_8).scrub
-        text << "<file name=\"#{path}\">\n#{content}\n</file>\n"
+        input.text << "<file name=\"#{path}\">\n#{content}\n</file>\n"
       rescue Truffle::Error
         raise
       rescue StandardError => e
@@ -196,8 +208,8 @@ module Truffle
       args.print || args.mode == "json"
     end
 
-    private_class_method :run_print, :final_print_response, :print_prompts,
-                         :print_file_text, :piped_stdin, :build_print_agent, :print_tools,
+    private_class_method :run_print, :final_print_response, :print_input,
+                         :print_file_input, :piped_stdin, :build_print_agent, :print_tools,
                          :report_diagnostics, :color?, :print_mode?
   end
 end

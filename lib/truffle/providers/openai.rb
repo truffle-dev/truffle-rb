@@ -169,7 +169,23 @@ module Truffle
           when :tool
             { role: "tool", tool_call_id: m.tool_call_id, content: m.text.to_s }
           else
-            { role: m.role.to_s, content: m.text.to_s }
+            { role: m.role.to_s, content: serialize_user_content(m) }
+          end
+        end
+      end
+
+      def serialize_user_content(message)
+        return message.text.to_s unless message.content.any?(Content::Image)
+
+        message.content.filter_map do |block|
+          case block
+          when Content::Text
+            next if block.text.empty?
+
+            { type: "text", text: block.text }
+          when Content::Image
+            { type: "image_url",
+              image_url: { url: "data:#{block.mime_type};base64,#{block.data}" } }
           end
         end
       end

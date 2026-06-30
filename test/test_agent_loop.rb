@@ -62,6 +62,21 @@ class TestAgentLoop < Minitest::Test
     assert_equal '{"city":"Berlin","capital":true}', tool_msg.text
   end
 
+  def test_run_accepts_images_on_the_user_turn
+    provider = StubProvider.new([StubProvider.text("seen")])
+    agent = Truffle::Agent.new(provider: provider)
+    image = Truffle::Content::Image.new(data: "base64data", mime_type: "image/png")
+
+    agent.run("look", images: [image])
+
+    user = provider.calls.first[:messages].find { |message| message[:role] == :user }
+
+    assert_equal [
+      { type: :text, text: "look" },
+      { type: :image, data: "base64data", mime_type: "image/png" }
+    ], user[:content]
+  end
+
   def test_emits_events_in_order
     provider = StubProvider.new([
                                   StubProvider.tool_call(id: "c1", name: "add",

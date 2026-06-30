@@ -47,4 +47,21 @@ class TestOpenAIProvider < Minitest::Test
     assert_equal 256, body[:max_completion_tokens]
     refute_includes body, :max_tokens
   end
+
+  def test_user_content_with_image_becomes_chat_completions_blocks
+    provider = Truffle::Providers::OpenAI.new(api_key: "test-key")
+    image = Truffle::Content::Image.new(data: "base64data", mime_type: "image/png")
+    message = Truffle::Message.user([Truffle::Content::Text.new(text: "look"), image])
+    body = provider.send(:build_chat_body, [message], [], "gpt-4o-mini", {})
+
+    content = body[:messages].first[:content]
+
+    assert_equal [
+      { type: "text", text: "look" },
+      {
+        type: "image_url",
+        image_url: { url: "data:image/png;base64,base64data" }
+      }
+    ], content
+  end
 end

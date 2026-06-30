@@ -43,6 +43,15 @@ module Truffle
       new(role: :user, content: content)
     end
 
+    def self.user_with_images(content, images: [])
+      images = Array(images)
+      return user(content) if images.empty?
+
+      text = content.to_s unless content.nil?
+      blocks = [text.nil? || text.empty? ? nil : Content::Text.new(text: text), *images].compact
+      user(blocks)
+    end
+
     def self.assistant(content: nil, tool_calls: [])
       new(role: :assistant, content: content, tool_calls: tool_calls)
     end

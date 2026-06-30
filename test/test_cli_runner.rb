@@ -10,13 +10,14 @@ require "tmpdir"
 # capture can be exercised offline. Later runs replay later payloads (clamped to
 # the last), which is how the "last assistant turn wins" rule gets proven.
 class PrintStubAgent
-  attr_reader :prompts
+  attr_reader :prompts, :image_batches
 
   def initialize(payloads)
     @payloads = payloads
     @listeners = Hash.new { |h, k| h[k] = [] }
     @all_listeners = []
     @prompts = []
+    @image_batches = []
     @run = 0
   end
 
@@ -29,8 +30,9 @@ class PrintStubAgent
     self
   end
 
-  def run(prompt)
+  def run(prompt, images: [])
     @prompts << prompt
+    @image_batches << images
     emit(:agent_start, input: prompt)
     payload = @payloads[@run] || @payloads.last
     @run += 1
@@ -302,18 +304,25 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
-  def test_print_reports_image_file_arguments_until_image_input_lands
+  def test_print_attaches_supported_image_file_arguments_to_the_initial_prompt
     in_tmpdir do |dir|
       path = File.join(dir, "image.jpg")
-      File.binwrite(path, [0xff, 0xd8, 0xff, 0xe0].pack("C*"))
-      agent = PrintStubAgent.new([assistant_payload("unused")])
+      data = [0xff, 0xd8, 0xff, 0xe0].pack("C*")
+      File.binwrite(path, data)
+      agent = PrintStubAgent.new([assistant_payload("ok")])
 
-      status, out, err = run_print_cli(["-p", "@image.jpg"], agent: agent)
+      status, out, err = run_print_cli(["-p", "@image.jpg", "describe"], agent: agent)
 
-      assert_equal 1, status
-      assert_empty out
-      assert_equal "Error: @file image arguments are not implemented yet: #{path}\n", err
-      assert_empty agent.prompts
+      assert_equal 0, status
+      assert_equal "ok\n", out
+      assert_empty err
+      assert_equal ["<file name=\"#{path}\"></file>\ndescribe"], agent.prompts
+
+      image = agent.image_batches.first.first
+
+      assert_instance_of Truffle::Content::Image, image
+      assert_equal "image/jpeg", image.mime_type
+      assert_equal [data].pack("m0"), image.data
     end
   end
 

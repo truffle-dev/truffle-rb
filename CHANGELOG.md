@@ -24,8 +24,10 @@ All notable changes to Truffle are documented here. The format follows
   RPC output mode now reports that it is not implemented instead of falling
   through to print or interactive mode. Text `@file` arguments are spliced into
   the initial prompt after piped stdin and before the first message, wrapped in
-  pi's `<file name="...">` block. Sessions, extensions, skills, image `@file`
-  attachments, and the interactive REPL remain later slices.
+  pi's `<file name="...">` block. Supported image `@file` arguments now attach
+  to the first model turn as image content blocks, with an empty file marker in
+  the text prompt for filename context. Sessions, extensions, skills, automatic
+  image resizing, and the interactive REPL remain later slices.
 
 ### Fixed
 - The `bash` tool now fails a command killed by a signal (an OOM kill, an

@@ -163,18 +163,16 @@ module Truffle
       self
     end
 
-    # Send a user message and run the loop until the model answers without
-    # requesting a tool. Returns the final assistant text.
-    #
-    # Pass signal: a Truffle::AbortSignal to stop at turn boundaries and emit
-    # StopReason::ABORTED; an in-progress provider call still finishes.
-    def run(user_input, signal: nil)
-      command_result = resolve_slash_command(user_input)
+    # Send a user message and run the loop until the model answers. `images:`
+    # accepts Truffle::Content::Image blocks for multimodal turns. Pass signal:
+    # a Truffle::AbortSignal to stop at turn boundaries.
+    def run(user_input, images: [], signal: nil)
+      command_result = Array(images).empty? ? resolve_slash_command(user_input) : nil
       return run_slash_action(command_result) if command_result&.type == :action
 
       user_input = command_result.content if command_result&.type == :prompt
       emit(:agent_start, input: user_input)
-      append(Message.user(user_input))
+      append(Message.user_with_images(user_input, images: images))
       @overflow_recovery_attempted = false
       @retry_attempt = 0
 
