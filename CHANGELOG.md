@@ -6,6 +6,14 @@ All notable changes to Truffle are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- OpenAI reasoning-model calls now send `max_completion_tokens` instead of the
+  deprecated `max_tokens` field on the native OpenAI endpoint, while
+  OpenAI-compatible extension endpoints keep `max_tokens`.
+- Hitting `Agent#max_turns` now ends the run through `agent_end` with
+  `stop_reason: :error` and a clear error message instead of raising out of the
+  loop.
+
 ### Added
 - System prompt assembly. `Truffle::SystemPrompt.build` ports pi's
   `core/system-prompt.ts` `buildSystemPrompt`: the string an agent runs under,

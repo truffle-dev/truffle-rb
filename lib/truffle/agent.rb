@@ -52,9 +52,7 @@ module Truffle
                 agent_end compaction retry].freeze
 
     # Auto-retry defaults, ported from pi's getRetrySettings plus its provider
-    # retry-delay cap: retry up to three times with exponential backoff from a 2s
-    # base, and cap any server-requested delay at 60s. A caller tunes or disables
-    # this with retry_settings: at construction.
+    # retry-delay cap. A caller tunes or disables this with retry_settings:.
     DEFAULT_RETRY_SETTINGS = {
       enabled: true,
       max_retries: 3,
@@ -168,11 +166,8 @@ module Truffle
     # Send a user message and run the loop until the model answers without
     # requesting a tool. Returns the final assistant text.
     #
-    # Pass signal: a Truffle::AbortSignal to cancel a long run. It is checked at
-    # turn boundaries (before each provider call, which is also the point reached
-    # after a batch of tool calls), so an abort stops the loop mid-flight and
-    # ends with a StopReason::ABORTED terminal rather than starting another turn.
-    # Cancellation is cooperative: an in-progress provider call still finishes.
+    # Pass signal: a Truffle::AbortSignal to stop at turn boundaries and emit
+    # StopReason::ABORTED; an in-progress provider call still finishes.
     def run(user_input, signal: nil)
       command_result = resolve_slash_command(user_input)
       return run_slash_action(command_result) if command_result&.type == :action
@@ -189,15 +184,18 @@ module Truffle
       turns = 0
 
       loop do
-        if signal&.aborted?
-          aborted = true
-          break
-        end
+        aborted = true if signal&.aborted?
+        break if aborted
 
         prepare_provider_turn(signal)
 
         turns += 1
-        raise Error, "exceeded max_turns (#{max_turns}) without a final answer" if turns > max_turns
+        if turns > max_turns
+          final_response = Response.new(message: Message.assistant(content: []),
+                                        stop_reason: StopReason::ERROR,
+                                        error_message: max_turns_error_message)
+          break
+        end
 
         emit(:turn_start, turn: turns)
         response = chat_current_turn
@@ -219,16 +217,7 @@ module Truffle
         emit(:turn_end, turn: turns, tool_results: tool_results)
       end
 
-      # On a clean finish, final_response is the turn that ended the loop (the
-      # model answered without asking for a tool), so its stop reason carries.
-      # On an abort there is no clean final answer, so the run's reason is
-      # :aborted and any partial output stays available on `messages`.
-      stop_reason = aborted ? StopReason::ABORTED : final_response&.stop_reason
-      error_message = aborted ? nil : final_response&.error_message
-      emit(:agent_end, output: final_text, messages: @messages,
-                       stop_reason: stop_reason,
-                       error_message: error_message,
-                       usage: @usage)
+      emit_agent_end(final_text, final_response, aborted)
       final_text
     end
 
@@ -274,6 +263,14 @@ module Truffle
       @messages << message
       @session&.append_message(message)
     end
+
+    def emit_agent_end(final_text, final_response, aborted)
+      reason = aborted ? StopReason::ABORTED : final_response&.stop_reason
+      emit(:agent_end, output: final_text, messages: @messages, stop_reason: reason,
+                       error_message: aborted ? nil : final_response&.error_message, usage: @usage)
+    end
+
+    def max_turns_error_message = "exceeded max_turns (#{max_turns}) without a final answer"
 
     # Before a turn, summarize older history into a session compaction entry when
     # the last response's reported context has crossed the model's threshold, then

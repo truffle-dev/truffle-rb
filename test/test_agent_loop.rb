@@ -128,17 +128,32 @@ class TestAgentLoop < Minitest::Test
     assert_equal "handled", result
   end
 
-  def test_max_turns_guard_raises
+  def test_max_turns_guard_ends_with_error_stop_reason
     # Provider always asks for a tool, never settles -> must hit the guard.
     infinite = Class.new(Truffle::Providers::Base) do
+      attr_reader :calls
+
+      def initialize
+        super
+        @calls = 0
+      end
+
       def chat(messages:, tools: [], model: nil, **_)
+        @calls += 1
         StubProvider.tool_call(id: "x", name: "add", arguments: { "a" => 1, "b" => 1 })
       end
     end.new
     agent = Truffle::Agent.new(provider: infinite, tools: [@add], max_turns: 3)
 
-    err = assert_raises(Truffle::Error) { agent.run("loop forever") }
-    assert_includes err.message, "max_turns"
+    ended = nil
+    agent.on(:agent_end) { |payload| ended = payload }
+
+    result = agent.run("loop forever")
+
+    assert_nil result
+    assert_equal 3, infinite.calls
+    assert_equal Truffle::StopReason::ERROR, ended[:stop_reason]
+    assert_includes ended[:error_message], "max_turns"
   end
 
   def test_agent_end_surfaces_stop_reason

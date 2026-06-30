@@ -125,8 +125,30 @@ module Truffle
           body[:tool_choice] = options.fetch(:tool_choice, "auto")
         end
         body[:temperature] = options[:temperature] if options.key?(:temperature)
-        body[:max_tokens] = options[:max_tokens] if options.key?(:max_tokens)
+        apply_token_limit(body, model, options)
         body
+      end
+
+      def apply_token_limit(body, model, options)
+        if options.key?(:max_completion_tokens)
+          body[:max_completion_tokens] = options[:max_completion_tokens]
+        elsif options.key?(:max_tokens)
+          key = max_completion_tokens_field?(model) ? :max_completion_tokens : :max_tokens
+          body[key] = options[:max_tokens]
+        end
+      end
+
+      def max_completion_tokens_field?(model)
+        native_openai_endpoint? &&
+          (catalog_model = Models.find(model.to_s)) &&
+          catalog_model.provider == :openai &&
+          catalog_model.reasoning?
+      end
+
+      def native_openai_endpoint?
+        @provider_name == "openai" && URI(@base_url).host == "api.openai.com"
+      rescue URI::InvalidURIError
+        false
       end
 
       def serialize_messages(messages)
