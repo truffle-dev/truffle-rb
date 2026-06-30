@@ -78,6 +78,14 @@ All notable changes to Truffle are documented here. The format follows
   `truffle.on(...)` observe the agent events Truffle already emits, in extension
   load order and registration order. A raising handler is captured on
   `agent.extension_errors` and does not stop later handlers or the agent run.
+- Extension provider registrations now bind into provider construction.
+  `Truffle.provider` and `Truffle.agent` can use loaded
+  `truffle.register_provider` configs for OpenAI Chat Completions-compatible
+  endpoints, honoring registered `base_url` / `baseUrl`, `api_key` / `apiKey`,
+  default `model`, and `models`. Later registrations for the same provider
+  override defined values, `LoadResult` runtime unregisters are respected, and
+  registered model references can infer the provider without mutating the global
+  catalog.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

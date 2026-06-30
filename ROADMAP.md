@@ -391,8 +391,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       already emits. Handlers run in extension load order, then registration
       order within each extension; a raising handler is recorded on
       `agent.extension_errors` and does not stop later handlers or the agent run.
-    - [ ] Bind extension provider registrations and reload into agents and
-      sessions.
+    - [x] **Bind OpenAI-compatible provider registrations.** Loaded
+      `truffle.register_provider` configs can back `Truffle.provider` and
+      `Truffle.agent` when they describe an OpenAI Chat Completions-compatible
+      endpoint. Registered `base_url` / `baseUrl`, `api_key` / `apiKey`, default
+      `model`, and `models` are honored; later registrations for the same
+      provider override defined values; `LoadResult` runtime unregisters are
+      respected; and registered model names can infer the provider without
+      mutating the global catalog.
+    - [ ] Bind provider registration reload/unregister into live agents and
+      sessions, plus non-OpenAI custom APIs, OAuth, request headers, and
+      `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

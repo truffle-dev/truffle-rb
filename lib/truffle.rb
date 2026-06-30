@@ -31,6 +31,7 @@ require_relative "truffle/providers/anthropic_stream"
 require_relative "truffle/providers/google"
 require_relative "truffle/providers/google_stream"
 require_relative "truffle/extensions"
+require_relative "truffle/extensions/providers"
 require_relative "truffle/agent"
 require_relative "truffle/agent/extensions"
 require_relative "truffle/agent/tool_execution"
@@ -77,12 +78,19 @@ module Truffle
 
   module_function
 
-  # Build a provider by symbol (:openai) or pass a ready-made instance through.
-  def provider(name, **options)
+  # Build a provider by symbol (:openai), an extension-registered provider, or
+  # pass a ready-made instance through.
+  def provider(name, extensions: nil, **options)
     return name if name.is_a?(Providers::Base)
 
+    extension_options = Extensions.provider_options(extensions, name)
+    return Providers::OpenAI.new(**extension_options, **options) if extension_options
+
     klass = PROVIDERS[name.to_sym]
-    raise Error, "unknown provider #{name.inspect}, known: #{PROVIDERS.keys.inspect}" if klass.nil?
+    if klass.nil?
+      known = (PROVIDERS.keys.map(&:to_s) + Extensions.provider_names(extensions)).uniq
+      raise Error, "unknown provider #{name.inspect}, known: #{known.inspect}"
+    end
 
     klass.new(**options)
   end
@@ -104,14 +112,20 @@ module Truffle
 
       resolved = Models.resolve(model)
       if resolved.nil?
-        raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
-      end
+        resolved = Extensions.model_reference(extensions, model)
+        if resolved.nil?
+          raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
+        end
 
-      provider = resolved.provider
-      model = resolved.id
+        provider = resolved.provider
+        model = resolved.model_id
+      else
+        provider = resolved.provider
+        model = resolved.id
+      end
     end
 
-    prov = provider(provider, **provider_options)
+    prov = provider(provider, extensions: extensions, **provider_options)
     Agent.new(
       provider: prov,
       system_prompt: system_prompt,

@@ -18,10 +18,11 @@ module Truffle
       DEFAULT_MODEL = "gpt-4o-mini"
       DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
-      attr_reader :model
+      attr_reader :model, :base_url
 
       def initialize(api_key: ENV.fetch("OPENAI_API_KEY", nil), model: DEFAULT_MODEL,
-                     base_url: DEFAULT_BASE_URL, open_timeout: 15, read_timeout: 120)
+                     base_url: DEFAULT_BASE_URL, open_timeout: 15, read_timeout: 120,
+                     provider_name: "openai")
         super()
         if api_key.nil? || api_key.empty?
           raise ArgumentError,
@@ -31,12 +32,13 @@ module Truffle
         @api_key = api_key
         @model = model
         @base_url = base_url.chomp("/")
+        @provider_name = provider_name.to_s
         @open_timeout = open_timeout
         @read_timeout = read_timeout
       end
 
       def name
-        "openai"
+        @provider_name
       end
 
       def chat(messages:, tools: [], model: nil, **options)
