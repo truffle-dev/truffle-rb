@@ -260,6 +260,24 @@ class TestStream < Minitest::Test
     assert_in_delta 0.15, acc.response.usage.cost.total, 1e-9
   end
 
+  def test_usage_priced_from_requested_model_when_chunk_echoes_unknown_id
+    # A gateway-prefixed echoed id is not in the catalog; pricing it would
+    # yield $0 despite real tokens. Pricing must anchor on the requested model.
+    acc = Truffle::Providers::OpenAIStream.new(pricing_model: "gpt-4o-mini")
+    events = []
+    [{ "model" => "my-gateway/gpt-4o-mini",
+       "choices" => [{ "delta" => { "content" => "x" } }] },
+     { "choices" => [{ "delta" => {}, "finish_reason" => "stop" }],
+       "usage" => { "prompt_tokens" => 1_000_000, "completion_tokens" => 0 } }].each do |c|
+      acc.feed(c) { |event| events << event }
+    end
+    acc.finish { |event| events << event }
+
+    assert_in_delta 0.15, acc.response.usage.cost.total, 1e-9
+    # The reported model still names the id the server echoed.
+    assert_equal "my-gateway/gpt-4o-mini", acc.response.model
+  end
+
   def test_model_captured_from_chunk
     _events, acc = collect([
                              { "model" => "gpt-4o-mini-2024",

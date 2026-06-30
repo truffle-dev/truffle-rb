@@ -231,9 +231,16 @@ module Truffle
 
       def build_response
         model = @model || @pricing_model
+        # Anchor pricing on the requested model, which the caller chose and the
+        # catalog knows. The server-echoed @model can be a gateway-prefixed id,
+        # a fine-tune, or a preview snapshot that is not in the catalog, so
+        # pricing it would silently yield $0 despite real tokens. Fall back to
+        # the echoed id only when the requested model is unpriceable. The
+        # reported model stays the echoed id.
+        pricing = Pricing.cost_for(@pricing_model) || Pricing.cost_for(@model)
         Response.new(
           message: @message,
-          usage: Usage.from_google(@usage, pricing: Pricing.cost_for(model)),
+          usage: Usage.from_google(@usage, pricing: pricing),
           model: model,
           finish_reason: @raw_stop_reason,
           stop_reason: @stop_reason,

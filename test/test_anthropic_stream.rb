@@ -255,6 +255,25 @@ class TestAnthropicStream < Minitest::Test
     assert_operator usage.cost.total, :>, 0.0
   end
 
+  def test_usage_priced_from_requested_model_when_message_echoes_unknown_id
+    # The echoed model carries a gateway prefix the catalog does not know;
+    # pricing it would yield $0. Pricing must anchor on the requested model.
+    acc = Stream.new(pricing_model: "claude-sonnet-4-5")
+    events = []
+    echoed = { "type" => "message_start",
+               "message" => { "id" => "msg_1", "model" => "vertex/claude-sonnet-4-5",
+                              "usage" => { "input_tokens" => 42, "output_tokens" => 0 } } }
+    [echoed,
+     text_block_start(0), text_delta(0, "hi"), block_stop(0),
+     message_delta(stop_reason: "end_turn", output: 7),
+     message_stop].each { |frame| acc.feed(frame) { |e| events << e } }
+    acc.finish { |e| events << e }
+
+    assert_operator acc.response.usage.cost.total, :>, 0.0
+    # The reported model still names the id the server echoed.
+    assert_equal "vertex/claude-sonnet-4-5", acc.response.model
+  end
+
   # --- abort --------------------------------------------------------------
 
   def test_abort_mid_text_seals_the_block_and_ends_clean

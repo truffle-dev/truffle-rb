@@ -240,6 +240,17 @@ class TestGoogleStream < Minitest::Test
     assert_equal "gemini-2.5-flash-001", acc.response.model
   end
 
+  def test_usage_priced_from_requested_model_when_chunk_echoes_unknown_id
+    # The echoed modelVersion carries a region prefix the catalog does not
+    # know; pricing it would yield $0. Pricing anchors on the requested model.
+    _, acc = collect([text_chunk("hi"),
+                      finish_chunk(model: "us-central1/gemini-2.5-flash")])
+
+    assert_operator acc.response.usage.cost.total, :>, 0.0
+    # The reported model still names the id the server echoed.
+    assert_equal "us-central1/gemini-2.5-flash", acc.response.model
+  end
+
   # --- partial snapshots ---------------------------------------------------
 
   def test_non_terminal_events_carry_a_partial_message
