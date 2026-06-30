@@ -32,15 +32,17 @@ module Truffle
       end
     end
 
-    # The text-read core, a faithful port of read.ts's text path. Splitting with
-    # a limit of -1 keeps trailing empties so the line count matches pi's
-    # `allLines.length` (including the trailing-newline quirk). File errors
-    # (missing, unreadable) propagate as the underlying SystemCallError; the agent
-    # loop reports them back to the model.
+    # The text-read core, a faithful port of read.ts's text path. An empty file
+    # counts as one empty line because JavaScript `"".split("\n")` returns [""];
+    # splitting with a limit of -1 keeps trailing empties so the line count
+    # matches pi's `allLines.length` (including the trailing-newline quirk). File
+    # errors (missing, unreadable) propagate as the underlying SystemCallError;
+    # the agent loop reports them back to the model.
     def self.read_file(path:, cwd:, offset: nil, limit: nil,
                        max_lines: Truncate::DEFAULT_MAX_LINES, max_bytes: Truncate::DEFAULT_MAX_BYTES)
       absolute = Path.resolve(path, cwd)
-      all_lines = File.read(absolute, encoding: "UTF-8").split("\n", -1)
+      content = File.read(absolute, encoding: "UTF-8")
+      all_lines = content.empty? ? [""] : content.split("\n", -1)
 
       start_line = offset ? [0, offset - 1].max : 0
       if start_line >= all_lines.length

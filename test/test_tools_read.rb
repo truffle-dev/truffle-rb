@@ -49,6 +49,21 @@ class TestToolsRead < Minitest::Test
     assert_equal "one\ntwo\n", read_tool.call("path" => path)
   end
 
+  def test_reads_empty_file_as_one_empty_line
+    write("empty.txt", "")
+
+    assert_equal "", read_tool.call("path" => "empty.txt")
+  end
+
+  def test_empty_file_offset_beyond_first_line_raises_with_one_line_total
+    write("empty.txt", "")
+
+    error = assert_raises(RuntimeError) do
+      read_tool.call("path" => "empty.txt", "offset" => 2)
+    end
+    assert_equal "Offset 2 is beyond end of file (1 lines total)", error.message
+  end
+
   def test_offset_is_one_indexed
     write("nums.txt", "l1\nl2\nl3\nl4\n")
 
