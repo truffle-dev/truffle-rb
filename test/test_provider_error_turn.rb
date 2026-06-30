@@ -22,6 +22,28 @@ class TestProviderErrorTurn < Minitest::Test
     def request(_) = raise @error
   end
 
+  class ResponseHTTP
+    def initialize(response) = @response = response
+    def use_ssl=(_); end
+    def open_timeout=(_); end
+    def read_timeout=(_); end
+    def request(_) = @response
+  end
+
+  class FailedHTTPResponse
+    attr_reader :code, :body
+
+    def initialize(code:, body:, headers: {})
+      @code = code
+      @body = body
+      @headers = headers
+    end
+
+    def [](name)
+      @headers[name.downcase]
+    end
+  end
+
   def providers
     [
       Providers::Anthropic.new(api_key: "test-key"),
@@ -44,6 +66,14 @@ class TestProviderErrorTurn < Minitest::Test
       refute_predicate response, :tool_calls?, provider.name
       assert_empty response.message.content, provider.name
     end
+  end
+
+  def test_chat_carries_retry_after_from_provider_error
+    provider = Providers::OpenAI.new(api_key: "test-key")
+    error = Providers::Error.new("OpenAI 429: slow down", retry_after_ms: 1500)
+    response = provider.stub(:post, ->(*) { raise error }) { chat(provider) }
+
+    assert_equal 1500, response.retry_after_ms
   end
 
   def test_error_turn_usage_is_zero
@@ -95,6 +125,53 @@ class TestProviderErrorTurn < Minitest::Test
     end
 
     assert_includes error.message, "OpenAI request failed"
+  end
+
+  def test_post_parses_retry_after_ms_header
+    provider = Providers::OpenAI.new(api_key: "test-key")
+    response = FailedHTTPResponse.new(
+      code: "429",
+      body: "rate limit",
+      headers: { "retry-after-ms" => "1500" }
+    )
+
+    error = Net::HTTP.stub(:new, ResponseHTTP.new(response)) do
+      assert_raises(Providers::Error) { provider.send(:post, "/chat/completions", {}) }
+    end
+
+    assert_equal 1500, error.retry_after_ms
+  end
+
+  def test_post_parses_retry_after_seconds_header
+    provider = Providers::Anthropic.new(api_key: "test-key")
+    response = FailedHTTPResponse.new(
+      code: "429",
+      body: "rate limit",
+      headers: { "retry-after" => "2" }
+    )
+
+    error = Net::HTTP.stub(:new, ResponseHTTP.new(response)) do
+      assert_raises(Providers::Error) { provider.send(:post, "/v1/messages", {}) }
+    end
+
+    assert_equal 2000, error.retry_after_ms
+  end
+
+  def test_post_parses_retry_after_http_date_header
+    provider = Providers::Google.new(api_key: "test-key")
+    retry_at = (Time.now + 60).httpdate
+    response = FailedHTTPResponse.new(
+      code: "429",
+      body: "rate limit",
+      headers: { "retry-after" => retry_at }
+    )
+
+    error = Net::HTTP.stub(:new, ResponseHTTP.new(response)) do
+      assert_raises(Providers::Error) { provider.send(:post, "/models/gemini:test", {}) }
+    end
+
+    assert_operator error.retry_after_ms, :>, 0
+    assert_operator error.retry_after_ms, :<=, 60_000
   end
 
   # --- a transport fault folds all the way to an error turn through #chat ----

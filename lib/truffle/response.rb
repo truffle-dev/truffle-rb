@@ -6,10 +6,11 @@ module Truffle
   # Every provider returns one of these regardless of its native wire format, so
   # the agent loop never has to branch on which model it is talking to.
   class Response
-    attr_reader :message, :usage, :raw, :model, :finish_reason, :stop_reason, :error_message
+    attr_reader :message, :usage, :raw, :model, :finish_reason, :stop_reason,
+                :error_message, :retry_after_ms
 
     def initialize(message:, usage: nil, raw: nil, model: nil, finish_reason: nil,
-                   stop_reason: nil, error_message: nil)
+                   stop_reason: nil, error_message: nil, retry_after_ms: nil)
       @message = message
       # usage is a Truffle::Usage (token counts plus dollar cost). An empty turn
       # gets a zero usage so callers can always read .usage.total_tokens.
@@ -21,6 +22,7 @@ module Truffle
       @finish_reason = finish_reason
       @stop_reason = stop_reason
       @error_message = error_message
+      @retry_after_ms = retry_after_ms
     end
 
     # The text content of the assistant turn (may be nil on a pure tool call).

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "time"
+
 module Truffle
   module Providers
     # The contract every provider implements. This single seam is what makes
@@ -44,19 +46,48 @@ module Truffle
       # paths already fold their failures this way through the accumulator's
       # #fail; this is the same shape for the non-streaming call. The message is
       # empty and usage is zero, since a failed call produced no content.
-      def error_response(message, model: nil)
+      def error_response(message, model: nil, retry_after_ms: nil)
         Response.new(
           message: Message.assistant(content: nil),
           stop_reason: StopReason::ERROR,
           error_message: message,
-          model: model
+          model: model,
+          retry_after_ms: retry_after_ms
         )
+      end
+
+      def retry_after_ms(response)
+        millis = numeric_header(response["retry-after-ms"])
+        return [millis, 0].max.to_i if millis
+
+        retry_after = response["retry-after"]
+        return nil if retry_after.nil? || retry_after.empty?
+
+        seconds = numeric_header(retry_after)
+        return [seconds * 1000, 0].max.to_i if seconds
+
+        date = Time.httpdate(retry_after)
+        [((date - Time.now) * 1000).ceil, 0].max
+      rescue ArgumentError
+        nil
+      end
+
+      def numeric_header(value)
+        number = Float(value, exception: false)
+        number&.finite? ? number : nil
       end
     end
 
     # Raised inside a provider when an HTTP call fails, a payload will not parse,
     # or the transport faults. #chat folds it into an error turn; callers of the
     # private transport (#post) still see it as a raise.
-    class Error < StandardError; end
+    class Error < StandardError
+      attr_reader :retry_after_ms
+
+      def initialize(message = nil, retry_after_ms: nil)
+        super(message)
+        @retry_after_ms = retry_after_ms
+      end
+    end
   end
 end

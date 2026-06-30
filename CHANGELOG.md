@@ -57,6 +57,10 @@ All notable changes to Truffle are documented here. The format follows
   tool result.
 
 ### Changed
+- Provider HTTP failures now carry parsed retry-delay hints. OpenAI, Anthropic,
+  and Google parse `retry-after-ms` and `retry-after` headers on failed
+  non-streaming calls, expose the delay on the returned error response, and let
+  the agent prefer that provider-requested delay over exponential backoff.
 - `script/rb` now bind-mounts the current checkout by default, uses the full
   Ruby 3.3 image with a cached bundle volume, and passes provider keys from
   `.env.local`, config files, or the current environment without printing them.

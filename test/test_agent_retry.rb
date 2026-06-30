@@ -10,11 +10,12 @@ require "test_helper"
 class TestAgentRetry < Minitest::Test
   # A transient error turn, the shape a provider's #chat returns when the call
   # faltered: an empty assistant message with an ERROR stop and the failure text.
-  def transient_error(message = "503 Service Unavailable")
+  def transient_error(message = "503 Service Unavailable", retry_after_ms: nil)
     Truffle::Response.new(
       message: Truffle::Message.assistant(content: nil),
       stop_reason: Truffle::StopReason::ERROR,
-      error_message: message
+      error_message: message,
+      retry_after_ms: retry_after_ms
     )
   end
 
@@ -79,6 +80,23 @@ class TestAgentRetry < Minitest::Test
 
     assert_equal 4, provider.calls.size
     assert_equal [1, 2, 4], delays
+  end
+
+  def test_retry_after_delay_overrides_exponential_backoff
+    agent, provider = agent_over([transient_error("429 Too Many Requests", retry_after_ms: 25),
+                                  StubProvider.text("Recovered.")],
+                                 base_delay_ms: 1000)
+    retry_delays = []
+    slept = []
+    agent.on(:retry) { |p| retry_delays << p[:delay_ms] }
+
+    agent.stub(:backoff, ->(delay_ms, _signal) { slept << delay_ms }) do
+      agent.run("go")
+    end
+
+    assert_equal 2, provider.calls.size
+    assert_equal [25], retry_delays
+    assert_equal [25], slept
   end
 
   def test_a_non_retryable_error_is_not_retried

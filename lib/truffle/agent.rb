@@ -425,7 +425,8 @@ module Truffle
         return :none
       end
 
-      delay_ms = @retry_settings[:base_delay_ms] * (2**(@retry_attempt - 1))
+      delay_ms = response.retry_after_ms ||
+                 (@retry_settings[:base_delay_ms] * (2**(@retry_attempt - 1)))
       emit(:retry, attempt: @retry_attempt, max_retries: @retry_settings[:max_retries],
                    delay_ms: delay_ms, error_message: response.error_message)
       backoff(delay_ms, signal)

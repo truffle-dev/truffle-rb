@@ -76,7 +76,7 @@ module Truffle
           error_message: error_message
         )
       rescue Providers::Error => e
-        error_response(e.message, model: request_model)
+        error_response(e.message, model: request_model, retry_after_ms: e.retry_after_ms)
       end
 
       # Streaming counterpart to #chat. Opens an SSE request, decodes each
@@ -313,7 +313,8 @@ module Truffle
 
         response = http.request(request)
         unless response.is_a?(Net::HTTPSuccess)
-          raise Error, "Anthropic #{response.code}: #{truncate(response.body)}"
+          raise Error.new("Anthropic #{response.code}: #{truncate(response.body)}",
+                          retry_after_ms: retry_after_ms(response))
         end
 
         JSON.parse(response.body)
