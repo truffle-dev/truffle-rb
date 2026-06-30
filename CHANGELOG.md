@@ -34,8 +34,14 @@ All notable changes to Truffle are documented here. The format follows
   directory scans are deterministic, and `/name args` expands through the
   argument parser. The parser handles bash-style quoted arguments and
   single-pass substitution for `$1`, `$@`, `$ARGUMENTS`, `${N:-default}`,
-  `${@:N}`, and `${@:N:L}` placeholders. Default prompt directories and the
-  slash-command registry remain later item-17 slices.
+  `${@:N}`, and `${@:N:L}` placeholders. Default prompt directories remain a
+  later item-17 slice.
+- `Truffle::SlashCommands::Registry` now handles slash command lookup and
+  dispatch. Prompt commands expand into user text before the provider sees a
+  turn; handler commands run locally without consuming a provider response; and
+  duplicate command names receive `:1`, `:2`, ... invocation suffixes like pi's
+  extension commands. `Agent` accepts `prompt_templates:` and `slash_commands:`
+  so callers can opt into this behavior without changing existing agents.
 - Skills. `Truffle::Frontmatter` parses the optional YAML frontmatter at the head
   of a markdown file and returns it with the trimmed body. `Truffle::Skills` loads
   one skill file into a `Skill` plus diagnostics: the name comes from the

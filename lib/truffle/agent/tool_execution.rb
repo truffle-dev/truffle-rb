@@ -9,6 +9,15 @@ module Truffle
   class Agent
     private
 
+    def normalize_tool_execution(mode)
+      mode = mode.to_sym if mode.respond_to?(:to_sym)
+      return mode if TOOL_EXECUTION_MODES.include?(mode)
+
+      expected = TOOL_EXECUTION_MODES.inspect
+      raise ArgumentError,
+            "unknown tool execution mode #{mode.inspect}, expected one of #{expected}"
+    end
+
     # Run each tool call the assistant requested, append its result to history as
     # a tool message, and return the result strings. Ports pi's default execution
     # mode: preflight calls in assistant order, run allowed tool bodies

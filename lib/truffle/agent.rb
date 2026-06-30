@@ -75,13 +75,15 @@ module Truffle
     # agent had must be present in `tools`, or load raises. The model defaults to
     # the one recorded in the session; pass model: to override it.
     def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
-                  max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel)
+                  max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel,
+                  prompt_templates: [], slash_commands: nil)
       session = Session.load(path)
       toolbox = rebind_toolbox(session.tools, tools)
       context = session.context
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
                   model: model || context.model&.model_id, max_turns: max_turns,
-                  tool_execution: tool_execution)
+                  tool_execution: tool_execution, prompt_templates: prompt_templates,
+                  slash_commands: slash_commands)
       agent.restore(context.messages)
     end
 
@@ -112,7 +114,8 @@ module Truffle
                    compaction_settings: Compaction::DEFAULT_SETTINGS, auto_compact: true,
                    retry_settings: DEFAULT_RETRY_SETTINGS,
                    before_tool_call: nil, after_tool_call: nil,
-                   tool_execution: :parallel)
+                   tool_execution: :parallel,
+                   prompt_templates: [], slash_commands: nil)
       @provider = provider
       @system_prompt = system_prompt
       @model = model
@@ -124,6 +127,7 @@ module Truffle
       @auto_compact = auto_compact
       @retry_settings = DEFAULT_RETRY_SETTINGS.merge(retry_settings || {})
       @tool_execution = normalize_tool_execution(tool_execution)
+      @slash_commands = slash_commands || slash_registry_for(prompt_templates)
       # Optional tool-execution middleware, ported from pi's beforeToolCall /
       # afterToolCall seam. Each is a callable handed a single context Hash. The
       # before hook can veto a call ({ block: true }); the after hook can override
@@ -152,16 +156,6 @@ module Truffle
       @usage = Usage.zero
     end
 
-    def normalize_tool_execution(mode)
-      mode = mode.to_sym if mode.respond_to?(:to_sym)
-      return mode if TOOL_EXECUTION_MODES.include?(mode)
-
-      expected = TOOL_EXECUTION_MODES.inspect
-      raise ArgumentError,
-            "unknown tool execution mode #{mode.inspect}, expected one of #{expected}"
-    end
-    private :normalize_tool_execution
-
     # Register a listener. `on(:tool_call) { |payload| ... }` for one event, or
     # `on { |type, payload| ... }` (no event arg) for every event.
     def on(event = nil, &block)
@@ -189,6 +183,10 @@ module Truffle
     # ends with a StopReason::ABORTED terminal rather than starting another turn.
     # Cancellation is cooperative: an in-progress provider call still finishes.
     def run(user_input, signal: nil)
+      command_result = resolve_slash_command(user_input)
+      return run_slash_action(command_result) if command_result&.type == :action
+
+      user_input = command_result.content if command_result&.type == :prompt
       emit(:agent_start, input: user_input)
       append(Message.user(user_input))
       @overflow_recovery_attempted = false

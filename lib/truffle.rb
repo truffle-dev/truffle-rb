@@ -13,6 +13,7 @@ require_relative "truffle/message"
 require_relative "truffle/uuid"
 require_relative "truffle/frontmatter"
 require_relative "truffle/prompt_templates"
+require_relative "truffle/slash_commands"
 require_relative "truffle/session"
 require_relative "truffle/response"
 require_relative "truffle/overflow"
@@ -30,6 +31,7 @@ require_relative "truffle/providers/google"
 require_relative "truffle/providers/google_stream"
 require_relative "truffle/agent"
 require_relative "truffle/agent/tool_execution"
+require_relative "truffle/agent/slash_commands"
 require_relative "truffle/compaction"
 require_relative "truffle/ignore"
 require_relative "truffle/skills"
@@ -91,6 +93,7 @@ module Truffle
   # model id still works when the provider is named.
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
             max_turns: Agent::DEFAULT_MAX_TURNS, tool_execution: :parallel,
+            prompt_templates: [], slash_commands: nil,
             **provider_options)
     if provider.nil?
       raise Error, "pass provider:, or a model: that names one" if model.nil?
@@ -111,7 +114,9 @@ module Truffle
       tools: tools,
       model: model,
       max_turns: max_turns,
-      tool_execution: tool_execution
+      tool_execution: tool_execution,
+      prompt_templates: prompt_templates,
+      slash_commands: slash_commands
     )
   end
 

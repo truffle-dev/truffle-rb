@@ -327,7 +327,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       frontmatter, falls back to the first body line for descriptions, and
       expands `/name args` with the argument helpers.
     - [ ] Default command/prompt directories once the Ruby config layout exists.
-    - [ ] Slash command registry and expansion into prompts/actions.
+    - [x] **Slash command registry and expansion into prompts/actions.**
+      `Truffle::SlashCommands::Registry` parses `/name args`, expands prompt
+      templates before the provider turn, dispatches handler commands without a
+      provider response, exposes pi's built-in command info for UI/help surfaces,
+      and suffixes duplicate invocation names like pi extension commands.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
     - [x] **Event bus.** `Truffle::EventBus` ports pi's `core/event-bus.ts`: the
