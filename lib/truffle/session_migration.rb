@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "json"
+require "fileutils"
+require "securerandom"
 require_relative "uuid"
 
 module Truffle
@@ -43,9 +45,22 @@ module Truffle
     end
 
     def rewrite_file(path, records)
-      File.open(path, "w") do |handle|
+      dir = File.dirname(path)
+      basename = File.basename(path)
+      mode = File.stat(path).mode & 0o777
+      tmp_path = File.join(dir, ".#{basename}.#{Process.pid}.#{SecureRandom.hex(8)}.tmp")
+
+      File.open(tmp_path, File::WRONLY | File::CREAT | File::EXCL, mode) do |handle|
         records.each { |record| handle.write("#{JSON.generate(record)}\n") }
+        handle.flush
+        handle.fsync
       end
+      File.chmod(mode, tmp_path)
+
+      FileUtils.cp(path, "#{path}.bak", preserve: true)
+      File.rename(tmp_path, path)
+    ensure
+      FileUtils.rm_f(tmp_path) if tmp_path && File.exist?(tmp_path)
     end
 
     def normalize_keys(hash, renames)

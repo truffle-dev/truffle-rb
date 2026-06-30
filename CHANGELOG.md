@@ -29,6 +29,9 @@ All notable changes to Truffle are documented here. The format follows
 - `Session.load` now raises on malformed JSONL before the final line instead of
   silently dropping the corrupt entry and shortening the resumed conversation.
   A truncated final line is still tolerated as an interrupted append.
+- Legacy session migration now writes through a same-directory temp file, keeps
+  a `.bak` copy of the original session, and renames the completed rewrite into
+  place instead of truncating the only copy in place.
 - `Agent#dump` / `Agent.load` now preserve accumulated token usage and cost, so
   a resumed agent continues accounting from the saved session instead of
   restarting totals at zero.

@@ -215,6 +215,24 @@ class TestSession < Minitest::Test
     refute rewritten[2].key?("parentId")
   end
 
+  def test_load_keeps_a_backup_when_rewriting_a_legacy_session
+    path = write_session_file(
+      "v1-backup.jsonl",
+      [
+        { type: "session", id: "sess-1", timestamp: "2025-01-01T00:00:00Z", cwd: "/work" },
+        { type: "message", timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: "hello" } }
+      ]
+    )
+    original = File.read(path)
+
+    Truffle::Session.load(path)
+
+    assert_equal original, File.read("#{path}.bak")
+    refute_equal original, File.read(path)
+    assert_empty Dir.glob(File.join(@dir, ".v1-backup.jsonl.*.tmp"))
+  end
+
   def test_load_migrates_v1_compaction_kept_index_to_kept_id
     path = write_session_file(
       "v1-compaction.jsonl",
