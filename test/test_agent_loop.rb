@@ -143,6 +143,21 @@ class TestAgentLoop < Minitest::Test
     assert_equal "handled", result
   end
 
+  def test_tool_argument_validation_error_is_fed_back_plainly
+    provider = StubProvider.new([
+                                  StubProvider.tool_call(id: "c1", name: "add",
+                                                         arguments: { "a" => 2 }),
+                                  StubProvider.text("I need b.")
+                                ])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
+    agent.run("add with a missing argument")
+
+    tool_msg = agent.messages.find { |message| message.role == :tool }
+
+    assert_equal "missing keyword: b", tool_msg.text
+    refute_includes tool_msg.text, "ArgumentError"
+  end
+
   def test_max_turns_guard_ends_with_error_stop_reason
     # Provider always asks for a tool, never settles -> must hit the guard.
     infinite = Class.new(Truffle::Providers::Base) do

@@ -54,6 +54,9 @@ module Truffle
     # they are symbolized so the handler can use keyword arguments. The handler's
     # return value is serialized for the model by #serialize_result.
     def call(arguments)
+      validation_error = validate_arguments(arguments || {})
+      return validation_error if validation_error
+
       kwargs = (arguments || {}).each_with_object({}) { |(k, v), h| h[k.to_sym] = v }
       serialize_result(handler.call(**kwargs))
     end
@@ -69,6 +72,41 @@ module Truffle
     end
 
     private
+
+    def validate_arguments(arguments)
+      keys = arguments.keys.map(&:to_s)
+      missing = required_parameters - keys
+      if !missing.empty? && !handler_can_prepare_missing_required?(missing, keys)
+        return "missing keyword: #{missing.first}"
+      end
+
+      unknown = keys - property_names
+      return nil if unknown.empty? || handler_accepts_unknown_keywords?
+
+      "unknown keyword: #{unknown.first}"
+    end
+
+    def required_parameters
+      Array(parameters[:required]).map(&:to_s)
+    end
+
+    def property_names
+      parameters.fetch(:properties, {}).keys.map(&:to_s)
+    end
+
+    def handler_accepts_unknown_keywords?
+      handler.parameters.any? { |kind, _name| kind == :keyrest }
+    end
+
+    def handler_can_prepare_missing_required?(missing, keys)
+      return false unless handler_accepts_unknown_keywords?
+      return false if (keys - property_names).empty?
+
+      optional_keywords = handler.parameters.filter_map do |kind, name|
+        name.to_s if kind == :key
+      end
+      missing.all? { |name| optional_keywords.include?(name) }
+    end
 
     # The model reads tool output as text. A String result is already that text
     # and passes through unchanged, so a handler that formats its own output

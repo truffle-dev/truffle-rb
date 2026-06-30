@@ -55,6 +55,46 @@ class TestTool < Minitest::Test
     refute_includes greet.to_schema[:parameters][:required], "loud"
   end
 
+  def test_missing_required_param_returns_model_readable_error
+    assert_equal "missing keyword: b", @add.call("a" => 2)
+  end
+
+  def test_unknown_param_returns_model_readable_error
+    assert_equal "unknown keyword: c", @add.call("a" => 2, "b" => 3, "c" => 4)
+  end
+
+  def test_unknown_param_is_allowed_when_handler_accepts_keyrest
+    tool = Truffle::Tool.define("flex", "Accept extra keywords") do
+      param :name, :string, required: true
+      run { |name:, **rest| { name: name, rest: rest } }
+    end
+
+    assert_equal '{"name":"sam","rest":{"nickname":"s"}}',
+                 tool.call("name" => "sam", "nickname" => "s")
+  end
+
+  def test_keyrest_handler_can_prepare_missing_optional_keyword
+    tool = Truffle::Tool.define("legacy", "Fold a legacy shape") do
+      param :path, :string, required: true
+      param :edits, :array, required: true
+      run { |path:, edits: nil, **legacy| { path: path, edits: edits || [legacy] } }
+    end
+
+    assert_equal '{"path":"a.txt","edits":[{"oldText":"old","newText":"new"}]}',
+                 tool.call("path" => "a.txt", "oldText" => "old", "newText" => "new")
+  end
+
+  def test_handler_argument_errors_still_propagate
+    tool = Truffle::Tool.define("boom", "Raise inside the handler") do
+      param :value, :integer, required: true
+      run { |value:| raise ArgumentError, "bad value #{value}" }
+    end
+
+    error = assert_raises(ArgumentError) { tool.call("value" => 3) }
+
+    assert_equal "bad value 3", error.message
+  end
+
   def test_string_result_passes_through_verbatim
     # A handler that formats its own output is handed to the model as-is, not
     # JSON-quoted, so existing string-returning tools keep working.

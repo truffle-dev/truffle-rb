@@ -41,6 +41,11 @@ All notable changes to Truffle are documented here. The format follows
   image resizing, and the interactive REPL remain later slices.
 
 ### Fixed
+- Tool calls with missing required params or undeclared keyword params now return
+  model-readable tool results such as `missing keyword: path` or
+  `unknown keyword: cwd` before the handler runs, instead of surfacing Ruby's
+  keyword `ArgumentError`. Handlers that raise their own `ArgumentError` still
+  use the existing tool-error path.
 - The `bash` tool now fails a command killed by a signal (an OOM kill, an
   external `SIGKILL`) instead of returning its partial output as success. Such a
   command has no exit code, so the exit-code guard alone let it pass; the signal
