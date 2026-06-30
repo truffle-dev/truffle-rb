@@ -127,6 +127,10 @@ All notable changes to Truffle are documented here. The format follows
   same literal and `$ENV` / `${ENV}` interpolation as provider headers, apply to
   the actual request model, and merge after provider defaults but before generated
   bearer auth.
+- Agents now observe later OpenAI-compatible extension provider registrations
+  before the next provider turn. An extension event handler or slash-command
+  handler can call `truffle.register_provider` after the agent is constructed,
+  and the following request uses the updated endpoint, key, model, and headers.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

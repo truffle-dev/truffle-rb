@@ -76,14 +76,17 @@ module Truffle
     # the one recorded in the session; pass model: to override it.
     def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
                   max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel,
-                  prompt_templates: [], slash_commands: nil, extensions: nil)
+                  prompt_templates: [], slash_commands: nil, extensions: nil,
+                  extension_provider_name: nil, extension_provider_overrides: {})
       session = Session.load(path)
       toolbox = rebind_toolbox(session.tools, tools, extensions: extensions)
       context = session.context
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
                   model: model || context.model&.model_id, max_turns: max_turns,
                   tool_execution: tool_execution, prompt_templates: prompt_templates,
-                  slash_commands: slash_commands, extensions: extensions)
+                  slash_commands: slash_commands, extensions: extensions,
+                  extension_provider_name: extension_provider_name,
+                  extension_provider_overrides: extension_provider_overrides)
       agent.restore(context.messages)
     end
 
@@ -100,13 +103,13 @@ module Truffle
                    retry_settings: DEFAULT_RETRY_SETTINGS,
                    before_tool_call: nil, after_tool_call: nil,
                    tool_execution: :parallel,
-                   prompt_templates: [], slash_commands: nil, extensions: nil)
+                   prompt_templates: [], slash_commands: nil, extensions: nil,
+                   extension_provider_name: nil, extension_provider_overrides: {})
       @provider = provider
       @system_prompt = system_prompt
       @model = model
       @max_turns = max_turns
-      @extensions = Extensions.loaded(extensions)
-      @extension_errors = []
+      setup_extensions(extensions, provider, extension_provider_name, extension_provider_overrides)
       @toolbox = toolbox_for(tools, @extensions)
       @listeners = Hash.new { |h, k| h[k] = [] }
       @session = session
@@ -191,13 +194,13 @@ module Truffle
           break
         end
 
-        maybe_compact(signal)
+        prepare_provider_turn(signal)
 
         turns += 1
         raise Error, "exceeded max_turns (#{max_turns}) without a final answer" if turns > max_turns
 
         emit(:turn_start, turn: turns)
-        response = @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
+        response = chat_current_turn
         final_response = response
         append(response.message)
         @usage += response.usage

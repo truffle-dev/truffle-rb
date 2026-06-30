@@ -31,9 +31,66 @@ module Truffle
       toolbox
     end
 
+    def setup_extensions(source, provider, provider_name, provider_overrides)
+      @extension_source = source
+      @extensions = Extensions.loaded(source)
+      @extension_errors = []
+      @extension_provider_name =
+        provider_name&.to_s || default_extension_provider_name(provider)
+      @extension_provider_overrides = provider_overrides || {}
+      @extension_provider_signature = current_extension_provider_signature
+    end
+
     def dispatch_extension_handlers(event, payload)
       errors = Extensions.dispatch_handlers(@extensions, event, payload)
       @extension_errors.concat(errors)
+    end
+
+    def prepare_provider_turn(signal)
+      refresh_extension_provider
+      maybe_compact(signal)
+    end
+
+    def chat_current_turn
+      refresh_extension_provider
+      @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
+    end
+
+    def default_extension_provider_name(provider)
+      return nil if @extension_source.nil?
+
+      provider.name
+    rescue StandardError
+      nil
+    end
+
+    def refresh_extension_provider
+      options = Extensions.provider_options(@extension_source, @extension_provider_name)
+      signature = extension_provider_signature(options)
+      return if signature == @extension_provider_signature
+
+      @extension_provider_signature = signature
+      return unless options
+
+      @provider = Providers::OpenAI.new(**merge_extension_provider_overrides(options))
+    end
+
+    def current_extension_provider_signature
+      extension_provider_signature(
+        Extensions.provider_options(@extension_source, @extension_provider_name)
+      )
+    end
+
+    def extension_provider_signature(options)
+      options&.inspect
+    end
+
+    def merge_extension_provider_overrides(options)
+      merged = options.merge(@extension_provider_overrides)
+      if options[:headers].is_a?(Hash) && @extension_provider_overrides[:headers].is_a?(Hash)
+        merged[:headers] = options[:headers].merge(@extension_provider_overrides[:headers])
+      end
+      merged
     end
   end
 end

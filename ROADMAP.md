@@ -413,6 +413,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       provider headers, applies the headers for the actual request model, and
       keeps pi's merge order: provider defaults, model headers, then generated
       bearer auth when enabled.
+    - [x] **Refresh live provider registration overrides.** An already-built
+      agent now observes later OpenAI-compatible `truffle.register_provider`
+      overrides before the next provider turn, so event handlers and extension
+      slash-command handlers can move the active provider endpoint without
+      reloading extensions.
     - [ ] Bind provider registration reload/unregister into live agents and
       sessions, plus non-OpenAI custom APIs, OAuth, and `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,

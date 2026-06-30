@@ -28,6 +28,25 @@ class TestAgentExtensions < Minitest::Test
     Truffle::Extensions.load_files([path])
   end
 
+  def capture_openai_chat
+    original = Truffle::Providers::OpenAI.instance_method(:chat)
+    calls = []
+    Truffle::Providers::OpenAI.define_method(:chat) do |messages:, tools: [], model: nil, **options|
+      calls << {
+        base_url: base_url,
+        headers: send(:request_headers),
+        messages: messages,
+        model: model,
+        options: options,
+        tools: tools
+      }
+      StubProvider.text("done")
+    end
+    yield calls
+  ensure
+    Truffle::Providers::OpenAI.define_method(:chat, original)
+  end
+
   def test_extension_tool_is_available_to_agent
     extensions = load_extension(<<~'RUBY')
       tool = Truffle.tool("lookup", "Lookup a value") do
@@ -114,6 +133,74 @@ class TestAgentExtensions < Minitest::Test
     agent = Truffle.agent(provider: provider, extensions: extensions)
 
     assert_equal "pong", agent.run("/ping")
+  end
+
+  def test_event_time_provider_registration_refreshes_next_provider_turn
+    extensions = load_extension(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://first.test/v1",
+        api_key: "first-key",
+        model: "llama3"
+      })
+
+      truffle.on("agent_start") do
+        truffle.register_provider("local", {
+          api: :openai_completions,
+          base_url: "http://second.test/v1",
+          api_key: "second-key",
+          model: "llama3"
+        })
+      end
+    RUBY
+
+    capture_openai_chat do |calls|
+      agent = Truffle.agent(provider: :local, model: "llama3", extensions: extensions)
+
+      assert_equal "http://first.test/v1", agent.provider.base_url
+      assert_equal "done", agent.run("hello")
+
+      assert_equal 1, calls.length
+      assert_equal "http://second.test/v1", calls.first[:base_url]
+      assert_equal "llama3", calls.first[:model]
+      assert_equal "Bearer second-key", calls.first[:headers]["Authorization"]
+      assert_equal "http://second.test/v1", agent.provider.base_url
+    end
+  end
+
+  def test_command_time_provider_registration_refreshes_later_provider_turn
+    extensions = load_extension(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://first.test/v1",
+        api_key: "first-key",
+        model: "llama3"
+      })
+
+      truffle.register_command("use-proxy") do
+        truffle.register_provider("local", {
+          api: :openai_completions,
+          base_url: "http://command.test/v1",
+          api_key: "command-key",
+          model: "llama3"
+        })
+        "proxy ready"
+      end
+    RUBY
+
+    capture_openai_chat do |calls|
+      agent = Truffle.agent(provider: :local, model: "llama3", extensions: extensions)
+
+      assert_equal "proxy ready", agent.run("/use-proxy")
+      assert_empty calls
+
+      assert_equal "done", agent.run("hello")
+
+      assert_equal 1, calls.length
+      assert_equal "http://command.test/v1", calls.first[:base_url]
+      assert_equal "Bearer command-key", calls.first[:headers]["Authorization"]
+      assert_equal "http://command.test/v1", agent.provider.base_url
+    end
   end
 
   def test_extension_handlers_observe_agent_events_in_order

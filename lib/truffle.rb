@@ -134,6 +134,7 @@ module Truffle
       end
     end
 
+    provider_name = provider.is_a?(Providers::Base) ? provider.name : provider.to_s
     prov = provider(provider, extensions: extensions, **provider_options)
     Agent.new(
       provider: prov,
@@ -144,7 +145,9 @@ module Truffle
       tool_execution: tool_execution,
       prompt_templates: prompt_templates,
       slash_commands: slash_commands,
-      extensions: extensions
+      extensions: extensions,
+      extension_provider_name: provider_name,
+      extension_provider_overrides: provider_options
     )
   end
 
