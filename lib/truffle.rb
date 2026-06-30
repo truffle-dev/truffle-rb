@@ -2,6 +2,7 @@
 
 require_relative "truffle/version"
 require_relative "truffle/content"
+require_relative "truffle/mime"
 require_relative "truffle/stop_reason"
 require_relative "truffle/abort_signal"
 require_relative "truffle/event_bus"

@@ -484,6 +484,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       top-level dispatch. RPC mode is parsed but reports not implemented until a
       real `runRpcMode` port lands. Session headers and the RPC runtime remain
       later slices.
+    - [x] Image MIME sniffing. `Truffle::Mime.detect_supported_image_mime_type`
+      and its `_from_file` variant port pi's coding-agent `utils/mime.ts`: pure
+      magic-byte detection for JPEG, PNG, GIF, WEBP, and BMP that rejects a
+      lossless JPEG and an animated PNG, reading raw bytes from a binary String
+      with no image library pulled in. This is the prerequisite for the `@file`
+      image arguments that still remain a later slice.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
