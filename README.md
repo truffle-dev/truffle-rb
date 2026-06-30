@@ -85,8 +85,9 @@ bundle install
 Truffle targets Ruby 3.1 and newer.
 
 Installing the gem also adds a `truffle` command. Today it answers
-`truffle --version` and `truffle --help`; the interactive REPL is in progress, so
-running it with no flags reports that interactive mode is not implemented yet.
+`truffle --version`, `truffle --help`, and `truffle --list-models`; the
+interactive REPL is in progress, so running it with no flags reports that
+interactive mode is not implemented yet.
 
 ## A Real Example
 

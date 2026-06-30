@@ -446,9 +446,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] Binary entry point. The gem ships a `truffle` executable backed by
       `Truffle::CLI.run`, the Ruby counterpart of the top of pi's `main.ts`
       dispatch: it parses argv, surfaces diagnostics, and acts on the terminal
-      flags the harness supports today (`--version`, `--help`), returning an exit
+      flags from this slice (`--version`, `--help`), returning an exit
       status from injectable streams so the dispatch is testable offline. The
-      interactive REPL, `--export`, and `--list-models` remain later slices.
+      interactive REPL and `--export` remain later slices.
+    - [x] Model listing. `truffle --list-models [search]` prints the built-in
+      model catalog as an aligned offline table, sorted by provider and model,
+      with provider, model id, context, max output, reasoning, and image support
+      columns.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

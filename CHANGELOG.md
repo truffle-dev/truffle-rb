@@ -15,6 +15,11 @@ All notable changes to Truffle are documented here. The format follows
   loop.
 
 ### Added
+- `truffle --list-models [search]` now prints the built-in model catalog as an
+  offline table sorted by provider and model. The output mirrors pi's
+  provider/model/context/max-output/thinking/images columns, supports fuzzy
+  search against provider, id, and name, and exits zero without requiring API
+  keys or network access.
 - System prompt assembly. `Truffle::SystemPrompt.build` ports pi's
   `core/system-prompt.ts` `buildSystemPrompt`: the string an agent runs under,
   in either the custom-prompt branch or the default coding-agent branch. The

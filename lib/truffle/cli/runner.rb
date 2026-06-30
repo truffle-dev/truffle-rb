@@ -4,9 +4,9 @@ module Truffle
   module CLI
     # The thin entry point behind the `truffle` executable. It parses argv,
     # surfaces the parser's diagnostics, and acts on the terminal flags the
-    # harness supports today: `--version` and `--help`. This is the Ruby
-    # counterpart of the top of pi's `main.ts` dispatcher, narrowed to the slices
-    # that exist. The interactive REPL, `--export`, and `--list-models` are later
+    # harness supports today: `--version`, `--help`, and `--list-models`. This
+    # is the Ruby counterpart of the top of pi's `main.ts` dispatcher, narrowed
+    # to the slices that exist. The interactive REPL and `--export` are later
     # slices of roadmap item 19, so any other invocation reports that and exits.
     #
     # `run` takes injectable out/err streams and RETURNS an exit status rather
@@ -31,6 +31,12 @@ module Truffle
 
       if args.help
         out.puts help_text(color: color?(out))
+        return 0
+      end
+
+      if args.list_models
+        search = args.list_models == true ? nil : args.list_models
+        out.print models_text(search: search)
         return 0
       end
 

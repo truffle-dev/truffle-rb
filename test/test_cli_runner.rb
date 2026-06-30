@@ -31,6 +31,25 @@ class TestCLIRunner < Minitest::Test
     assert_empty err
   end
 
+  def test_list_models_prints_the_builtin_catalog_and_exits_zero
+    status, out, err = run_cli(["--list-models"])
+
+    assert_equal 0, status
+    assert_includes out, "provider"
+    assert_includes out, "gpt-4o-mini"
+    assert_includes out, "claude-haiku-4-5"
+    assert_empty err
+  end
+
+  def test_list_models_accepts_a_search_pattern
+    status, out, err = run_cli(["--list-models", "sonnet"])
+
+    assert_equal 0, status
+    assert_includes out, "claude-sonnet-4-5"
+    refute_includes out, "gpt-4o-mini"
+    assert_empty err
+  end
+
   def test_help_to_a_non_tty_stream_has_no_ansi_escapes
     _status, out, = run_cli(["-h"])
 
@@ -69,6 +88,14 @@ class TestCLIRunner < Minitest::Test
     assert_equal 0, status
     assert_equal "#{Truffle::CLI.version_text}\n", out
     refute_includes out, "Options:"
+  end
+
+  def test_version_takes_precedence_over_list_models
+    status, out, = run_cli(["--list-models", "--version"])
+
+    assert_equal 0, status
+    assert_equal "#{Truffle::CLI.version_text}\n", out
+    refute_includes out, "provider"
   end
 
   def test_no_actionable_flag_reports_the_unimplemented_repl
