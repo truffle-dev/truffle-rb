@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::PromptTemplates` now ports pi's pure prompt-template argument
+  layer for commands: bash-style quoted argument parsing and single-pass
+  substitution for `$1`, `$@`, `$ARGUMENTS`, `${N:-default}`, `${@:N}`, and
+  `${@:N:L}` placeholders. Loading prompt markdown files and slash-command
+  execution remain later item-17 slices.
 - Skills. `Truffle::Frontmatter` parses the optional YAML frontmatter at the head
   of a markdown file and returns it with the trimmed body. `Truffle::Skills` loads
   one skill file into a `Skill` plus diagnostics: the name comes from the

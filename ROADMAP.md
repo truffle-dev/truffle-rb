@@ -313,6 +313,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [ ] Wire `Truffle::Ignore` into the discovery walk (pi's `addIgnoreRules`/
       `prefixIgnorePattern`/`toPosixPath` per-directory prefixing in `load_dir`).
 17. **Commands.** User-invocable commands that expand into prompts/actions.
+    - [x] **Prompt-template arguments.** `Truffle::PromptTemplates` ports pi's
+      pure prompt-template argument layer: bash-style quoted arg parsing and
+      single-pass substitution for `$1`, `$@`, `$ARGUMENTS`, `${N:-default}`,
+      `${@:N}`, and `${@:N:L}` placeholders.
+    - [ ] Prompt markdown loading from explicit paths and default command/prompt
+      directories.
+    - [ ] Slash command registry and expansion into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
 
