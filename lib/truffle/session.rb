@@ -18,9 +18,14 @@ module Truffle
   # and a compaction entry (a summary that stands in for the turns before it).
   # #context walks the path and applies them: it recovers the live model and
   # thinking level and, when the path was compacted, returns the summary followed
-  # by the kept tail instead of the full history. Branching to a second child,
-  # branch summaries, labels, the deferred-first-flush optimization, and v1/v2
-  # file migration are faithful follow-ups, not part of this slice.
+  # by the kept tail instead of the full history.
+  #
+  # Because entries form a tree, the leaf can be moved back to an earlier entry
+  # (#branch / #reset_leaf) so the next append opens a second child, a new branch
+  # that leaves the abandoned path untouched. Any entry can carry a user label
+  # (#append_label_change / #label), a bookmark that rides along as its own entry
+  # and never enters the model's context. Branch summaries, the deferred-first-
+  # flush optimization, and v1/v2 file migration remain faithful follow-ups.
   #
   #   session = Truffle::Session.create(dir: "/tmp/sessions", cwd: Dir.pwd)
   #   session.append_message(Truffle::Message.user("hello"))
@@ -107,6 +112,7 @@ module Truffle
       @tools = header[:tools]
       @entries = entries
       @by_id = {}
+      @labels_by_id = {}
       @leaf_id = nil
       entries.each { |entry| index(entry) }
     end
@@ -188,6 +194,55 @@ module Truffle
     # ending at leaf_id. Resolves the path, then defers to build_context.
     def context(leaf_id: @leaf_id)
       self.class.build_context(path_to(leaf_id))
+    end
+
+    # Move the leaf back to an earlier entry so the next append becomes a second
+    # child of it, opening a new branch while the abandoned path stays on disk
+    # unchanged. #messages and #context follow the leaf, so they reflect the new
+    # branch immediately. Ports pi's SessionManager#branch; raises if the id is
+    # not an entry in this session.
+    def branch(entry_id)
+      raise ArgumentError, "entry not found: #{entry_id}" unless @by_id.key?(entry_id)
+
+      @leaf_id = entry_id
+    end
+
+    # Reset the leaf to before any entry, so the next append starts a fresh root
+    # (parent_id nil). Used to re-edit the very first message. Ports pi's
+    # SessionManager#resetLeaf.
+    def reset_leaf
+      @leaf_id = nil
+    end
+
+    # The entry with this id, or nil. Ports pi's getEntry.
+    def entry(entry_id)
+      @by_id[entry_id]
+    end
+
+    # The direct children of an entry, in file order: every entry whose parent_id
+    # is parent_id. Pass nil for the root entries. More than one child means the
+    # node was branched. Ports pi's getChildren.
+    def children(parent_id)
+      @entries.select { |candidate| candidate[:parent_id] == parent_id }
+    end
+
+    # Set or clear a user label (a bookmark) on an entry. The label is appended as
+    # its own entry, so it advances the leaf like any append but never enters the
+    # model's context; the resolved label is updated in the index, last write
+    # winning. A nil or empty label clears it (the entry omits the label field,
+    # as pi drops an undefined one). Ports pi's appendLabelChange; raises if the
+    # target id is not an entry here. Returns the new label entry's id.
+    def append_label_change(target_id, label)
+      raise ArgumentError, "entry not found: #{target_id}" unless @by_id.key?(target_id)
+
+      fields = { target_id: target_id }
+      fields[:label] = label if label && !label.empty?
+      append_typed("label", **fields)
+    end
+
+    # The resolved label on an entry, or nil. Ports pi's getLabel.
+    def label(entry_id)
+      @labels_by_id[entry_id]
     end
 
     # Turn the message entries on a path into Messages, dropping settings and
@@ -283,11 +338,24 @@ module Truffle
     end
     private_class_method :compaction_summary_message
 
-    # Record an entry in the id map and advance the leaf to it. Called once per
-    # loaded entry by the constructor and once per appended entry.
+    # Record an entry in the id map and advance the leaf to it, and resolve a
+    # label entry into the label index. Called once per loaded entry by the
+    # constructor and once per appended entry, so labels survive a reload.
     def index(entry)
       @by_id[entry[:id]] = entry
       @leaf_id = entry[:id]
+      apply_label(entry[:target_id], entry[:label]) if entry[:type] == "label"
+    end
+
+    # Apply one label entry to the resolved-label index: a present label sets the
+    # bookmark on its target, a nil or empty one clears it. Mirrors pi's
+    # last-match-wins label resolution in _buildIndex.
+    def apply_label(target_id, label)
+      if label && !label.empty?
+        @labels_by_id[target_id] = label
+      else
+        @labels_by_id.delete(target_id)
+      end
     end
   end
 end

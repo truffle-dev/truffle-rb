@@ -157,8 +157,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `append_compaction`, and a context reader (pi's `buildSessionContext`) that
       recovers the live thinking level and model and, after a compaction, returns
       the summary plus the kept tail instead of the full history.
-    - [ ] Branching (a second child off a node), branch-summary entries, labels,
-      the deferred-first-flush optimization, and v1/v2 file migration.
+    - [x] **Branching and labels.** `Session#branch` moves the leaf back to an
+      earlier entry so the next append opens a second child (a new branch off a
+      node, leaving the abandoned path on disk); `Session#reset_leaf` rewinds to
+      before any entry. `Session#children` / `Session#entry` read the tree.
+      `Session#append_label_change` / `Session#label` attach a user bookmark to
+      any entry, resolved through an index that survives a reload (last write
+      wins, an empty label clears); a label entry advances the leaf but stays out
+      of the model context. Ports pi's `branch` / `resetLeaf` / `getChildren` /
+      `appendLabelChange` / `getLabel`.
+    - [ ] Branch-summary entries, the deferred-first-flush optimization, and
+      v1/v2 file migration.
     - [x] `Agent#dump` / `Agent.load` wired onto the session store, persisting
       tool definitions by name so a resumed agent rebinds its toolbox. `dump`
       writes the conversation (no system prompt, regenerated on resume), a

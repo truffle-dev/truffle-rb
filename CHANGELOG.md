@@ -7,6 +7,17 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Session branching and labels. `Session#branch` moves the leaf back to an
+  earlier entry so the next append opens a second child, a new branch that leaves
+  the abandoned path on disk; `Session#reset_leaf` rewinds to before any entry to
+  re-edit the first message. `Session#children` and `Session#entry` read the
+  tree. `Session#append_label_change` / `Session#label` attach a user bookmark to
+  any entry; the label rides along as its own entry (advancing the leaf) but
+  never enters the model context, and resolves through an index that survives a
+  reload, last write winning and an empty label clearing. Ports pi's
+  `SessionManager#branch` / `resetLeaf` / `getChildren` / `appendLabelChange` /
+  `getLabel`. Remaining item-11 follow-ups (branch summaries, deferred-first-
+  flush, v1/v2 file migration) stay deferred.
 - Tool middleware: `Agent.new` takes optional `before_tool_call:` and
   `after_tool_call:` callables that wrap tool execution without changing tool
   definitions. `before_tool_call` runs after the tool is resolved and can veto a
