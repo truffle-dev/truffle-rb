@@ -24,6 +24,18 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Truffle::Agent` now auto-retries a turn that failed with a transient error.
+  When the `Retry` classifier deems a failed turn transient (a load spike, a 5xx,
+  a throttle, a dropped socket) and it is not a context overflow, the agent drops
+  the failed turn, waits out an exponential backoff (`base_delay_ms * 2 ** (n-1)`
+  from a 2s base), and runs the turn again, up to a retry budget (three by
+  default). It emits a `:retry` event per attempt and resets its budget on the
+  next turn that is not retried, so each fresh failure gets the full count. The
+  failed turn stays in the session for history but is dropped from the live
+  context the retry sees. Tune or switch it off with `retry_settings:` at
+  construction. Works with or without a session, and runs after overflow recovery
+  so the compactor keeps first claim on a window overflow. Ports pi's
+  `_prepareRetry`.
 - `Truffle::Retry.retryable_assistant_error?(response)` classifies whether a
   failed turn reads as a transient provider or transport error worth restarting:
   a load spike, an HTTP 5xx, a throttle, a network or stream transport failure,

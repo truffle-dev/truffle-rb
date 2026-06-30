@@ -231,9 +231,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       premature stream end, explicit retry guidance) vs a non-retryable account or
       billing limit. Ports pi's `isRetryableAssistantError`. Classification only;
       the policy below consumes it.
-    - [ ] Configurable HTTP open/read timeout per provider call.
-    - [ ] Bounded backoff retry policy: restart a turn that `Retry` deems
-      transient, capped by a retry budget, honoring a provider retry-after.
+    - [x] Configurable HTTP open/read timeout per provider call (all three
+      providers take `open_timeout:`/`read_timeout:` and apply them in `#post`).
+    - [x] Bounded backoff retry policy: `Agent` restarts a turn that `Retry` deems
+      transient, capped by a retry budget, with exponential backoff. Ports pi's
+      `_prepareRetry`. Follow-up: honor a provider `Retry-After` header once the
+      providers parse it onto the response.
 14. **Tool middleware.** before/after hooks around tool execution (logging,
     auth, rate limiting) without changing tool definitions.
 15. **Parallel tool dispatch.** Run independent tool calls in one turn

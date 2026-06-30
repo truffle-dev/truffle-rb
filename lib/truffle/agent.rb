@@ -37,11 +37,24 @@ module Truffle
   # agent compacts and, if the failed turn can be retried, drops it and runs the
   # turn again on the smaller context. Recovery is attempted once per overflow; a
   # second consecutive overflow ends the run rather than looping.
+  #
+  # Any agent (session-backed or not) also auto-retries a turn that failed with a
+  # transient provider or transport error: a load spike, a 5xx, a throttle, a
+  # dropped socket. When the Retry classifier deems a failed turn transient (and
+  # it is not a context overflow, which the compactor owns), the agent drops the
+  # failed turn, waits out an exponential backoff, and runs the turn again, up to
+  # a retry budget. The counter resets on the next turn that is not retried, so
+  # each fresh failure gets the full budget. Port of pi's _prepareRetry.
   class Agent
     DEFAULT_MAX_TURNS = 12
 
     EVENTS = %i[agent_start turn_start message tool_call tool_result turn_end
-                agent_end compaction].freeze
+                agent_end compaction retry].freeze
+
+    # Auto-retry defaults, ported from pi's getRetrySettings (settings-manager.ts):
+    # retry up to three times with exponential backoff from a 2s base, on. A
+    # caller tunes or disables this with retry_settings: at construction.
+    DEFAULT_RETRY_SETTINGS = { enabled: true, max_retries: 3, base_delay_ms: 2000 }.freeze
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns, :usage, :session
 
@@ -87,7 +100,8 @@ module Truffle
     # ever compacting (the session is still mirrored).
     def initialize(provider:, system_prompt: nil, tools: [], model: nil,
                    max_turns: DEFAULT_MAX_TURNS, session: nil,
-                   compaction_settings: Compaction::DEFAULT_SETTINGS, auto_compact: true)
+                   compaction_settings: Compaction::DEFAULT_SETTINGS, auto_compact: true,
+                   retry_settings: DEFAULT_RETRY_SETTINGS)
       @provider = provider
       @system_prompt = system_prompt
       @model = model
@@ -97,6 +111,11 @@ module Truffle
       @session = session
       @compaction_settings = compaction_settings
       @auto_compact = auto_compact
+      @retry_settings = retry_settings
+      # How many times the current run has restarted a turn the Retry classifier
+      # deemed transient. Reset to zero at the start of each run and after any turn
+      # that is not retried, so each fresh failure gets the full retry budget.
+      @retry_attempt = 0
       # The context tokens the last provider response reported, the input to the
       # compaction threshold at the top of the next turn. Nil until the first
       # response, and cleared once a usage reading has triggered a compaction so
@@ -145,6 +164,7 @@ module Truffle
       emit(:agent_start, input: user_input)
       append(Message.user(user_input))
       @overflow_recovery_attempted = false
+      @retry_attempt = 0
 
       final_text = nil
       final_response = nil
@@ -170,10 +190,7 @@ module Truffle
         @last_usage = response.usage
         emit(:message, message: response.message, usage: response.usage)
 
-        case maybe_recover_from_overflow(response, signal)
-        when :retry then next
-        when :none then @overflow_recovery_attempted = false
-        end
+        next if handle_recovery(response, signal) == :retry
 
         unless response.tool_calls?
           final_text = response.text
@@ -287,6 +304,26 @@ module Truffle
       false
     end
 
+    # After a turn, run the two recovery checks in order and report whether the
+    # loop should restart the turn. Context overflow is the compactor's job and is
+    # checked first; a transient provider or transport error is the retry policy's
+    # and is checked second. Either may ask for a restart (:retry); otherwise the
+    # turn proceeds (:continue). Each check, when it declines, resets its own
+    # one-shot gate so the next distinct failure starts fresh.
+    def handle_recovery(response, signal)
+      case maybe_recover_from_overflow(response, signal)
+      when :retry then return :retry
+      when :none then @overflow_recovery_attempted = false
+      end
+
+      case maybe_retry(response, signal)
+      when :retry then return :retry
+      when :none then @retry_attempt = 0
+      end
+
+      :continue
+    end
+
     # After a turn, decide whether it overflowed the context window and what to do
     # about it. Returns :retry when the turn was compacted away and the loop should
     # run the turn again on the smaller context; :none when the turn did not
@@ -340,6 +377,61 @@ module Truffle
       @messages.pop if @messages.last&.role == :assistant
       @last_usage = nil
       :retry
+    end
+
+    # After a turn, decide whether it failed with a transient provider or
+    # transport error worth restarting. Returns :retry when the turn was dropped
+    # and the loop should run it again after a backoff, and :none otherwise (a
+    # clean turn, a non-retryable error, or a spent retry budget). Port of pi's
+    # _isRetryableError gate plus _prepareRetry: classify, count against the
+    # budget, back off, drop the failed turn from the live context, and retry.
+    #
+    # A turn that overflowed the context window is not retried here: overflow is
+    # the compactor's job (handled just above), so a retry would only refail. The
+    # failed turn is removed from the live messages but stays in the session for
+    # history, the way pi keeps the error in the session while dropping it from
+    # the context the next call sees.
+    def maybe_retry(response, signal)
+      return :none unless @retry_settings[:enabled]
+      return :none unless retryable_error?(response)
+
+      @retry_attempt += 1
+      if @retry_attempt > @retry_settings[:max_retries]
+        # The budget is spent. Step the counter back so it reads as the number of
+        # attempts actually made, and let the failed turn end the run.
+        @retry_attempt -= 1
+        return :none
+      end
+
+      delay_ms = @retry_settings[:base_delay_ms] * (2**(@retry_attempt - 1))
+      emit(:retry, attempt: @retry_attempt, max_retries: @retry_settings[:max_retries],
+                   delay_ms: delay_ms, error_message: response.error_message)
+      backoff(delay_ms, signal)
+
+      @messages.pop if @messages.last&.role == :assistant
+      @last_usage = nil
+      :retry
+    end
+
+    # Whether a failed turn reads as a transient, retryable error and is not a
+    # context overflow. Overflow is excluded because the compactor owns it; the
+    # window comes from the catalog when the model is known (an error-phrase
+    # overflow is caught without one). Mirrors pi's _isRetryableError.
+    def retryable_error?(response)
+      window = (@model && Models.find(@model))&.context_window
+      return false if Overflow.context_overflow?(response, context_window: window)
+
+      Retry.retryable_assistant_error?(response)
+    end
+
+    # Wait out the backoff before a retry. The sleep is skipped when the delay is
+    # zero (a caller that tuned it away, or a test) or the run has been aborted,
+    # since the loop's top-of-turn abort check ends the run cleanly on the next
+    # pass rather than sleeping first.
+    def backoff(delay_ms, signal)
+      return if delay_ms <= 0 || signal&.aborted?
+
+      sleep(delay_ms / 1000.0)
     end
 
     # Replace the running history with the session's current context (compaction
