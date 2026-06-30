@@ -139,8 +139,26 @@ class TestUsage < Minitest::Test
 
     assert_equal 3, h[:input]
     assert_equal 1, h[:output]
+    assert_equal 0, h[:cache_write_1h]
     assert_equal 4, h[:total_tokens]
     assert_kind_of Hash, h[:cost]
+  end
+
+  def test_from_h_round_trips_the_serialized_shape
+    usage = Truffle::Usage.new(
+      input: 10,
+      output: 5,
+      cache_read: 3,
+      cache_write: 2,
+      cache_write_1h: 1,
+      reasoning: 4,
+      cost: Truffle::Usage::Cost.new(input: 0.1, output: 0.2, cache_read: 0.03,
+                                     cache_write: 0.04, total: 0.37)
+    )
+
+    parsed = JSON.parse(JSON.generate(usage.to_h))
+
+    assert_equal usage, Truffle::Usage.from_h(parsed)
   end
 end
 

@@ -5,6 +5,7 @@ require "time"
 require "fileutils"
 require_relative "uuid"
 require_relative "message"
+require_relative "usage"
 require_relative "session_migration"
 
 module Truffle
@@ -176,6 +177,11 @@ module Truffle
       append_typed("thinking_level_change", thinking_level: level)
     end
 
+    # Record the accumulated usage seen by an agent at a persistence checkpoint.
+    # It stays out of model context; Agent.load reads the latest entry on the
+    # active path and continues accounting from there.
+    def append_usage(usage) = append_typed("usage", usage: usage.to_h)
+
     # Record that the turns before first_kept_entry_id were compacted into a
     # summary. tokens_before is the size that was compacted away, kept for display.
     # After this, #context returns the summary plus the kept tail, not the full
@@ -225,6 +231,10 @@ module Truffle
     def context(leaf_id: @leaf_id)
       self.class.build_context(path_to(leaf_id))
     end
+
+    # The latest accumulated-usage snapshot on the active path, or zero when a
+    # session predates usage persistence.
+    def usage(leaf_id: @leaf_id) = usage_from(path_to(leaf_id))
 
     # Move the leaf back to an earlier entry so the next append becomes a second
     # child of it, opening a new branch while the abandoned path stays on disk
@@ -423,6 +433,11 @@ module Truffle
       Message.user(text)
     end
     private_class_method :branch_summary_message
+
+    def usage_from(path)
+      entry = path.reverse.find { |candidate| candidate[:type] == "usage" }
+      entry ? Usage.from_h(entry[:usage]) : Usage.zero
+    end
 
     # Record an entry in the id map and advance the leaf to it, and resolve a
     # label entry into the label index. Called once per loaded entry by the

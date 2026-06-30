@@ -44,6 +44,29 @@ module Truffle
       new
     end
 
+    # Rebuild a Usage object from #to_h output after a JSON round-trip. Session
+    # files store accumulated usage this way so Agent.load can resume accounting.
+    def self.from_h(hash)
+      h = stringify_keys(hash)
+      cost_h = stringify_keys(h["cost"])
+      cost = Cost.new(
+        input: cost_h.fetch("input", 0).to_f,
+        output: cost_h.fetch("output", 0).to_f,
+        cache_read: cost_h.fetch("cache_read", 0).to_f,
+        cache_write: cost_h.fetch("cache_write", 0).to_f,
+        total: cost_h.fetch("total", 0).to_f
+      )
+      new(
+        input: h.fetch("input", 0).to_i,
+        output: h.fetch("output", 0).to_i,
+        cache_read: h.fetch("cache_read", 0).to_i,
+        cache_write: h.fetch("cache_write", 0).to_i,
+        cache_write_1h: h.fetch("cache_write_1h", 0).to_i,
+        reasoning: h.fetch("reasoning", 0).to_i,
+        cost: cost
+      )
+    end
+
     # Build a Usage from a provider's raw usage hash (OpenAI Chat Completions
     # shape, string keys from JSON). `pricing` is a per-million-token rate hash
     # (Pricing.cost_for); when given, the dollar cost is filled in. Faithful to
@@ -159,7 +182,7 @@ module Truffle
 
     def to_h
       { input: input, output: output, cache_read: cache_read,
-        cache_write: cache_write, reasoning: reasoning,
+        cache_write: cache_write, cache_write_1h: cache_write_1h, reasoning: reasoning,
         total_tokens: total_tokens, cost: cost.to_h }
     end
 
@@ -173,6 +196,13 @@ module Truffle
     end
 
     private
+
+    def self.stringify_keys(hash)
+      return {} unless hash.respond_to?(:each_with_object)
+
+      hash.each_with_object({}) { |(key, value), result| result[key.to_s] = value }
+    end
+    private_class_method :stringify_keys
 
     def per_million(rate, tokens)
       (rate / 1_000_000.0) * tokens

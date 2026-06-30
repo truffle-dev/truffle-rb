@@ -85,7 +85,7 @@ module Truffle
                   slash_commands: slash_commands, extensions: extensions,
                   extension_provider_name: extension_provider_name,
                   extension_provider_overrides: extension_provider_overrides)
-      agent.restore(context.messages)
+      agent.restore(context.messages, usage: session.usage)
     end
 
     # session, when given, makes the agent session-backed: appended messages are
@@ -224,8 +224,7 @@ module Truffle
     # Reset history back to just the system prompt (keeps tools + listeners) and
     # clear the accumulated usage.
     def reset
-      @messages = []
-      @messages << Message.system(@system_prompt) if @system_prompt
+      @messages = @system_prompt ? [Message.system(@system_prompt)] : []
       @usage = Usage.zero
       self
     end
@@ -240,6 +239,7 @@ module Truffle
       session = Session.create(dir: dir, cwd: cwd, tools: @toolbox.names)
       session.append_model_change(provider: @provider.name, model_id: @model) if @model
       conversation.each { |message| session.append_message(message) }
+      session.append_usage(@usage) unless @usage == Usage.zero
       session.flush
       session
     end
@@ -247,9 +247,10 @@ module Truffle
     # Replace the running history with a restored conversation, keeping the
     # system prompt at the front. Used by Agent.load to resume a session; the
     # restored messages are the user/assistant/tool turns, never a system message.
-    def restore(messages)
+    def restore(messages, usage: nil)
       reset
       @messages.concat(messages)
+      @usage = usage if usage
       self
     end
 

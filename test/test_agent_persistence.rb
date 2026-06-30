@@ -22,6 +22,13 @@ class TestAgentPersistence < Minitest::Test
     agent.dump(dir: dir)
   end
 
+  def usage_for(input:, output:)
+    Truffle::Usage.parse(
+      { "prompt_tokens" => input, "completion_tokens" => output },
+      pricing: Truffle::Pricing.cost_for("gpt-5.4-mini")
+    )
+  end
+
   def test_dump_then_load_continues_the_conversation
     Dir.mktmpdir("truffle-agent") do |dir|
       session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("Hi there.")]),
@@ -40,6 +47,30 @@ class TestAgentPersistence < Minitest::Test
 
       assert_equal %i[system user assistant user], roles
       assert_equal "hello", Truffle::Message.from_h(seen[1]).text
+    end
+  end
+
+  def test_dump_then_load_preserves_accumulated_usage
+    Dir.mktmpdir("truffle-agent") do |dir|
+      first_usage = usage_for(input: 100, output: 10)
+      second_usage = usage_for(input: 200, output: 20)
+      agent = Truffle::Agent.new(
+        provider: StubProvider.new([StubProvider.text("first", usage: first_usage)])
+      )
+      agent.run("hello")
+
+      session = agent.dump(dir: dir)
+      loaded = Truffle::Agent.load(
+        session.file,
+        provider: StubProvider.new([StubProvider.text("second", usage: second_usage)])
+      )
+
+      assert_equal first_usage, loaded.usage
+
+      loaded.run("again")
+
+      assert_equal first_usage + second_usage, loaded.usage
+      assert_equal "usage", Truffle::Session.load(session.file).entries.last[:type]
     end
   end
 

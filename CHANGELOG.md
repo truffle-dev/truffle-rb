@@ -26,6 +26,9 @@ All notable changes to Truffle are documented here. The format follows
 - Session appends no longer reparse older message content just to decide whether
   the first assistant message has been seen, so sessions containing
   forward-compatible content blocks can still accept new entries.
+- `Agent#dump` / `Agent.load` now preserve accumulated token usage and cost, so
+  a resumed agent continues accounting from the saved session instead of
+  restarting totals at zero.
 
 ### Added
 - Print-mode text renderer. `Truffle::CLI.render_print_text(response, out:, err:)`
