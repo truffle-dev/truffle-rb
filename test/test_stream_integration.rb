@@ -13,10 +13,17 @@ class TestStreamIntegration < Minitest::Test
 
   def test_streams_text_from_real_model
     provider = Truffle::Providers::OpenAI.new(model: "gpt-4o-mini")
-    messages = [Truffle::Message.user("Say the word 'pong' and nothing else.")]
+    messages = [
+      Truffle::Message.user(
+        "Return exactly the four lowercase letters pong. " \
+        "No spaces, punctuation, explanation, or quotes."
+      )
+    ]
 
     events = []
-    response = provider.chat_stream(messages: messages) { |event| events << event }
+    response = provider.chat_stream(messages: messages, temperature: 0) do |event|
+      events << event
+    end
 
     assert_equal :start, events.first.type
     assert_predicate events.last, :terminal?, "stream must end on a terminal event"
@@ -26,7 +33,7 @@ class TestStreamIntegration < Minitest::Test
     streamed_text = events.select { |e| e.type == :text_delta }.map(&:delta).join
 
     assert_equal response.message.text, streamed_text
-    assert_includes response.message.text.downcase, "pong"
+    assert_equal "pong", response.message.text.to_s.strip.downcase
     assert_equal Truffle::StopReason::STOP, response.stop_reason
   end
 end

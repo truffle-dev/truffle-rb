@@ -64,6 +64,9 @@ All notable changes to Truffle are documented here. The format follows
 - The shared test helper now loads Minitest's stub/mock support, so the provider
   error-turn tests run under a clean `rake test` without requiring a separate
   manual preload.
+- The live OpenAI and Google streaming smoke tests now use deterministic prompts
+  and `temperature: 0`, avoiding provider phrasing drift while still verifying
+  the streamed text matches the final response.
 
 ### Added
 - `Truffle::Agent` now runs multiple tool calls from the same assistant turn in
