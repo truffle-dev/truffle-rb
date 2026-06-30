@@ -101,7 +101,8 @@ module Truffle
     def initialize(provider:, system_prompt: nil, tools: [], model: nil,
                    max_turns: DEFAULT_MAX_TURNS, session: nil,
                    compaction_settings: Compaction::DEFAULT_SETTINGS, auto_compact: true,
-                   retry_settings: DEFAULT_RETRY_SETTINGS)
+                   retry_settings: DEFAULT_RETRY_SETTINGS,
+                   before_tool_call: nil, after_tool_call: nil)
       @provider = provider
       @system_prompt = system_prompt
       @model = model
@@ -112,6 +113,12 @@ module Truffle
       @compaction_settings = compaction_settings
       @auto_compact = auto_compact
       @retry_settings = retry_settings
+      # Optional tool-execution middleware, ported from pi's beforeToolCall /
+      # afterToolCall seam. Each is a callable handed a single context Hash. The
+      # before hook can veto a call ({ block: true }); the after hook can override
+      # the executed result ({ result: ... }). See #execute for the contract.
+      @before_tool_call = before_tool_call
+      @after_tool_call = after_tool_call
       # How many times the current run has restarted a turn the Retry classifier
       # deemed transient. Reset to zero at the start of each run and after any turn
       # that is not retried, so each fresh failure gets the full retry budget.
@@ -448,28 +455,6 @@ module Truffle
     # configuration re-supplied on resume rather than part of the conversation.
     def conversation
       @messages.reject { |message| message.role == :system }
-    end
-
-    def run_tool_calls(tool_calls)
-      tool_calls.map do |call|
-        emit(:tool_call, call: call)
-        result = execute(call)
-        message = Message.tool(content: result, tool_call_id: call.id, name: call.name)
-        append(message)
-        emit(:tool_result, call: call, result: result, message: message)
-        result
-      end
-    end
-
-    def execute(call)
-      tool = @toolbox[call.name]
-      return "Error: unknown tool '#{call.name}'" if tool.nil?
-
-      tool.call(call.arguments)
-    rescue StandardError => e
-      # A tool raising should not kill the loop; report it back to the model so
-      # it can recover or apologize. This mirrors how pi treats tool failures.
-      "Error running tool '#{call.name}': #{e.class}: #{e.message}"
     end
 
     def emit(event, **payload)

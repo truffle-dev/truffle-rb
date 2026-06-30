@@ -237,8 +237,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       transient, capped by a retry budget, with exponential backoff. Ports pi's
       `_prepareRetry`. Follow-up: honor a provider `Retry-After` header once the
       providers parse it onto the response.
-14. **Tool middleware.** before/after hooks around tool execution (logging,
-    auth, rate limiting) without changing tool definitions.
+14. [x] **Tool middleware.** before/after hooks around tool execution (logging,
+    auth, rate limiting) without changing tool definitions. `Agent.new` takes
+    `before_tool_call:` (veto a call with `{ block: true, reason: }`) and
+    `after_tool_call:` (override the result with `{ result: }`), ported from pi's
+    `beforeToolCall` / `afterToolCall`. The before hook runs after the tool
+    resolves; the after hook runs on an executed result; an unknown tool skips
+    both; a raising hook becomes an error result. Narrowed to this port's
+    single-string tool result (no structured content/details/isError/terminate).
 15. **Parallel tool dispatch.** Run independent tool calls in one turn
     concurrently while preserving result ordering in the history.
 

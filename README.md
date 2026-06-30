@@ -168,6 +168,35 @@ Events fire in order: `agent_start`, then per turn `turn_start`, `message`,
 `tool_call`/`tool_result` (one pair per tool the model invokes), `turn_end`,
 and finally `agent_end`.
 
+### Tool middleware
+
+Two optional hooks wrap tool execution without touching the tool definitions,
+ported from pi's `beforeToolCall` / `afterToolCall`. Use them for logging,
+authorization, redaction, or rate limiting.
+
+```ruby
+agent = Truffle.agent(
+  provider: :openai,
+  tools: [read_file, write_file],
+  # Veto a call before it runs. Return { block: true, reason: ... } to stop it;
+  # the reason becomes the tool result the model reads. Return nil to proceed.
+  before_tool_call: ->(tool_call:, **) {
+    { block: true, reason: "writes are disabled" } if tool_call.name == "write_file"
+  },
+  # Rewrite an executed result. Return { result: ... } to override; anything else
+  # (including nil) keeps the original.
+  after_tool_call: ->(result:, **) {
+    { result: result.gsub(/sk-[A-Za-z0-9]+/, "[redacted]") }
+  }
+)
+```
+
+Each hook is handed a context Hash by keyword: `:tool_call`, `:args` (the parsed
+arguments), and `:messages` (the running history), plus `:result` for the after
+hook. Declare only the keys you read and absorb the rest with `**`. An unknown
+tool skips both hooks, and a hook that raises becomes an error result rather than
+killing the loop.
+
 ### Providers
 
 A provider is anything that implements:

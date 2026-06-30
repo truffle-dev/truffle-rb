@@ -6,6 +6,18 @@ All notable changes to Truffle are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Tool middleware: `Agent.new` takes optional `before_tool_call:` and
+  `after_tool_call:` callables that wrap tool execution without changing tool
+  definitions. `before_tool_call` runs after the tool is resolved and can veto a
+  call by returning `{ block: true, reason: ... }`, in which case the reason
+  becomes the tool result and the tool never runs. `after_tool_call` runs on an
+  executed result (including one from a tool that raised) and can override it by
+  returning `{ result: ... }`. An unknown tool skips both hooks, and a hook that
+  raises is folded into an error result rather than killing the loop. Ports pi's
+  `beforeToolCall` / `afterToolCall` seam, narrowed to this port's single-string
+  tool result.
+
 ### Changed
 - `script/rb` now bind-mounts the current checkout by default, uses the full
   Ruby 3.3 image with a cached bundle volume, and passes provider keys from
