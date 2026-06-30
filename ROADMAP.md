@@ -245,6 +245,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       answer; give up after one attempt or when nothing can be compacted. The
       gate resets only on non-overflow turns, so a repeated length-stop overflow
       cannot loop forever.
+    - [x] Tool-message pairing coverage: `test/test_compaction_tool_messages.rb`
+      builds fixtures from real `assistant(tool_call)` / `tool(result)` pairs and
+      asserts a tool result is never separated from its call across three cut
+      shapes (clean cut, split turn, prior-compaction continuation), on both the
+      summarized history and the rebuilt session context. Mutation-proven against
+      a `valid_cut_points` that admits tool results.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
     - [x] `Retry.retryable_assistant_error?`: classify whether a failed error turn
