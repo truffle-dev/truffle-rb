@@ -20,6 +20,13 @@ class TestSession < Minitest::Test
     FileUtils.remove_entry(@dir)
   end
 
+  def write_session_file(name, records)
+    path = File.join(@dir, name)
+    body = records.map { |record| JSON.generate(record) }.join("\n")
+    File.write(path, "#{body}\n")
+    path
+  end
+
   def test_create_writes_a_header_line
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     header = JSON.parse(File.read(session.file).each_line.first)
@@ -115,6 +122,79 @@ class TestSession < Minitest::Test
     reloaded = Truffle::Session.load(session.file)
 
     assert_equal ["kept"], reloaded.messages.map(&:text)
+  end
+
+  def test_load_migrates_v1_entries_to_the_current_tree_shape
+    path = write_session_file(
+      "v1.jsonl",
+      [
+        { type: "session", id: "sess-1", timestamp: "2025-01-01T00:00:00Z", cwd: "/work" },
+        { type: "message", timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: "hello" } },
+        { type: "message", timestamp: "2025-01-01T00:00:02Z",
+          message: { role: "assistant", content: [{ type: "text", text: "hi" }] } }
+      ]
+    )
+
+    session = Truffle::Session.load(path)
+    entries = session.entries
+    rewritten = File.read(path).each_line.map { |line| JSON.parse(line) }
+
+    assert_equal Truffle::Session::SESSION_VERSION, session.version
+    assert_equal %w[hello hi], session.messages.map(&:text)
+    assert_match(/\A\h{8}\z/, entries[0][:id])
+    assert_nil entries[0][:parent_id]
+    assert_equal entries[0][:id], entries[1][:parent_id]
+    assert_equal Truffle::Session::SESSION_VERSION, rewritten.first["version"]
+    assert rewritten[2].key?("parent_id")
+    refute rewritten[2].key?("parentId")
+  end
+
+  def test_load_migrates_v1_compaction_kept_index_to_kept_id
+    path = write_session_file(
+      "v1-compaction.jsonl",
+      [
+        { type: "session", id: "sess-1", timestamp: "2025-01-01T00:00:00Z", cwd: "/work" },
+        { type: "message", timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: "old" } },
+        { type: "message", timestamp: "2025-01-01T00:00:02Z",
+          message: { role: "user", content: "kept" } },
+        { type: "compaction", timestamp: "2025-01-01T00:00:03Z",
+          summary: "summary", first_kept_entry_index: 2, tokens_before: 12 }
+      ]
+    )
+
+    session = Truffle::Session.load(path)
+    compaction = session.entries.last
+    texts = session.context.messages.map(&:text)
+
+    assert_equal session.entries[1][:id], compaction[:first_kept_entry_id]
+    refute compaction.key?(:first_kept_entry_index)
+    assert_includes texts.first, "summary"
+    assert_equal "kept", texts.last
+  end
+
+  def test_load_migrates_v2_camel_case_fields_to_current_names
+    path = write_session_file(
+      "v2.jsonl",
+      [
+        { type: "session", version: 2, id: "sess-2", timestamp: "2025-01-01T00:00:00Z",
+          cwd: "/work", parentSession: "parent" },
+        { type: "message", id: "11111111", parentId: nil, timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: "hello" } },
+        { type: "model_change", id: "22222222", parentId: "11111111",
+          timestamp: "2025-01-01T00:00:02Z", provider: "openai", modelId: "gpt-4o-mini" }
+      ]
+    )
+
+    session = Truffle::Session.load(path)
+    rewritten = File.read(path)
+
+    assert_equal "parent", session.parent_session
+    assert_equal "11111111", session.entries[1][:parent_id]
+    assert_equal "gpt-4o-mini", session.context.model.model_id
+    refute_includes rewritten, "parentId"
+    refute_includes rewritten, "modelId"
   end
 
   def test_messages_is_empty_for_a_fresh_session

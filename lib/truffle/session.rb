@@ -5,6 +5,7 @@ require "time"
 require "fileutils"
 require_relative "uuid"
 require_relative "message"
+require_relative "session_migration"
 
 module Truffle
   # An append-only session store, ported from pi's session manager. A session is
@@ -18,7 +19,8 @@ module Truffle
   # and a compaction entry (a summary that stands in for the turns before it).
   # #context walks the path and applies them: it recovers the live model and
   # thinking level and, when the path was compacted, returns the summary followed
-  # by the kept tail instead of the full history.
+  # by the kept tail instead of the full history. Old v1/v2 files are migrated to
+  # the current tree shape on load.
   #
   # Because entries form a tree, the leaf can be moved back to an earlier entry
   # (#branch / #reset_leaf) so the next append opens a second child, a new branch
@@ -27,7 +29,7 @@ module Truffle
   # came back past that folds into #context as a user message. Any entry can carry
   # a user label (#append_label_change / #label), a bookmark that rides along as
   # its own entry and never enters the model's context. The deferred-first-flush
-  # optimization and v1/v2 file migration remain faithful follow-ups.
+  # optimization remains a faithful follow-up.
   #
   #   session = Truffle::Session.create(dir: "/tmp/sessions", cwd: Dir.pwd)
   #   session.append_message(Truffle::Message.user("hello"))
@@ -35,7 +37,7 @@ module Truffle
   #   reloaded.messages # => [#<Truffle::Message role=:user ...>]
   class Session
     # Bumped when the on-disk entry shape changes. New sessions are born at this
-    # version; reading an older file is a migration follow-up.
+    # version; older v1/v2 files are upgraded by .load.
     SESSION_VERSION = 3
 
     # Wrap the compaction summary so the model knows it is replacing earlier
@@ -97,6 +99,10 @@ module Truffle
       header = parsed.first
       unless header && header[:type] == "session" && header[:id].is_a?(String)
         raise ArgumentError, "not a valid Truffle session: #{path}"
+      end
+
+      if SessionMigration.migrate_to_current_version(parsed, current_version: SESSION_VERSION)
+        SessionMigration.rewrite_file(path, parsed)
       end
 
       new(file: path, header: header, entries: parsed.drop(1))

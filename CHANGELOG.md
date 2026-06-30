@@ -87,6 +87,11 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Fixed
+- `Session.load` now migrates older JSONL session files to the current v3 tree
+  shape. It fills missing entry ids and parent links, converts compaction
+  `first_kept_entry_index` values to `first_kept_entry_id`, normalizes legacy
+  field names, and rewrites the file once after migration. The
+  deferred-first-flush optimization remains the only open item-11 follow-up.
 - The shared test helper now loads Minitest's stub/mock support, so the provider
   error-turn tests run under a clean `rake test` without requiring a separate
   manual preload.
