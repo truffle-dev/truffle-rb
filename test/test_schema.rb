@@ -201,4 +201,86 @@ class TestSchema < Minitest::Test
 
     assert_equal "value", store[b]
   end
+
+  def test_valid_accepts_a_matching_nested_value
+    schema = Truffle::Schema.build do
+      param :name, :string, required: true
+      param :age, :integer, required: true
+      param :tags, :array, items: :string
+      param :address, :object, required: true do
+        param :city, :string, required: true
+      end
+    end
+    value = {
+      "name" => "Dana",
+      "age" => 36,
+      "tags" => ["vip"],
+      "address" => { "city" => "Portland" }
+    }
+
+    assert schema.valid?(value)
+    assert_empty schema.errors(value)
+  end
+
+  def test_errors_report_missing_required_fields_and_type_mismatches
+    schema = Truffle::Schema.build do
+      param :name, :string, required: true
+      param :age, :integer, required: true
+      param :tags, :array, items: :string
+      param :address, :object, required: true do
+        param :city, :string, required: true
+      end
+    end
+
+    errors = schema.errors(
+      "age" => "36",
+      "tags" => ["vip", 7],
+      "address" => {}
+    )
+
+    assert_includes errors, "$.name is required"
+    assert_includes errors, "$.age must be an integer"
+    assert_includes errors, "$.tags[1] must be a string"
+    assert_includes errors, "$.address.city is required"
+    refute schema.valid?("age" => "36", "tags" => ["vip", 7], "address" => {})
+  end
+
+  def test_errors_report_enum_mismatches
+    schema = Truffle::Schema.build do
+      param :unit, :string, enum: %w[celsius fahrenheit]
+    end
+
+    assert_equal(
+      ['$.unit must be one of: "celsius", "fahrenheit"'],
+      schema.errors("unit" => "kelvin")
+    )
+  end
+
+  def test_errors_report_root_type_mismatches
+    schema = Truffle::Schema.build do
+      param :name, :string
+    end
+
+    assert_equal ["$ must be an object"], schema.errors([])
+  end
+
+  def test_validation_accepts_symbol_keys_for_ruby_callers
+    schema = Truffle::Schema.build do
+      param :name, :string, required: true
+    end
+
+    assert schema.valid?(name: "Dana")
+  end
+
+  def test_validation_supports_json_schema_union_types
+    schema = Truffle::Schema.from_h(
+      type: :object,
+      properties: { note: { type: %i[string null] } }
+    )
+
+    assert schema.valid?("note" => "ready")
+    assert schema.valid?("note" => nil)
+    assert_equal ["$.note must be one of a string, a null"],
+                 schema.errors("note" => 42)
+  end
 end

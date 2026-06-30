@@ -92,7 +92,7 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
     - [ ] **Provider seam.** A `schema:` option on the provider request builders,
       wrapped in each API's envelope (OpenAI `response_format.json_schema`,
       Anthropic `output_config.format`, Gemini `responseSchema`).
-    - [ ] **Parsed accessor.** `Response#parsed` lazily `JSON.parse`s the final
+    - [x] **Parsed accessor.** `Response#parsed` lazily `JSON.parse`s the final
       text, with an advisory `Schema#valid?`/`#errors` for callers that validate.
 
 ## Phase 3: the coding-agent surface

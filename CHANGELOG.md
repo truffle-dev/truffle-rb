@@ -17,6 +17,10 @@ All notable changes to Truffle are documented here. The format follows
   round-trip survives equality. Values are deeply frozen and usable as hash keys.
   This is the foundation for the `schema:` provider seam and a structured
   `Response#parsed` accessor.
+- `Response#parsed` lazily parses the final assistant text as JSON without
+  changing `#text`. `Truffle::Schema#valid?` and `#errors` provide advisory
+  validation for the JSON-Schema subset Truffle emits: type, enum, required
+  object properties, nested properties, and array items.
 - `Truffle::Mime` detects the image MIME type of a binary buffer or a file from
   its leading bytes, a port of pi's coding-agent `utils/mime.ts`. It recognizes
   JPEG, PNG, GIF, WEBP, and BMP, and returns nil for a lossless JPEG or an
