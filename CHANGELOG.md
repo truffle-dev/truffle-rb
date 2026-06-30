@@ -7,6 +7,17 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Extensions. `Truffle::EventBus` ports pi's channel-based event bus, the
+  publish/subscribe seam pi hands to extensions as `pi.events` so independently
+  loaded extensions communicate without direct references. `emit(channel, data)`
+  fans a payload out to every handler on a channel, `on(channel, handler)`
+  subscribes and returns an unsubscribe closure, and `clear` drops every
+  subscription. A handler that raises is isolated: the error is reported through a
+  logger (defaulting to `$stderr`, like pi's `console.error`) and neither stops the
+  other handlers nor propagates back into `emit`, and `emit` dispatches over a
+  snapshot of the channel so subscribing or unsubscribing mid-handler is safe. The
+  bus is guarded by a `Monitor` for cross-thread use. This is the first slice of
+  the extensions plugin seam (item 18); the loader and runner build on it later.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

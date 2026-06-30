@@ -330,6 +330,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [ ] Slash command registry and expansion into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
+    - [x] **Event bus.** `Truffle::EventBus` ports pi's `core/event-bus.ts`: the
+      channel-based `emit`/`on`/`clear` pub/sub seam exposed to extensions as
+      `pi.events`, with `on` returning an unsubscribe closure, raising handlers
+      isolated and logged rather than propagated, snapshot dispatch so handlers may
+      (un)subscribe mid-emit, and a `Monitor` for cross-thread use.
+    - [ ] Extension manifest and loader (discover, validate, and load extension
+      modules; pi's `core/extensions/loader.ts`).
+    - [ ] Extension runtime context (the `pi` object extensions register tools,
+      providers, and commands through; pi's `core/extensions/runner.ts`).
 
 ## Phase 5: adoption + the CLI
 
