@@ -142,6 +142,27 @@ class TestSession < Minitest::Test
     assert_equal ["kept"], reloaded.messages.map(&:text)
   end
 
+  def test_append_after_load_does_not_reparse_unknown_content_blocks
+    path = write_session_file(
+      "future-content.jsonl",
+      [
+        { type: "session", version: Truffle::Session::SESSION_VERSION,
+          id: "sess-future", timestamp: "2025-01-01T00:00:00Z", cwd: "/work" },
+        { type: "message", id: "11111111", parent_id: nil,
+          timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: [{ type: "future", value: "kept raw" }] } }
+      ]
+    )
+
+    session = Truffle::Session.load(path)
+
+    appended = session.append_message(Truffle::Message.user("new turn"))
+    lines = File.read(path).each_line.map { |line| JSON.parse(line) }
+
+    assert_equal appended, lines.last.fetch("id")
+    assert_equal "new turn", lines.last.dig("message", "content", 0, "text")
+  end
+
   def test_load_migrates_v1_entries_to_the_current_tree_shape
     path = write_session_file(
       "v1.jsonl",

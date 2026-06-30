@@ -23,6 +23,9 @@ All notable changes to Truffle are documented here. The format follows
 - Hitting `Agent#max_turns` now ends the run through `agent_end` with
   `stop_reason: :error` and a clear error message instead of raising out of the
   loop.
+- Session appends no longer reparse older message content just to decide whether
+  the first assistant message has been seen, so sessions containing
+  forward-compatible content blocks can still accept new entries.
 
 ### Added
 - Print-mode text renderer. `Truffle::CLI.render_print_text(response, out:, err:)`

@@ -132,6 +132,7 @@ module Truffle
       @labels_by_id = {}
       @leaf_id = nil
       @flushed = flushed
+      @assistant_entry_seen = false
       entries.each { |entry| index(entry) }
     end
 
@@ -337,10 +338,7 @@ module Truffle
     end
 
     def assistant_entry_seen?
-      @entries.any? do |entry|
-        entry[:type] == "message" &&
-          Message.from_h(entry[:message]).role == :assistant
-      end
+      @assistant_entry_seen
     end
 
     def append_line(entry)
@@ -432,7 +430,19 @@ module Truffle
     def index(entry)
       @by_id[entry[:id]] = entry
       @leaf_id = entry[:id]
+      @assistant_entry_seen = true if message_role(entry) == "assistant"
       apply_label(entry[:target_id], entry[:label]) if entry[:type] == "label"
+    end
+
+    # Read the role directly from the serialized entry. Persistence must tolerate
+    # future content block shapes that full Message parsing would reject.
+    def message_role(entry)
+      return nil unless entry[:type] == "message"
+
+      message = entry[:message]
+      return nil unless message.respond_to?(:[])
+
+      (message[:role] || message["role"]).to_s
     end
 
     # Apply one label entry to the resolved-label index: a present label sets the
