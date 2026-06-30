@@ -34,9 +34,29 @@ module Truffle
       def name
         self.class.name.split("::").last.downcase
       end
+
+      protected
+
+      # The error turn a failed #chat returns instead of raising. pi never throws
+      # out of a provider: a failed call surfaces as a turn whose stop_reason is
+      # :error carrying the failure text, so the agent loop can read it (retry,
+      # compact on a context overflow, or end with the message). The streaming
+      # paths already fold their failures this way through the accumulator's
+      # #fail; this is the same shape for the non-streaming call. The message is
+      # empty and usage is zero, since a failed call produced no content.
+      def error_response(message, model: nil)
+        Response.new(
+          message: Message.assistant(content: nil),
+          stop_reason: StopReason::ERROR,
+          error_message: message,
+          model: model
+        )
+      end
     end
 
-    # Raised when a provider's HTTP call fails or returns an error payload.
+    # Raised inside a provider when an HTTP call fails, a payload will not parse,
+    # or the transport faults. #chat folds it into an error turn; callers of the
+    # private transport (#post) still see it as a raise.
     class Error < StandardError; end
   end
 end

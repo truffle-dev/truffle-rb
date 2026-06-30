@@ -55,6 +55,8 @@ module Truffle
           stop_reason: stop_reason,
           error_message: error_message
         )
+      rescue Providers::Error => e
+        error_response(e.message, model: model || @model)
       end
 
       # Streaming counterpart to #chat. Opens an SSE request, decodes each chunk
@@ -179,6 +181,8 @@ module Truffle
         JSON.parse(response.body)
       rescue JSON::ParserError => e
         raise Error, "could not parse OpenAI response: #{e.message}"
+      rescue Timeout::Error, IOError, SocketError, SystemCallError => e
+        raise Error, "OpenAI request failed: #{e.class}: #{e.message}"
       end
 
       # Auth header for the shared SSE transport (Providers::SSE#stream_post).

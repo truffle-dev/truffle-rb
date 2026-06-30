@@ -24,6 +24,15 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- A failed non-streaming `#chat` now returns an error turn instead of raising:
+  a `Response` whose `stop_reason` is `:error` carrying the failure text, with an
+  empty message and zero usage. The transport (`#post`) folds a connection or read
+  fault (`Timeout::Error`, `IOError`, `SocketError`, `SystemCallError`) into a
+  `Providers::Error` first, so a network failure surfaces as the same error turn.
+  This matches the streaming paths, which already fold their failures this way
+  through the accumulator's `#fail`, and ports pi's contract that a provider never
+  throws out of a call. It is the seam the agent loop reads to inspect a failure
+  (end on it, or compact and retry on a context overflow).
 - `Truffle::Overflow.context_overflow?(response, context_window:)` recognizes a
   turn that failed (or silently degraded) because the prompt exceeded the model's
   context window, across the three ways providers report it: an error message

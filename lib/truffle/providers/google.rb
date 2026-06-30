@@ -77,6 +77,8 @@ module Truffle
           stop_reason: stop_reason,
           error_message: error_message
         )
+      rescue Providers::Error => e
+        error_response(e.message, model: request_model)
       end
 
       # Streaming counterpart to #chat. Opens an SSE request to
@@ -342,6 +344,8 @@ module Truffle
         JSON.parse(response.body)
       rescue JSON::ParserError => e
         raise Error, "could not parse Google response: #{e.message}"
+      rescue Timeout::Error, IOError, SocketError, SystemCallError => e
+        raise Error, "Google request failed: #{e.class}: #{e.message}"
       end
 
       def truncate(str, limit = 500)
