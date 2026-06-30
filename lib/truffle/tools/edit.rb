@@ -45,7 +45,7 @@ module Truffle
     # model. pi's diff and unified-patch rendering feeds only the TUI and pulls in
     # the `diff` package, so it is out of scope here.
     def self.edit(cwd: Dir.pwd)
-      Tool.define("edit", EDIT_DESCRIPTION) do
+      Tool.define("edit", EDIT_DESCRIPTION, execution_mode: :sequential) do
         param :path, :string, "Path to the file to edit (relative or absolute)", required: true
         param :edits, :array, EDITS_DESCRIPTION, required: true, items: EDIT_ITEM_SCHEMA
         run do |path:, edits: nil, **legacy|

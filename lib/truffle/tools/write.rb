@@ -14,7 +14,7 @@ module Truffle
     # written UTF-8, creating the file or overwriting it. Returns a short
     # confirmation naming the byte count and the path the model passed.
     def self.write(cwd: Dir.pwd)
-      Tool.define("write", WRITE_DESCRIPTION) do
+      Tool.define("write", WRITE_DESCRIPTION, execution_mode: :sequential) do
         param :path, :string, "Path to the file to write (relative or absolute)", required: true
         param :content, :string, "Content to write to the file", required: true
         run do |path:, content:|

@@ -22,7 +22,7 @@ module Truffle
     # nonzero exit, or a timeout, raises with the captured output plus a status
     # line, which the agent loop reports back to the model, matching pi's throw.
     def self.bash(cwd: Dir.pwd, shell: Bash::DEFAULT_SHELL)
-      Tool.define("bash", BASH_DESCRIPTION) do
+      Tool.define("bash", BASH_DESCRIPTION, execution_mode: :sequential) do
         param :command, :string, "Bash command to execute", required: true
         param :timeout, :number, "Timeout in seconds (optional, no default timeout)"
         run do |command:, timeout: nil|

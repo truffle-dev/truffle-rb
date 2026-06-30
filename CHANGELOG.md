@@ -29,6 +29,9 @@ All notable changes to Truffle are documented here. The format follows
 - `Agent#dump` / `Agent.load` now preserve accumulated token usage and cost, so
   a resumed agent continues accounting from the saved session instead of
   restarting totals at zero.
+- The built-in `write`, `edit`, and `bash` tools now run sequentially when they
+  appear in a multi-tool turn, preventing parallel file mutations from silently
+  overwriting each other.
 
 ### Added
 - Print-mode text renderer. `Truffle::CLI.render_print_text(response, out:, err:)`
