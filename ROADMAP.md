@@ -453,6 +453,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       model catalog as an aligned offline table, sorted by provider and model,
       with provider, model id, context, max output, reasoning, and image support
       columns.
+    - [x] Print-mode text renderer. `Truffle::CLI.render_print_text` ports the
+      text branch of pi's `runPrintMode` (`modes/print-mode.ts`): the final
+      assistant `Response` of a single-shot run renders each text content block
+      on its own line to stdout, while an error or aborted stop reason writes
+      `error_message || "Request <reason>"` to stderr and exits 1. Pure over
+      injectable streams so it tests offline; the `--print` dispatch that drives
+      the agent and feeds it is a later slice.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

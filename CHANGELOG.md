@@ -15,6 +15,15 @@ All notable changes to Truffle are documented here. The format follows
   loop.
 
 ### Added
+- Print-mode text renderer. `Truffle::CLI.render_print_text(response, out:, err:)`
+  ports the text branch of pi's `runPrintMode` (`modes/print-mode.ts`): given the
+  final assistant `Response` of a single-shot run, an error or aborted stop reason
+  writes `error_message || "Request <reason>"` to stderr and returns exit 1, while
+  any other stop reason writes each text content block on its own line to stdout
+  (thinking and tool-call blocks skipped) and returns 0. A nil response prints
+  nothing and exits 0. Pure over streams, so it renders offline without a
+  provider; the `--print` dispatch that drives the agent and calls it is a later
+  slice.
 - `truffle --list-models [search]` now prints the built-in model catalog as an
   offline table sorted by provider and model. The output mirrors pi's
   provider/model/context/max-output/thinking/images columns, supports fuzzy
