@@ -21,6 +21,15 @@ All notable changes to Truffle are documented here. The format follows
   is injectable so the assembly stays deterministic in tests; it defaults to the
   wall clock. Produces the system-prompt string the agent already accepts;
   wiring the builder into the agent constructor is a later slice.
+- Project context-file loader. `Truffle::ContextFiles.load` ports pi's
+  `core/resource-loader.ts` `loadProjectContextFiles`: it discovers the
+  `AGENTS.md` / `CLAUDE.md` instruction files that feed `SystemPrompt.build`'s
+  `<project_context>` block. The global agent-directory file comes first, then the
+  chain from the filesystem root down to the working directory so the nearest file
+  lands last; within a directory the first existing candidate wins (`AGENTS.md`
+  over `CLAUDE.md`), a file reachable by more than one route appears once, and an
+  unreadable candidate warns and falls through to the next name. The warning sink
+  is injectable so tests stay quiet.
 - `Truffle::Config` defines the local config layout for command prompts:
   `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
   `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt

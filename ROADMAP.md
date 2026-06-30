@@ -289,6 +289,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       prompt names Truffle and its documentation pointer references the gem's
       bundled README and examples; the date is injectable so tests stay
       deterministic.
+    - [x] **Project context-file loader.** `Truffle::ContextFiles.load` ports pi's
+      `core/resource-loader.ts` `loadProjectContextFiles`: it discovers the
+      `AGENTS.md` / `CLAUDE.md` instruction files that feed `SystemPrompt.build`'s
+      `<project_context>` block. The global agent-directory file comes first, then
+      the chain from the filesystem root down to the working directory so the
+      nearest file lands last; within one directory the first existing candidate
+      wins (`AGENTS.md` over `CLAUDE.md`), a file reachable by more than one route
+      appears once, and an unreadable candidate warns and falls through to the next
+      name. The warning sink is injectable so tests stay quiet.
 
 ## Phase 4: self-extension (skills, commands, extensions)
 
