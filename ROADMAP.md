@@ -465,7 +465,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       on its own line to stdout, while an error or aborted stop reason writes
       `error_message || "Request <reason>"` to stderr and exits 1. Pure over
       injectable streams so it tests offline; the `--print` dispatch that drives
-      the agent and feeds it is a later slice.
+      the agent and feeds it is the next slice.
+    - [x] Print-mode dispatch. `Truffle::CLI.run` acts on `--print`/`-p`: it
+      builds a provider-backed agent (builtin tools narrowed by `--no-tools`,
+      `--tools`, and `--exclude-tools`), assembles prompts the way pi's
+      `buildInitialMessage` does (piped stdin and the first message joined,
+      remaining messages sent after), captures the final assistant turn through
+      the `:agent_end` event using pi's last-assistant-message rule, and renders
+      it through `render_print_text`. An unresolvable provider/model fails on
+      stderr with exit 1. An injectable `agent_builder:` keeps the dispatch
+      offline-testable. JSON/RPC modes, sessions, `--continue`/`--resume`,
+      extensions, skills, `@file` content and images, and the interactive REPL
+      remain later slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

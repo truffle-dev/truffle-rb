@@ -3,6 +3,48 @@
 require "test_helper"
 require "stringio"
 
+# A stand-in for the agent a `--print` run drives, with no provider and no
+# network. It records the prompts it is sent and replays a scripted `:agent_end`
+# payload after each run, so the dispatch's prompt assembly and final-response
+# capture can be exercised offline. Later runs replay later payloads (clamped to
+# the last), which is how the "last assistant turn wins" rule gets proven.
+class PrintStubAgent
+  attr_reader :prompts
+
+  def initialize(payloads)
+    @payloads = payloads
+    @listeners = []
+    @prompts = []
+    @run = 0
+  end
+
+  def on(event, &block)
+    @listeners << block if event == :agent_end
+    self
+  end
+
+  def run(prompt)
+    @prompts << prompt
+    payload = @payloads[@run] || @payloads.last
+    @run += 1
+    @listeners.each { |listener| listener.call(payload) } if payload
+    ""
+  end
+end
+
+# An input stream that claims to be a terminal. `piped_stdin` must skip it
+# without reading, so a `read` here returns content the dispatch should never
+# splice into a prompt.
+class FakeTTYInput
+  def tty?
+    true
+  end
+
+  def read
+    "LEAK"
+  end
+end
+
 # Tests for the `truffle` binary entry point (Truffle::CLI.run): the thin
 # dispatcher that parses argv, surfaces diagnostics, and acts on the terminal
 # flags the harness supports today.
@@ -12,6 +54,23 @@ class TestCLIRunner < Minitest::Test
     err = StringIO.new
     status = Truffle::CLI.run(argv, out: out, err: err)
     [status, out.string, err.string]
+  end
+
+  # Drive a `--print` dispatch offline: an empty stdin unless one is given, and
+  # an injected agent unless the test wants the real builder (to exercise the
+  # unresolvable-model path).
+  def run_print_cli(argv, input: StringIO.new(""), agent: nil)
+    out = StringIO.new
+    err = StringIO.new
+    builder = agent && ->(_args) { agent }
+    status = Truffle::CLI.run(argv, out: out, err: err, input: input, agent_builder: builder)
+    [status, out.string, err.string]
+  end
+
+  # An :agent_end payload whose last message is an assistant turn of plain text.
+  def assistant_payload(text, stop_reason: Truffle::StopReason::STOP, error_message: nil)
+    message = Truffle::Message.assistant(content: text)
+    { output: text, messages: [message], stop_reason: stop_reason, error_message: error_message }
   end
 
   def test_version_flag_prints_version_text_and_exits_zero
@@ -104,5 +163,115 @@ class TestCLIRunner < Minitest::Test
     assert_equal Truffle::CLI::EXIT_NOT_IMPLEMENTED, status
     assert_includes err, "truffle: interactive mode is not implemented yet"
     assert_empty out
+  end
+
+  # ---- --print single-shot dispatch ----
+
+  def test_print_renders_the_final_assistant_text
+    agent = PrintStubAgent.new([assistant_payload("the answer")])
+
+    status, out, err = run_print_cli(["-p", "ask"], agent: agent)
+
+    assert_equal 0, status
+    assert_equal "the answer\n", out
+    assert_empty err
+    assert_equal ["ask"], agent.prompts
+  end
+
+  def test_print_surfaces_an_error_stop_on_stderr_and_exits_one
+    payload = assistant_payload("", stop_reason: Truffle::StopReason::ERROR,
+                                    error_message: "boom")
+    agent = PrintStubAgent.new([payload])
+
+    status, out, err = run_print_cli(["-p", "ask"], agent: agent)
+
+    assert_equal 1, status
+    assert_equal "boom\n", err
+    assert_empty out
+  end
+
+  def test_print_renders_nothing_when_the_last_message_is_not_an_assistant_turn
+    # A run that ended on a tool result (no assistant turn after it) renders
+    # nothing, even on an error stop. The role guard is what skips it; without
+    # it the error stop would be surfaced on stderr with exit 1.
+    tool = Truffle::Message.tool(content: "result", tool_call_id: "c1", name: "read")
+    payload = { messages: [tool], stop_reason: Truffle::StopReason::ERROR,
+                error_message: "midtool" }
+    agent = PrintStubAgent.new([payload])
+
+    status, out, err = run_print_cli(["-p", "ask"], agent: agent)
+
+    assert_equal 0, status
+    assert_empty out
+    assert_empty err
+  end
+
+  def test_print_joins_piped_stdin_with_the_first_message
+    agent = PrintStubAgent.new([assistant_payload("ok")])
+
+    status, = run_print_cli(["-p", "do it"], input: StringIO.new("ctx\n"), agent: agent)
+
+    assert_equal 0, status
+    assert_equal ["ctx\ndo it"], agent.prompts
+  end
+
+  def test_print_sends_remaining_messages_as_their_own_prompts_last_turn_wins
+    agent = PrintStubAgent.new([assistant_payload("first reply"),
+                                assistant_payload("second reply")])
+
+    status, out, = run_print_cli(["-p", "one", "two"], agent: agent)
+
+    assert_equal 0, status
+    assert_equal %w[one two], agent.prompts
+    assert_equal "second reply\n", out
+  end
+
+  def test_print_does_not_read_an_interactive_stdin
+    agent = PrintStubAgent.new([assistant_payload("ok")])
+
+    status, = run_print_cli(["-p", "ask"], input: FakeTTYInput.new, agent: agent)
+
+    assert_equal 0, status
+    assert_equal ["ask"], agent.prompts
+  end
+
+  def test_print_with_no_input_at_all_sends_no_prompts
+    agent = PrintStubAgent.new([assistant_payload("unused")])
+
+    status, out, err = run_print_cli(["-p"], agent: agent)
+
+    assert_equal 0, status
+    assert_empty agent.prompts
+    assert_empty out
+    assert_empty err
+  end
+
+  def test_print_with_an_unresolvable_model_errors_on_stderr_and_exits_one
+    status, out, err = run_print_cli(["-p", "ask"])
+
+    assert_equal 1, status
+    assert_includes err, "pass provider:"
+    assert_empty out
+  end
+
+  def test_print_tools_default_to_the_full_builtin_set
+    args = Truffle::CLI.parse_args(["-p", "ask"])
+    names = Truffle::CLI.send(:print_tools, args, Dir.pwd).map(&:name)
+
+    assert_equal %w[read write bash edit find grep], names
+  end
+
+  def test_print_tools_are_empty_under_no_tools
+    args = Truffle::CLI.parse_args(["-p", "ask", "--no-tools"])
+
+    assert_empty Truffle::CLI.send(:print_tools, args, Dir.pwd)
+  end
+
+  def test_print_tools_honor_a_whitelist_then_a_blacklist
+    args = Truffle::CLI.parse_args(["-p", "ask", "--tools", "read,bash,edit",
+                                    "--exclude-tools", "bash"])
+    names = Truffle::CLI.send(:print_tools, args, Dir.pwd).map(&:name)
+
+    assert_equal %w[read edit], names
   end
 end

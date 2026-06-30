@@ -4,22 +4,34 @@ module Truffle
   module CLI
     # The thin entry point behind the `truffle` executable. It parses argv,
     # surfaces the parser's diagnostics, and acts on the terminal flags the
-    # harness supports today: `--version`, `--help`, and `--list-models`. This
-    # is the Ruby counterpart of the top of pi's `main.ts` dispatcher, narrowed
-    # to the slices that exist. The interactive REPL and `--export` are later
-    # slices of roadmap item 19, so any other invocation reports that and exits.
+    # harness supports today: `--version`, `--help`, `--list-models`, and the
+    # `--print` single-shot run. This is the Ruby counterpart of the top of pi's
+    # `main.ts` dispatcher, narrowed to the slices that exist. The interactive
+    # REPL and `--export` are later slices of roadmap item 19, so any other
+    # invocation reports that and exits.
     #
-    # `run` takes injectable out/err streams and RETURNS an exit status rather
-    # than calling `exit`, so the whole dispatch is testable offline with StringIO
-    # and the executable stays a one-line caller.
+    # `run` takes injectable out/err/input streams and RETURNS an exit status
+    # rather than calling `exit`, so the whole dispatch is testable offline with
+    # StringIO and the executable stays a one-line caller. `agent_builder:` is an
+    # injection seam: tests hand in a stub agent, production falls back to
+    # `build_print_agent`, which assembles a real provider-backed agent.
 
     # Exit status when the only instruction is a flag the binary cannot act on
     # yet (the interactive REPL is a later slice).
     EXIT_NOT_IMPLEMENTED = 2
 
+    # The builtin tools a print run wires by default, in pi's coding-agent order.
+    # Each factory binds to the working directory; `print_tools` filters this set
+    # by the parsed tool flags.
+    BUILTIN_TOOL_FACTORIES = {
+      "read" => Tools.method(:read), "write" => Tools.method(:write),
+      "bash" => Tools.method(:bash), "edit" => Tools.method(:edit),
+      "find" => Tools.method(:find), "grep" => Tools.method(:grep)
+    }.freeze
+
     module_function
 
-    def run(argv, out: $stdout, err: $stderr)
+    def run(argv, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
       args = parse_args(argv)
       report_diagnostics(args.diagnostics, err)
       return 1 if args.diagnostics.any? { |diagnostic| diagnostic[:type] == :error }
@@ -40,8 +52,89 @@ module Truffle
         return 0
       end
 
+      if args.print
+        return run_print(args, out: out, err: err, input: input, agent_builder: agent_builder)
+      end
+
       err.puts "#{APP_NAME}: interactive mode is not implemented yet"
       EXIT_NOT_IMPLEMENTED
+    end
+
+    # Drive a single-shot `--print` run: build the agent, prompt it with the
+    # assembled messages in order, and render its final assistant turn. Faithful
+    # to the text branch of pi's `runPrintMode`. An unresolvable provider/model
+    # (or any harness error) surfaces on stderr with exit 1, the analog of pi's
+    # `catch`. `agent_builder` lets a test inject a stub agent; production builds
+    # one with `build_print_agent`.
+    def run_print(args, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
+      agent = (agent_builder || method(:build_print_agent)).call(args)
+      final = nil
+      agent.on(:agent_end) { |payload| final = final_print_response(payload) }
+      print_prompts(args, input).each { |prompt| agent.run(prompt) }
+      render_print_text(final, out: out, err: err)
+    rescue Truffle::Error => e
+      err.puts e.message
+      1
+    end
+
+    # The Response a print run renders: pi reads the last conversation message
+    # and only renders it when it is the assistant's, so a run that ended on a
+    # tool result or produced no assistant turn renders nothing. Rebuilt from the
+    # `:agent_end` payload because the event carries messages, not the Response.
+    def final_print_response(payload)
+      last = payload[:messages].last
+      return nil unless last&.role == :assistant
+
+      Response.new(message: last, stop_reason: payload[:stop_reason],
+                   error_message: payload[:error_message])
+    end
+
+    # The ordered prompts a print run sends. Piped stdin and the first CLI
+    # message join into one initial prompt (pi's `buildInitialMessage`, minus the
+    # deferred @file text); the remaining CLI messages follow as their own
+    # prompts. A run with neither stdin nor messages sends nothing.
+    def print_prompts(args, input)
+      messages = args.messages.dup
+      parts = []
+      stdin = piped_stdin(input)
+      parts << stdin unless stdin.nil?
+      parts << messages.shift unless messages.empty?
+      initial = parts.empty? ? nil : parts.join
+      [initial, *messages].compact
+    end
+
+    # The piped stdin content, or nil when stdin is a terminal or empty. Mirrors
+    # pi's `readPipedStdin`, which returns undefined for an interactive stdin so
+    # a bare `truffle -p "ask"` does not block on the keyboard.
+    def piped_stdin(input)
+      return nil if input.respond_to?(:tty?) && input.tty?
+
+      content = input.read
+      content.nil? || content.empty? ? nil : content
+    end
+
+    # Build the provider-backed agent a print run drives. The provider is taken
+    # from `--provider` or inferred from `--model`; an api key flag passes
+    # through. Tools are the builtin set filtered by the parsed flags. Raises
+    # Truffle::Error when neither a provider nor a model-named provider resolves,
+    # which `run_print` turns into a stderr message and exit 1.
+    def build_print_agent(args, cwd: Dir.pwd)
+      options = { provider: args.provider&.to_sym, model: args.model,
+                  tools: print_tools(args, cwd) }
+      options[:api_key] = args.api_key if args.api_key
+      Truffle.agent(**options)
+    end
+
+    # The builtin tools a print run exposes, filtered by the parsed flags. No
+    # tools at all under `--no-tools`/`--no-builtin-tools`; otherwise an explicit
+    # `--tools` whitelist or `--exclude-tools` blacklist narrows the set.
+    def print_tools(args, cwd)
+      return [] if args.no_tools || args.no_builtin_tools
+
+      names = BUILTIN_TOOL_FACTORIES.keys
+      names &= args.tools if args.tools
+      names -= args.exclude_tools if args.exclude_tools
+      names.map { |name| BUILTIN_TOOL_FACTORIES[name].call(cwd: cwd) }
     end
 
     # Print each diagnostic on its own line, mirroring pi's red Error / yellow
@@ -60,6 +153,8 @@ module Truffle
       out.respond_to?(:tty?) && out.tty?
     end
 
-    private_class_method :report_diagnostics, :color?
+    private_class_method :run_print, :final_print_response, :print_prompts,
+                         :piped_stdin, :build_print_agent, :print_tools,
+                         :report_diagnostics, :color?
   end
 end
