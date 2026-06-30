@@ -43,8 +43,8 @@ All notable changes to Truffle are documented here. The format follows
   never enters the model context, and resolves through an index that survives a
   reload, last write winning and an empty label clearing. Ports pi's
   `SessionManager#branch` / `resetLeaf` / `getChildren` / `appendLabelChange` /
-  `getLabel`. Remaining item-11 follow-ups (branch summaries, deferred-first-
-  flush, v1/v2 file migration) stay deferred.
+  `getLabel`. Remaining item-11 follow-ups (the deferred-first-flush optimization
+  and v1/v2 file migration) stay deferred.
 - Tool middleware: `Agent.new` takes optional `before_tool_call:` and
   `after_tool_call:` callables that wrap tool execution without changing tool
   definitions. `before_tool_call` runs after the tool is resolved and can veto a
@@ -249,8 +249,8 @@ All notable changes to Truffle are documented here. The format follows
   everything after the compaction), rather than the full history.
   `Session#messages` still returns the raw history for inspection. pi also lets an
   assistant message carry the active model; `Truffle::Message` has no provider or
-  model field yet, so only `model_change` entries set the model for now. Branch
-  summaries, labels, and v1/v2 migration remain follow-ups.
+  model field yet, so only `model_change` entries set the model for now. The
+  deferred-first-flush optimization and v1/v2 migration remain follow-ups.
 - An append-only session store (`Truffle::Session`), ported from pi's session
   manager. A session is a JSONL file: the first line is a header (`type`,
   `version`, `id`, `cwd`, optional `parent_session`) and every line after it is
@@ -265,8 +265,8 @@ All notable changes to Truffle are documented here. The format follows
   creation order, and an 8-hex short id for entries, both against the standard
   library) and `Message.from_h` / `Content.from_h`, the inverse of the existing
   `to_h` that rebuilds a turn block by block (tool calls included) when a session
-  is read from disk. Branching, settings and compaction entries, labels, the
-  deferred-first-flush optimization, and v1/v2 file migration are follow-ups.
+  is read from disk. The deferred-first-flush optimization and v1/v2 file
+  migration are follow-ups.
 - The `grep` built-in tool (`Truffle::Tools.grep`), ported from pi's `grep.ts`.
   It takes a `pattern` (a regular expression, or a literal string when `literal`
   is set), an optional `path` (a file or directory, default the current
