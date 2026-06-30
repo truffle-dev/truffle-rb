@@ -418,8 +418,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       overrides before the next provider turn, so event handlers and extension
       slash-command handlers can move the active provider endpoint without
       reloading extensions.
-    - [ ] Bind provider registration reload/unregister into live agents and
-      sessions, plus non-OpenAI custom APIs, OAuth, and `streamSimple`.
+    - [x] **Live provider unregister/revert.** An already-built agent now observes
+      later `truffle.unregister_provider` calls before the next provider turn:
+      built-in provider names restore the built-in provider with caller overrides,
+      while extension-only provider names fail clearly instead of silently reusing
+      a stale endpoint.
+    - [ ] Bind provider registration reload/unregister into sessions, plus
+      non-OpenAI custom APIs, OAuth, and `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

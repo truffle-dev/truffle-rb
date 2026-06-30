@@ -139,6 +139,10 @@ All notable changes to Truffle are documented here. The format follows
   before the next provider turn. An extension event handler or slash-command
   handler can call `truffle.register_provider` after the agent is constructed,
   and the following request uses the updated endpoint, key, model, and headers.
+- Agents now observe later `truffle.unregister_provider` calls before the next
+  provider turn. Built-in provider names restore the built-in provider with
+  caller overrides; extension-only provider names fail clearly instead of
+  silently reusing a stale endpoint.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

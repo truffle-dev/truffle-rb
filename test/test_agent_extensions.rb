@@ -203,6 +203,68 @@ class TestAgentExtensions < Minitest::Test
     end
   end
 
+  def test_command_time_provider_unregister_does_not_reuse_stale_extension_provider
+    extensions = load_extension(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://first.test/v1",
+        api_key: "first-key",
+        model: "llama3"
+      })
+
+      truffle.register_command("remove-proxy") do
+        truffle.unregister_provider("local")
+        "proxy removed"
+      end
+    RUBY
+
+    capture_openai_chat do |calls|
+      agent = Truffle.agent(provider: :local, model: "llama3", extensions: extensions)
+
+      assert_equal "proxy removed", agent.run("/remove-proxy")
+      assert_empty calls
+
+      error = assert_raises(Truffle::Error) { agent.run("hello") }
+
+      assert_match(/extension provider "local" is no longer registered/, error.message)
+      assert_empty calls
+    end
+  end
+
+  def test_command_time_builtin_provider_unregister_restores_builtin_provider
+    extensions = load_extension(<<~RUBY)
+      truffle.register_provider("openai", {
+        api: :openai_completions,
+        base_url: "http://proxy.test/v1",
+        api_key: "proxy-key",
+        model: "gpt-4o-mini"
+      })
+
+      truffle.register_command("use-default-openai") do
+        truffle.unregister_provider("openai")
+        "default ready"
+      end
+    RUBY
+
+    capture_openai_chat do |calls|
+      agent = Truffle.agent(
+        provider: :openai,
+        model: "gpt-4o-mini",
+        extensions: extensions,
+        api_key: "builtin-key"
+      )
+
+      assert_equal "http://proxy.test/v1", agent.provider.base_url
+      assert_equal "default ready", agent.run("/use-default-openai")
+      assert_equal "done", agent.run("hello")
+
+      assert_equal 1, calls.length
+      assert_equal "https://api.openai.com/v1", calls.first[:base_url]
+      assert_equal "Bearer builtin-key", calls.first[:headers]["Authorization"]
+      assert_equal "gpt-4o-mini", calls.first[:model]
+    end
+  end
+
   def test_extension_handlers_observe_agent_events_in_order
     log_path = File.join(@dir, "events.log")
     extensions = load_extension(<<~RUBY)

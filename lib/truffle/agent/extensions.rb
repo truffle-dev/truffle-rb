@@ -38,6 +38,9 @@ module Truffle
       @extension_provider_name =
         provider_name&.to_s || default_extension_provider_name(provider)
       @extension_provider_overrides = provider_overrides || {}
+      @extension_provider_initial_options =
+        Extensions.provider_options(@extension_source, @extension_provider_name)
+      @extension_provider_initial_provider = provider
       @extension_provider_signature = current_extension_provider_signature
     end
 
@@ -70,7 +73,7 @@ module Truffle
       return if signature == @extension_provider_signature
 
       @extension_provider_signature = signature
-      return unless options
+      return restore_extension_provider unless options
 
       @provider = Providers::OpenAI.new(**merge_extension_provider_overrides(options))
     end
@@ -91,6 +94,22 @@ module Truffle
         merged[:headers] = options[:headers].merge(@extension_provider_overrides[:headers])
       end
       merged
+    end
+
+    def restore_extension_provider
+      if built_in_extension_provider?
+        @provider = Truffle::PROVIDERS.fetch(@extension_provider_name.to_sym)
+                                      .new(**@extension_provider_overrides)
+      elsif @extension_provider_initial_options.nil?
+        @provider = @extension_provider_initial_provider
+      else
+        raise Error,
+              "extension provider #{@extension_provider_name.inspect} is no longer registered"
+      end
+    end
+
+    def built_in_extension_provider?
+      Truffle::PROVIDERS.key?(@extension_provider_name&.to_sym)
     end
   end
 end
