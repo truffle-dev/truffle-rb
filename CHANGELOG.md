@@ -112,6 +112,11 @@ All notable changes to Truffle are documented here. The format follows
   `auth_header` / `authHeader` controls whether Truffle generates the bearer
   `Authorization` header; and caller-supplied `headers:` override registered
   header defaults per key.
+- Extension-registered OpenAI-compatible provider models now carry their own
+  request headers into chat and streaming requests. Model-level `headers` use the
+  same literal and `$ENV` / `${ENV}` interpolation as provider headers, apply to
+  the actual request model, and merge after provider defaults but before generated
+  bearer auth.
 - `Truffle::PromptTemplates` now ports pi's command prompt-template layer for
   explicit paths: markdown files load by basename, description comes from
   frontmatter or the first body line, `argument-hint` is preserved, direct

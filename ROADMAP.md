@@ -407,9 +407,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       own `Authorization`; and caller-supplied `headers:` override registered
       headers per key. Chat and streaming requests share the same provider
       headers.
+    - [x] **Bind model-specific provider request headers.** OpenAI-compatible
+      extension provider models can declare their own `headers`; Truffle resolves
+      those values with the same literal and `$ENV` / `${ENV}` interpolation as
+      provider headers, applies the headers for the actual request model, and
+      keeps pi's merge order: provider defaults, model headers, then generated
+      bearer auth when enabled.
     - [ ] Bind provider registration reload/unregister into live agents and
-      sessions, plus non-OpenAI custom APIs, OAuth, model-specific headers, and
-      `streamSimple`.
+      sessions, plus non-OpenAI custom APIs, OAuth, and `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

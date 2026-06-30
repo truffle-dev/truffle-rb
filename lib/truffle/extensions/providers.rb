@@ -52,6 +52,8 @@ module Truffle
       options[:api_key] = api_key if api_key
       headers = provider_headers(name, config[:headers])
       options[:headers] = headers if headers
+      model_headers = provider_model_headers(name, config[:models])
+      options[:model_headers] = model_headers if model_headers
       options[:auth_header] = config[:auth_header] if config.key?(:auth_header)
       model_id = config[:model] || first_model_id(config[:models])
       options[:model] = model_id.to_s if model_id
@@ -151,20 +153,36 @@ module Truffle
     end
     private_class_method :provider_api_key
 
-    def provider_headers(provider_name, headers)
+    def provider_headers(provider_name, headers, label_prefix: "header")
       return nil unless headers.is_a?(Hash)
 
       resolved = headers.each_with_object({}) do |(key, value), acc|
         resolved_value = ConfigValues.resolve(
           value,
           provider_name: provider_name,
-          label: "header #{key}"
+          label: "#{label_prefix} #{key}"
         )
         acc[key.to_s] = resolved_value if resolved_value
       end
       resolved.empty? ? nil : resolved
     end
     private_class_method :provider_headers
+
+    def provider_model_headers(provider_name, models)
+      resolved = Array(models).each_with_object({}) do |model, acc|
+        id = model_id(model)
+        next unless id
+
+        headers = provider_headers(
+          provider_name,
+          model_value(model, :headers),
+          label_prefix: "model #{id} header"
+        )
+        acc[id.to_s] = headers if headers
+      end
+      resolved.empty? ? nil : resolved
+    end
+    private_class_method :provider_model_headers
 
     def provider_model_references(source)
       provider_configs(source).flat_map do |provider, config|

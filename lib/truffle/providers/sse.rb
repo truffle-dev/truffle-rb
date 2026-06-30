@@ -23,7 +23,7 @@ module Truffle
       # request opens; a transport or parse failure folds into the stream as the
       # accumulator's #fail rather than raising. The accumulator must respond to
       # #feed, #finish, #abort, #fail, and #response (both stream classes do).
-      def drive_stream(path, body, acc, signal: nil, &block)
+      def drive_stream(path, body, acc, signal: nil, headers: nil, &block)
         emit = ->(event) { block&.call(event) }
         if signal&.aborted?
           acc.abort(&emit)
@@ -31,7 +31,9 @@ module Truffle
         end
 
         begin
-          stopped = stream_post(path, body, signal: signal) { |frame| acc.feed(frame, &emit) }
+          stopped = stream_post(path, body, signal: signal, headers: headers) do |frame|
+            acc.feed(frame, &emit)
+          end
           stopped == :aborted ? acc.abort(&emit) : acc.finish(&emit)
         rescue StandardError => e
           acc.fail(e, &emit)
@@ -48,10 +50,10 @@ module Truffle
       # :aborted so the caller can fold a clean cancellation into the stream.
       # Otherwise returns nil. The check is cooperative (between fragments), not a
       # forced socket close, so a stalled read still waits up to read_timeout.
-      def stream_post(path, body, signal: nil, &block)
+      def stream_post(path, body, signal: nil, headers: nil, &block)
         uri = URI("#{@base_url}#{path}")
         http = build_http(uri)
-        request = build_stream_request(uri, body)
+        request = build_stream_request(uri, body, headers: headers)
 
         aborted = false
         http.request(request) do |response|
@@ -74,11 +76,11 @@ module Truffle
         http
       end
 
-      def build_stream_request(uri, body)
+      def build_stream_request(uri, body, headers: nil)
         request = Net::HTTP::Post.new(uri)
         request["Content-Type"] = "application/json"
         request["Accept"] = "text/event-stream"
-        stream_request_headers.each { |key, value| request[key] = value }
+        stream_request_headers(headers: headers).each { |key, value| request[key] = value }
         request.body = JSON.generate(body)
         request
       end

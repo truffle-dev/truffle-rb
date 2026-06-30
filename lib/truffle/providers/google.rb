@@ -355,7 +355,7 @@ module Truffle
       end
 
       # Auth header for the shared SSE transport (Providers::SSE#stream_post).
-      def stream_request_headers
+      def stream_request_headers(**)
         { "x-goog-api-key" => @api_key }
       end
 

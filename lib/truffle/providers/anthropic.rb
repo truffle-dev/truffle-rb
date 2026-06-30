@@ -325,7 +325,7 @@ module Truffle
       end
 
       # Auth headers for the shared SSE transport (Providers::SSE#stream_post).
-      def stream_request_headers
+      def stream_request_headers(**)
         { "x-api-key" => @api_key, "anthropic-version" => API_VERSION }
       end
 

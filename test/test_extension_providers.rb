@@ -207,6 +207,121 @@ class TestExtensionProviders < Minitest::Test
     end
   end
 
+  def test_model_headers_merge_after_provider_headers_and_before_generated_auth
+    old_value = ENV.fetch("TRUFFLE_TEST_EXTENSION_MODEL_HEADER", nil)
+    ENV["TRUFFLE_TEST_EXTENSION_MODEL_HEADER"] = "model-secret"
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        api_key: "test-key",
+        model: "llama3",
+        headers: {
+          "Authorization" => "Bearer provider",
+          "X-Provider" => "provider",
+          "X-Shared" => "provider"
+        },
+        models: [
+          {
+            id: "llama3",
+            api: :openai_completions,
+            headers: {
+              "Authorization" => "Bearer model",
+              "X-Model" => "$TRUFFLE_TEST_EXTENSION_MODEL_HEADER",
+              "X-Shared" => "model"
+            }
+          },
+          {
+            id: "codellama",
+            api: :openai_completions,
+            headers: {
+              "X-Model" => "code"
+            }
+          }
+        ]
+      })
+    RUBY
+
+    provider = Truffle.provider(:local, extensions: extensions)
+    headers = provider.send(:request_headers, headers: provider.send(:model_headers_for, "llama3"))
+
+    assert_equal "application/json", headers["Content-Type"]
+    assert_equal "provider", headers["X-Provider"]
+    assert_equal "model", headers["X-Shared"]
+    assert_equal "model-secret", headers["X-Model"]
+    assert_equal "Bearer test-key", headers["Authorization"]
+
+    override_headers = provider.send(
+      :request_headers,
+      headers: provider.send(:model_headers_for, "codellama")
+    )
+
+    assert_equal "code", override_headers["X-Model"]
+    assert_equal "provider", override_headers["X-Shared"]
+  ensure
+    if old_value.nil?
+      ENV.delete("TRUFFLE_TEST_EXTENSION_MODEL_HEADER")
+    else
+      ENV["TRUFFLE_TEST_EXTENSION_MODEL_HEADER"] = old_value
+    end
+  end
+
+  def test_chat_and_stream_use_headers_for_requested_model
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        api_key: "test-key",
+        model: "llama3",
+        models: [
+          { id: "llama3", api: :openai_completions, headers: { "X-Model" => "default" } },
+          { id: "codellama", api: :openai_completions, headers: { "X-Model" => "override" } }
+        ]
+      })
+    RUBY
+
+    provider = Truffle.provider(:local, extensions: extensions)
+    captured_chat = nil
+    provider.define_singleton_method(:post) do |_path, body, headers: nil|
+      captured_chat = { body: body, headers: headers }
+      {
+        "choices" => [
+          { "message" => { "role" => "assistant", "content" => "ok" }, "finish_reason" => "stop" }
+        ],
+        "model" => body[:model],
+        "usage" => {}
+      }
+    end
+
+    provider.chat(messages: [Truffle::Message.user("hi")], model: "codellama")
+
+    assert_equal "codellama", captured_chat[:body][:model]
+    assert_equal({ "X-Model" => "override" }, captured_chat[:headers])
+
+    captured_stream = nil
+    provider.define_singleton_method(:drive_stream) do |_path, body, _acc,
+                                                       signal: nil, headers: nil|
+      captured_stream = { body: body, signal: signal, headers: headers }
+    end
+
+    provider.chat_stream(messages: [Truffle::Message.user("hi")])
+
+    assert_equal "llama3", captured_stream[:body][:model]
+    assert_nil captured_stream[:signal]
+    assert_equal({ "X-Model" => "default" }, captured_stream[:headers])
+
+    stream_request = provider.send(
+      :build_stream_request,
+      URI("http://localhost:11434/v1/chat"),
+      {},
+      headers: captured_stream[:headers]
+    )
+
+    assert_equal "text/event-stream", stream_request["Accept"]
+    assert_equal "default", stream_request["X-Model"]
+    assert_equal "Bearer test-key", stream_request["Authorization"]
+  end
+
   def test_auth_header_generates_authorization_after_custom_headers
     extensions = load_extensions(<<~RUBY)
       truffle.register_provider("local", {

@@ -22,7 +22,8 @@ module Truffle
 
       def initialize(api_key: ENV.fetch("OPENAI_API_KEY", nil), model: DEFAULT_MODEL,
                      base_url: DEFAULT_BASE_URL, open_timeout: 15, read_timeout: 120,
-                     provider_name: "openai", headers: nil, auth_header: true)
+                     provider_name: "openai", headers: nil, auth_header: true,
+                     model_headers: nil)
         super()
         if auth_header && (api_key.nil? || api_key.empty?)
           raise ArgumentError,
@@ -34,6 +35,7 @@ module Truffle
         @base_url = base_url.chomp("/")
         @provider_name = provider_name.to_s
         @headers = normalize_headers(headers)
+        @model_headers = normalize_model_headers(model_headers)
         @auth_header = auth_header
         @open_timeout = open_timeout
         @read_timeout = read_timeout
@@ -44,7 +46,12 @@ module Truffle
       end
 
       def chat(messages:, tools: [], model: nil, **options)
-        payload = post("/chat/completions", build_chat_body(messages, tools, model, options))
+        request_model = model || @model
+        payload = post(
+          "/chat/completions",
+          build_chat_body(messages, tools, request_model, options),
+          headers: model_headers_for(request_model)
+        )
         choice = payload.fetch("choices").first
         finish_reason = choice["finish_reason"]
         stop_reason, error_message = self.class.map_stop_reason(finish_reason)
@@ -52,7 +59,7 @@ module Truffle
         Response.new(
           message: deserialize_message(choice.fetch("message")),
           usage: Usage.parse(payload["usage"],
-                             pricing: Pricing.cost_for(response_model || model || @model)),
+                             pricing: Pricing.cost_for(response_model || request_model)),
           raw: payload,
           model: response_model,
           finish_reason: finish_reason,
@@ -60,7 +67,7 @@ module Truffle
           error_message: error_message
         )
       rescue Providers::Error => e
-        error_response(e.message, model: model || @model, retry_after_ms: e.retry_after_ms)
+        error_response(e.message, model: request_model, retry_after_ms: e.retry_after_ms)
       end
 
       # Streaming counterpart to #chat. Opens an SSE request, decodes each chunk
@@ -76,12 +83,14 @@ module Truffle
       # clean :done terminal with StopReason::ABORTED (not an :error), carrying
       # whatever content arrived before the cancel.
       def chat_stream(messages:, tools: [], model: nil, signal: nil, **options, &block)
-        body = build_chat_body(messages, tools, model, options)
+        request_model = model || @model
+        body = build_chat_body(messages, tools, request_model, options)
         body[:stream] = true
         body[:stream_options] = { include_usage: true }
 
-        acc = OpenAIStream.new(pricing_model: model || @model)
-        drive_stream("/chat/completions", body, acc, signal: signal, &block)
+        acc = OpenAIStream.new(pricing_model: request_model)
+        drive_stream("/chat/completions", body, acc,
+                     signal: signal, headers: model_headers_for(request_model), &block)
       end
 
       # Map an OpenAI Chat Completions finish_reason onto a Truffle::StopReason,
@@ -165,7 +174,7 @@ module Truffle
         { "_raw" => raw }
       end
 
-      def post(path, body)
+      def post(path, body, headers: nil)
         uri = URI("#{@base_url}#{path}")
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme == "https"
@@ -173,7 +182,7 @@ module Truffle
         http.read_timeout = @read_timeout
 
         request = Net::HTTP::Post.new(uri)
-        request_headers.each { |key, value| request[key] = value }
+        request_headers(headers: headers).each { |key, value| request[key] = value }
         request.body = JSON.generate(body)
 
         response = http.request(request)
@@ -190,8 +199,8 @@ module Truffle
       end
 
       # Auth header for the shared SSE transport (Providers::SSE#stream_post).
-      def stream_request_headers
-        provider_headers
+      def stream_request_headers(headers: nil)
+        provider_headers(headers: headers)
       end
 
       # Label the shared SSE transport puts on a non-success streaming response.
@@ -199,14 +208,18 @@ module Truffle
         "OpenAI"
       end
 
-      def request_headers
-        { "Content-Type" => "application/json" }.merge(provider_headers)
+      def request_headers(headers: nil)
+        { "Content-Type" => "application/json" }.merge(provider_headers(headers: headers))
       end
 
-      def provider_headers
-        headers = @headers.dup
-        headers["Authorization"] = "Bearer #{@api_key}" if @auth_header
-        headers
+      def provider_headers(headers: nil)
+        merged = @headers.merge(normalize_headers(headers))
+        merged["Authorization"] = "Bearer #{@api_key}" if @auth_header
+        merged
+      end
+
+      def model_headers_for(model)
+        @model_headers.fetch(model.to_s, {})
       end
 
       def normalize_headers(headers)
@@ -216,6 +229,17 @@ module Truffle
           next if key.nil? || value.nil?
 
           normalized[key.to_s] = value.to_s
+        end
+      end
+
+      def normalize_model_headers(model_headers)
+        return {} unless model_headers.respond_to?(:each)
+
+        model_headers.each_with_object({}) do |(model, headers), normalized|
+          next if model.nil?
+
+          values = normalize_headers(headers)
+          normalized[model.to_s] = values unless values.empty?
         end
       end
     end
