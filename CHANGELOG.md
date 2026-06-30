@@ -50,6 +50,16 @@ All notable changes to Truffle are documented here. The format follows
   parser cannot drift apart. The environment variables and built-in tool names
   describe this harness's real surface (the three providers it ships and the six
   built-in tools), not pi's full provider matrix.
+- `truffle` executable. The gem now ships a `truffle` binary backed by
+  `Truffle::CLI.run`, the Ruby counterpart of the top of pi's `main.ts` dispatch:
+  it parses argv, prints the parser's diagnostics (`Error:` / `Warning:`), and
+  acts on the terminal flags the harness supports today. `--version` prints the
+  version line and `--help` prints the help screen (colored only on a terminal);
+  any error diagnostic exits non-zero before either runs, and `--version` wins
+  over `--help` when both are given. `run` takes injectable output streams and
+  returns an exit status, so the whole dispatch is testable offline. The
+  interactive REPL, `--export`, and `--list-models` remain later slices, so a run
+  with no actionable flag reports that interactive mode is not implemented yet.
 - `Truffle::Config` defines the local config layout for command prompts:
   `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
   `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt

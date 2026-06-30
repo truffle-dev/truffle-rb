@@ -29,9 +29,12 @@ Gem::Specification.new do |spec|
   spec.files = Dir[
     "lib/**/*.rb",
     "examples/**/*.rb",
+    "exe/*",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ]
+  spec.bindir = "exe"
+  spec.executables = ["truffle"]
   spec.require_paths = ["lib"]
 end
