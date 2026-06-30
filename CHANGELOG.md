@@ -39,7 +39,13 @@ All notable changes to Truffle are documented here. The format follows
   for unanchored names) and `ignores?(path)` tests a posix relative path, excluding
   any child of an excluded directory. A faithful zero-dependency port of the
   `ignore` npm package's gitignore-to-regex pipeline, case-insensitive like pi's
-  default; wiring it into the skills discovery walk stays for the next slice.
+  default. `Skills.load_dir` now threads this matcher through its recursive walk:
+  at each directory level the `.gitignore`/`.ignore`/`.fdignore` files are read and
+  their patterns prefixed with the directory's root-relative path (so a nested
+  ignore file scopes to its own subtree), and every entry is tested before it is
+  loaded or descended into, with an ignored `SKILL.md` falling through to its
+  subdirectories. Ports pi's `addIgnoreRules`, `prefixIgnorePattern`, and
+  `toPosixPath`, closing the Skills item end to end.
 - Branch summaries. `Session#branch_with_summary` branches like `Session#branch`
   but also drops a `branch_summary` entry on the new path carrying a digest of the
   turns it came back past. The digest folds into `Session#context` as a user

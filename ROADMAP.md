@@ -310,8 +310,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       trailing `/`, and ancestor-directory exclusion, case-insensitive like pi's
       default. Validated by a 1450-comparison differential against the real
       `ignore` package.
-    - [ ] Wire `Truffle::Ignore` into the discovery walk (pi's `addIgnoreRules`/
-      `prefixIgnorePattern`/`toPosixPath` per-directory prefixing in `load_dir`).
+    - [x] **Wire `Truffle::Ignore` into the discovery walk.** `Skills.load_dir`
+      threads one matcher and the scan root through its recursion, folding in the
+      `.gitignore`/`.ignore`/`.fdignore` files at each level (patterns prefixed with
+      the directory's root-relative path) and pruning every entry before it loads,
+      with an ignored `SKILL.md` falling through to its subdirectories. Ports pi's
+      `addIgnoreRules`/`prefixIgnorePattern`/`toPosixPath`. Item 16 is closed.
 17. **Commands.** User-invocable commands that expand into prompts/actions.
     - [x] **Prompt-template arguments.** `Truffle::PromptTemplates` ports pi's
       pure prompt-template argument layer: bash-style quoted arg parsing and

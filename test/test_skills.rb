@@ -320,4 +320,94 @@ class TestSkills < Minitest::Test
     assert_equal ["deploy"], names(skills)
     refute(diagnostics.any? { |d| d.type == "collision" })
   end
+
+  def skill(rel, name)
+    write_skill(rel, "---\nname: #{name}\ndescription: d\n---\n")
+  end
+
+  def test_load_dir_prunes_a_subdirectory_named_in_a_gitignore
+    write_skill("skills/.gitignore", "secret/\n")
+    skill("skills/secret/SKILL.md", "secret")
+    skill("skills/real/SKILL.md", "real")
+
+    skills, diagnostics = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_empty diagnostics
+    assert_equal ["real"], names(skills)
+  end
+
+  def test_load_dir_honors_a_dot_ignore_file
+    write_skill("skills/.ignore", "vendor/\n")
+    skill("skills/vendor/SKILL.md", "vendor")
+    skill("skills/keep/SKILL.md", "keep")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["keep"], names(skills)
+  end
+
+  def test_load_dir_honors_a_dot_fdignore_file
+    write_skill("skills/.fdignore", "build/\n")
+    skill("skills/build/SKILL.md", "build")
+    skill("skills/src/SKILL.md", "src")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["src"], names(skills)
+  end
+
+  def test_load_dir_prunes_a_direct_md_child_matched_by_a_pattern
+    write_skill("skills/.gitignore", "draft.md\n")
+    skill("skills/draft.md", "draft")
+    skill("skills/top.md", "top")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["top"], names(skills)
+  end
+
+  def test_load_dir_re_includes_a_path_through_a_negation
+    write_skill("skills/.gitignore", "*.md\n!keep.md\n")
+    skill("skills/drop.md", "drop")
+    skill("skills/keep.md", "keep")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["keep"], names(skills)
+  end
+
+  def test_load_dir_treats_a_comment_line_in_the_ignore_file_as_no_pattern
+    write_skill("skills/.gitignore", "# a comment\nsecret/\n")
+    skill("skills/secret/SKILL.md", "secret")
+    skill("skills/real/SKILL.md", "real")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["real"], names(skills)
+  end
+
+  def test_load_dir_scopes_a_nested_ignore_file_to_its_own_subtree
+    # The matcher accumulates across the whole walk, so the prefixing is what keeps
+    # aaa's "target/" rule from leaking into the sibling zzz subtree (walked later).
+    # Correctly anchored as "aaa/target/", it prunes aaa's target only; zzz/target
+    # survives. Without the prefix the unanchored "target/" would prune both.
+    write_skill("skills/aaa/.gitignore", "target/\n")
+    skill("skills/aaa/target/SKILL.md", "aaatarget")
+    skill("skills/aaa/keep/SKILL.md", "keep")
+    skill("skills/zzz/target/SKILL.md", "zzztarget")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal %w[keep zzztarget], names(skills)
+  end
+
+  def test_load_dir_falls_through_an_ignored_skill_md_to_its_subdirectories
+    write_skill("skills/.gitignore", "tool/SKILL.md\n")
+    skill("skills/tool/SKILL.md", "tool")
+    skill("skills/tool/inner/SKILL.md", "inner")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["inner"], names(skills)
+  end
 end

@@ -10,18 +10,24 @@ module Truffle
   # the name and description against the Agent Skills spec, and formats a set of
   # skills into the <available_skills> block a system prompt advertises.
   #
-  # This first slice covers single-file loading, validation, and prompt
-  # formatting. Directory discovery (SKILL.md-root vs .md-children vs recurse),
-  # name-collision resolution across user/project/path sources, and the
-  # gitignore-style ignore matching pi layers on top are faithful follow-ups; the
-  # ignore matching in particular needs a matcher pi gets from the `ignore` npm
-  # package, which a zero-dependency port must hand-roll in its own slice. pi's
-  # SourceInfo (a TUI/diagnostics affordance) is not ported.
+  # Single-file loading, validation, and prompt formatting, directory discovery
+  # (SKILL.md-root vs .md-children vs recurse), name-collision resolution across
+  # user/project/path sources, and the gitignore-style ignore matching pi layers
+  # over the directory walk are all ported. The ignore matching reads the
+  # `.gitignore`/`.ignore`/`.fdignore` files found at each directory level and
+  # prunes entries through a `Truffle::Ignore` matcher (the hand-rolled zero-dep
+  # port of the `ignore` npm package pi uses). pi's SourceInfo (a TUI/diagnostics
+  # affordance) is not ported; pi's includeDefaults config-directory resolution is
+  # deferred until the port grows a config subsystem.
   module Skills
     # Per the Agent Skills spec: a name is at most 64 characters and a description
     # at most 1024.
     MAX_NAME_LENGTH = 64
     MAX_DESCRIPTION_LENGTH = 1024
+
+    # The ignore files consulted at each directory level during discovery, in pi's
+    # order. Patterns in any of these prune the walk like a gitignore.
+    IGNORE_FILE_NAMES = [".gitignore", ".ignore", ".fdignore"].freeze
 
     # A loaded skill: its spec name, the description the model matches against, the
     # file it was read from, the directory relative paths in its body resolve
@@ -75,9 +81,9 @@ module Truffle
     # SKILL.md roots (a stray .md inside a subdirectory is not a skill, only a
     # SKILL.md is). Dotfiles and node_modules are skipped, and a path that is not a
     # directory yields nothing. Entries are walked in sorted order so the result is
-    # deterministic rather than filesystem-order dependent. The ignore-file
-    # matching and symlink realpath dedup pi layers on top are deferred to a later
-    # slice; ordinary symlinks resolve naturally through File.file?/File.directory?.
+    # deterministic rather than filesystem-order dependent. A `Truffle::Ignore`
+    # matcher, seeded from the IGNORE_FILE_NAMES found at each level, prunes ignored
+    # entries; ordinary symlinks resolve naturally through File.file?/File.directory?.
     def load_dir(dir)
       load_dir_internal(dir, include_root_files: true)
     end
@@ -147,36 +153,140 @@ module Truffle
     # the directory the caller named: it gates loading direct .md children, so a
     # bare .md is a skill at a scan root but not when found while recursing for
     # SKILL.md roots. A SKILL.md short-circuits: the directory is one skill and we
-    # do not descend. Ports pi's loadSkillsFromDirInternal minus the ignore matcher.
-    def load_dir_internal(dir, include_root_files:)
+    # do not descend, unless the matcher prunes that SKILL.md (then the walk falls
+    # through to the general entries, mirroring pi). The `ignore_matcher` and
+    # `root_dir` thread one matcher and the original scan root through the
+    # recursion: at every level the IGNORE_FILE_NAMES are folded in (their patterns
+    # prefixed with the directory's path), and each entry's root-relative posix path
+    # is tested before it is loaded or descended into. Ports pi's
+    # loadSkillsFromDirInternal.
+    def load_dir_internal(dir, include_root_files:, ignore_matcher: nil, root_dir: nil)
       return [[], []] unless File.directory?(dir)
+
+      root = root_dir || dir
+      matcher = ignore_matcher || Ignore.new
+      add_ignore_rules(matcher, dir, root)
 
       entries = Dir.children(dir).sort
       skill_md = File.join(dir, "SKILL.md")
-      return load_from(skill_md) if entries.include?("SKILL.md") && File.file?(skill_md)
+      if entries.include?("SKILL.md") && File.file?(skill_md) &&
+         !matcher.ignores?(rel_posix(root, skill_md))
+        return load_from(skill_md)
+      end
 
+      walk_entries(dir, entries, include_root_files, matcher, root)
+    end
+    private_class_method :load_dir_internal
+
+    # Walk a directory's entries, skipping dotfiles, node_modules, and anything the
+    # matcher prunes (a directory is tested with a trailing slash so directory-only
+    # patterns apply), and accumulate the skills and diagnostics each yields.
+    def walk_entries(dir, entries, include_root_files, matcher, root)
       skills = []
       diagnostics = []
       entries.each do |name|
         next if name.start_with?(".") || name == "node_modules"
 
-        sub_skills, sub_diags = load_entry(File.join(dir, name), name, include_root_files)
+        full = File.join(dir, name)
+        rel = rel_posix(root, full)
+        next if matcher.ignores?(File.directory?(full) ? "#{rel}/" : rel)
+
+        sub_skills, sub_diags = load_entry(full, name, include_root_files, matcher, root)
         skills.concat(sub_skills)
         diagnostics.concat(sub_diags)
       end
       [skills, diagnostics]
     end
-    private_class_method :load_dir_internal
+    private_class_method :walk_entries
 
-    # Resolve one directory entry to its skills: descend into a subdirectory, or
-    # load a direct .md child when the scan root permits it. Anything else is empty.
-    def load_entry(full, name, include_root_files)
-      return load_dir_internal(full, include_root_files: false) if File.directory?(full)
+    # Resolve one directory entry to its skills: descend into a subdirectory
+    # (threading the shared matcher and scan root), or load a direct .md child when
+    # the scan root permits it. Anything else is empty.
+    def load_entry(full, name, include_root_files, matcher, root)
+      if File.directory?(full)
+        return load_dir_internal(full, include_root_files: false, ignore_matcher: matcher,
+                                       root_dir: root)
+      end
       return load_from(full) if include_root_files && name.end_with?(".md") && File.file?(full)
 
       [[], []]
     end
     private_class_method :load_entry
+
+    # Fold the IGNORE_FILE_NAMES present in `dir` into the shared matcher. Each
+    # file's patterns are prefixed with the directory's root-relative posix path so
+    # a pattern written in a nested ignore file scopes to that subtree, matching
+    # pi's addIgnoreRules. A read error on any one file is swallowed.
+    def add_ignore_rules(matcher, dir, root)
+      relative_dir = relative_path(dir, root)
+      prefix = relative_dir.empty? ? "" : "#{to_posix(relative_dir)}/"
+      IGNORE_FILE_NAMES.each do |filename|
+        patterns = read_ignore_file(File.join(dir, filename), prefix)
+        matcher.add(patterns) unless patterns.empty?
+      end
+    end
+    private_class_method :add_ignore_rules
+
+    # Read one ignore file (if it exists) into a list of prefixed patterns, dropping
+    # blanks and comments. Returns [] when the file is absent or unreadable.
+    def read_ignore_file(path, prefix)
+      return [] unless File.file?(path)
+
+      File.read(path).split(/\r?\n/)
+          .map { |line| prefix_ignore_pattern(line, prefix) }
+          .compact
+    rescue StandardError
+      []
+    end
+    private_class_method :read_ignore_file
+
+    # Scope one gitignore line to a subdirectory by stripping its leading anchor and
+    # gluing the directory prefix on, preserving a leading "!" negation. Blank and
+    # comment lines drop to nil. Ports pi's prefixIgnorePattern, including its
+    # handling of an escaped leading "\#"/"\!".
+    def prefix_ignore_pattern(line, prefix)
+      trimmed = line.strip
+      return nil if trimmed.empty?
+      return nil if trimmed.start_with?("#") && !trimmed.start_with?("\\#")
+
+      pattern = line
+      negated = false
+      if pattern.start_with?("!")
+        negated = true
+        pattern = pattern[1..]
+      elsif pattern.start_with?("\\!")
+        pattern = pattern[1..]
+      end
+      pattern = pattern[1..] if pattern.start_with?("/")
+      prefixed = prefix.empty? ? pattern : "#{prefix}#{pattern}"
+      negated ? "!#{prefixed}" : prefixed
+    end
+    private_class_method :prefix_ignore_pattern
+
+    # The root-relative posix path of `full` under `root`, used to test an entry
+    # against the matcher.
+    def rel_posix(root, full)
+      to_posix(relative_path(full, root))
+    end
+    private_class_method :rel_posix
+
+    # The path of `path` relative to `base`. The walk only ever descends, so `path`
+    # is always `base` itself or sits beneath it; an unrelated path is returned
+    # unchanged.
+    def relative_path(path, base)
+      return "" if path == base
+
+      prefix = base.end_with?("/") ? base : "#{base}/"
+      path.start_with?(prefix) ? path[prefix.length..] : path
+    end
+    private_class_method :relative_path
+
+    # Normalize a filesystem path to forward slashes, matching pi's toPosixPath (a
+    # no-op on posix, where the separator is already "/").
+    def to_posix(path)
+      path.split(File::SEPARATOR).join("/")
+    end
+    private_class_method :to_posix
 
     # Load one skill file into the [skills, diagnostics] pair the walk accumulates,
     # dropping the skill (but keeping its diagnostics) when the file did not load.
