@@ -139,4 +139,85 @@ class TestSessionBranching < Minitest::Test
 
     assert_nil reloaded.label(target)
   end
+
+  def test_branch_with_summary_moves_the_leaf_like_branch
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    first = session.append_message(Truffle::Message.user("a"))
+    session.append_message(Truffle::Message.assistant(content: "b"))
+
+    summary_id = session.branch_with_summary(first, "we tried b and abandoned it")
+
+    assert_equal summary_id, session.leaf_id
+    assert_equal first, session.entry(summary_id)[:parent_id]
+  end
+
+  def test_branch_with_summary_folds_the_digest_into_context_as_a_user_message
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    first = session.append_message(Truffle::Message.user("a"))
+    session.append_message(Truffle::Message.assistant(content: "b"))
+
+    session.branch_with_summary(first, "we tried b and abandoned it")
+    session.append_message(Truffle::Message.user("c"))
+
+    messages = session.context.messages
+
+    assert_equal %i[user user user], messages.map(&:role)
+    assert_equal "a", messages[0].text
+    assert_includes messages[1].text, "we tried b and abandoned it"
+    assert_equal "c", messages[2].text
+  end
+
+  def test_the_branch_summary_message_wraps_the_summary_for_the_model
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    first = session.append_message(Truffle::Message.user("a"))
+
+    session.branch_with_summary(first, "digest text")
+
+    digest = session.context.messages.last.text
+
+    assert_includes digest, "a summary of a branch that this conversation came back from"
+    assert_includes digest, "<summary>\ndigest text\n</summary>"
+  end
+
+  def test_branch_with_summary_to_nil_starts_a_fresh_root_carrying_the_digest
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("a"))
+
+    summary_id = session.branch_with_summary(nil, "abandoned the whole thing")
+    session.append_message(Truffle::Message.user("b"))
+
+    assert_nil session.entry(summary_id)[:parent_id]
+    assert_equal "root", session.entry(summary_id)[:from_id]
+    assert_includes session.context.messages.first.text, "abandoned the whole thing"
+    assert_equal "b", session.context.messages.last.text
+  end
+
+  def test_branch_with_summary_raises_on_an_unknown_entry
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+
+    assert_raises(ArgumentError) { session.branch_with_summary("nope", "x") }
+  end
+
+  def test_branch_summary_survives_a_reload
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    first = session.append_message(Truffle::Message.user("a"))
+    session.branch_with_summary(first, "kept digest")
+    session.append_message(Truffle::Message.user("b"))
+
+    reloaded = Truffle::Session.load(session.file)
+
+    assert_includes reloaded.context.messages[1].text, "kept digest"
+    assert_equal %w[a b], [reloaded.context.messages[0].text, reloaded.context.messages[2].text]
+  end
+
+  def test_branch_summary_stores_optional_details_and_omits_them_when_absent
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    first = session.append_message(Truffle::Message.user("a"))
+
+    with_details = session.branch_with_summary(first, "x", details: { "files" => ["a.rb"] })
+    without_details = session.branch_with_summary(first, "y")
+
+    assert_equal({ "files" => ["a.rb"] }, session.entry(with_details)[:details])
+    refute session.entry(without_details).key?(:details)
+  end
 end

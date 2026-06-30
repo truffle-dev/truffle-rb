@@ -22,10 +22,12 @@ module Truffle
   #
   # Because entries form a tree, the leaf can be moved back to an earlier entry
   # (#branch / #reset_leaf) so the next append opens a second child, a new branch
-  # that leaves the abandoned path untouched. Any entry can carry a user label
-  # (#append_label_change / #label), a bookmark that rides along as its own entry
-  # and never enters the model's context. Branch summaries, the deferred-first-
-  # flush optimization, and v1/v2 file migration remain faithful follow-ups.
+  # that leaves the abandoned path untouched. #branch_with_summary does the same
+  # but drops a branch_summary entry on the new path, a digest of the turns it
+  # came back past that folds into #context as a user message. Any entry can carry
+  # a user label (#append_label_change / #label), a bookmark that rides along as
+  # its own entry and never enters the model's context. The deferred-first-flush
+  # optimization and v1/v2 file migration remain faithful follow-ups.
   #
   #   session = Truffle::Session.create(dir: "/tmp/sessions", cwd: Dir.pwd)
   #   session.append_message(Truffle::Message.user("hello"))
@@ -43,6 +45,15 @@ module Truffle
       "The conversation history before this point was compacted into the " \
       "following summary:\n\n<summary>\n"
     COMPACTION_SUMMARY_SUFFIX = "\n</summary>"
+
+    # Wrap a branch summary so the model knows it is reading a digest of a path
+    # the conversation branched away from and came back past. Ported verbatim from
+    # pi's BRANCH_SUMMARY_PREFIX/SUFFIX in messages.ts. Unlike a compaction summary,
+    # a branch summary is a real entry on the path and folds into context inline.
+    BRANCH_SUMMARY_PREFIX =
+      "The following is a summary of a branch that this conversation came back " \
+      "from:\n\n<summary>\n"
+    BRANCH_SUMMARY_SUFFIX = "\n</summary>"
 
     # The model recorded by a model_change entry: which provider serves it and
     # the wire id it is named by.
@@ -207,6 +218,25 @@ module Truffle
       @leaf_id = entry_id
     end
 
+    # Branch like #branch, but also drop a branch_summary entry on the new path
+    # that carries a digest of the abandoned turns forward. The summary becomes a
+    # user message in #context (wrapped in BRANCH_SUMMARY_PREFIX/SUFFIX) so the
+    # model sees what the path it came back past contained, while the abandoned
+    # entries themselves stay out of context. Pass nil to branch from the root.
+    # details rides along for callers but is never sent to the model; it is
+    # omitted from the entry when nil, matching #append_compaction. Ports pi's
+    # SessionManager#branchWithSummary; raises if branch_from_id is not an entry.
+    def branch_with_summary(branch_from_id, summary, details: nil)
+      unless branch_from_id.nil? || @by_id.key?(branch_from_id)
+        raise ArgumentError, "entry not found: #{branch_from_id}"
+      end
+
+      @leaf_id = branch_from_id
+      fields = { from_id: branch_from_id || "root", summary: summary }
+      fields[:details] = details unless details.nil?
+      append_typed("branch_summary", **fields)
+    end
+
     # Reset the leaf to before any entry, so the next append starts a fresh root
     # (parent_id nil). Used to re-edit the very first message. Ports pi's
     # SessionManager#resetLeaf.
@@ -245,11 +275,16 @@ module Truffle
       @labels_by_id[entry_id]
     end
 
-    # Turn the message entries on a path into Messages, dropping settings and
-    # compaction entries (they shape the walk but are not messages themselves).
+    # Turn the entries on a path into Messages, dropping settings and compaction
+    # entries (they shape the walk but are not messages themselves). A message
+    # entry yields its stored message; a branch_summary entry folds in inline as
+    # a user message, matching pi's _buildContextMessages walk.
     def self.message_entries(entries)
       entries.filter_map do |entry|
-        Message.from_h(entry[:message]) if entry[:type] == "message"
+        case entry[:type]
+        when "message" then Message.from_h(entry[:message])
+        when "branch_summary" then branch_summary_message(entry)
+        end
       end
     end
 
@@ -337,6 +372,13 @@ module Truffle
       Message.user(text)
     end
     private_class_method :compaction_summary_message
+
+    # The user message a branch_summary entry folds into context as.
+    def self.branch_summary_message(entry)
+      text = BRANCH_SUMMARY_PREFIX + entry[:summary] + BRANCH_SUMMARY_SUFFIX
+      Message.user(text)
+    end
+    private_class_method :branch_summary_message
 
     # Record an entry in the id map and advance the leaf to it, and resolve a
     # label entry into the label index. Called once per loaded entry by the

@@ -7,6 +7,17 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Branch summaries. `Session#branch_with_summary` branches like `Session#branch`
+  but also drops a `branch_summary` entry on the new path carrying a digest of the
+  turns it came back past. The digest folds into `Session#context` as a user
+  message wrapped so the model knows it is reading a summary of an abandoned
+  branch, while the abandoned entries themselves stay out of context. Passing nil
+  branches from the root; an optional `details:` rides along for callers but is
+  never sent to the model and is omitted from the entry when absent. The summary
+  survives a reload and flows through compaction's kept window like any other
+  message. Ports pi's `SessionManager#branchWithSummary` and the branch_summary
+  arm of its context walk; remaining item-11 follow-ups (the deferred-first-flush
+  optimization and v1/v2 file migration) stay deferred.
 - Session branching and labels. `Session#branch` moves the leaf back to an
   earlier entry so the next append opens a second child, a new branch that leaves
   the abandoned path on disk; `Session#reset_leaf` rewinds to before any entry to

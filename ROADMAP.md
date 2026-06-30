@@ -166,8 +166,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       wins, an empty label clears); a label entry advances the leaf but stays out
       of the model context. Ports pi's `branch` / `resetLeaf` / `getChildren` /
       `appendLabelChange` / `getLabel`.
-    - [ ] Branch-summary entries, the deferred-first-flush optimization, and
-      v1/v2 file migration.
+    - [x] **Branch summaries.** `Session#branch_with_summary` branches and drops a
+      `branch_summary` entry digesting the abandoned path; the digest folds into
+      `#context` as a wrapped user message while the abandoned entries stay out of
+      context. Ports pi's `branchWithSummary` and the branch_summary arm of the
+      context walk.
+    - [ ] The deferred-first-flush optimization and v1/v2 file migration.
     - [x] `Agent#dump` / `Agent.load` wired onto the session store, persisting
       tool definitions by name so a resumed agent rebinds its toolbox. `dump`
       writes the conversation (no system prompt, regenerated on resume), a
