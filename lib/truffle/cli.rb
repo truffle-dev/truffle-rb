@@ -4,8 +4,8 @@ module Truffle
   # Command-line surface for the `truffle` binary. `parse_args` is the Ruby port
   # of pi's `cli/args.ts` `parseArgs`: a pure function from an argv array to an
   # `Args` struct of parsed flags plus diagnostics, with no side effects. The
-  # printHelp text, the REPL loop, and acting on the parsed flags are later
-  # slices of roadmap item 19; this is the parser only.
+  # `--help` and `--version` text lives in `cli/help.rb`. The REPL loop and acting
+  # on the parsed flags are later slices of roadmap item 19.
   module CLI
     # The thinking levels pi accepts for `--thinking`, lowest to highest. Stored
     # as strings to match how the rest of the port records a thinking level.

@@ -41,6 +41,15 @@ All notable changes to Truffle are documented here. The format follows
   counts as a message), `--models` keeps blank entries after trimming while
   `--tools` drops them, and an unknown `--flag` claims the next non-flag argument as
   its value. The REPL, help text, and acting on the parsed flags are later slices.
+- CLI help and version text. `Truffle::CLI.help_text` and `Truffle::CLI.version_text`
+  port pi's `cli/args.ts` `printHelp`: pure string builders for the `--help` screen
+  and the `--version` line, so the binary stays a thin caller and the text is
+  testable offline. Section headers bold on a terminal (pass `color: true`) and stay
+  plain in pipes and tests. The options block lists exactly the flags `parse_args`
+  recognizes, with a test that parses every documented flag so the help and the
+  parser cannot drift apart. The environment variables and built-in tool names
+  describe this harness's real surface (the three providers it ships and the six
+  built-in tools), not pi's full provider matrix.
 - `Truffle::Config` defines the local config layout for command prompts:
   `~/.truffle/agent` (or `TRUFFLE_AGENT_DIR`) for user-scoped state and
   `.truffle` for project-scoped state. `PromptTemplates.load_all` now loads prompt

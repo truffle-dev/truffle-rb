@@ -414,6 +414,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `parseArgs`: a pure argv-to-`Args` function with the diagnostics, unknown-flag
       capture, and per-flag quirks the binary will act on. The REPL, help text, and
       acting on the parsed flags are later slices.
+    - [x] Help and version text. `Truffle::CLI.help_text` and `version_text` port
+      pi's `printHelp`: pure string builders for `--help` and `--version`. The
+      options block lists exactly the flags the parser recognizes (a test holds them
+      in sync); the environment variables and built-in tool names describe this
+      harness's real surface (three providers, six built-in tools). The REPL and
+      acting on the parsed flags remain later slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
