@@ -6,6 +6,7 @@ require "fileutils"
 require_relative "uuid"
 require_relative "message"
 require_relative "usage"
+require_relative "session_append"
 require_relative "session_migration"
 
 module Truffle
@@ -30,6 +31,8 @@ module Truffle
   # before the next append opens a second child. Branch summaries and labels ride
   # along as entries while staying out of normal message history.
   class Session
+    include SessionAppend
+
     # Bumped when the on-disk entry shape changes. New sessions are born at this
     # version; older v1/v2 files are upgraded by .load.
     SESSION_VERSION = 3
@@ -132,6 +135,7 @@ module Truffle
       @leaf_id = nil
       @flushed = flushed
       @assistant_entry_seen = false
+      @leaf_explicitly_set = false
       entries.each { |entry| index(entry) }
     end
 
@@ -239,6 +243,7 @@ module Truffle
       raise ArgumentError, "entry not found: #{entry_id}" unless @by_id.key?(entry_id)
 
       @leaf_id = entry_id
+      @leaf_explicitly_set = true
     end
 
     # Branch like #branch, but also drop a branch_summary entry on the new path
@@ -255,6 +260,7 @@ module Truffle
       end
 
       @leaf_id = branch_from_id
+      @leaf_explicitly_set = true
       fields = { from_id: branch_from_id || "root", summary: summary }
       fields[:details] = details unless details.nil?
       append_typed("branch_summary", **fields)
@@ -265,6 +271,7 @@ module Truffle
     # SessionManager#resetLeaf.
     def reset_leaf
       @leaf_id = nil
+      @leaf_explicitly_set = true
     end
 
     # The entry with this id, or nil. Ports pi's getEntry.
@@ -312,50 +319,6 @@ module Truffle
     end
 
     private
-
-    # Build an entry of the given type with the id/parent/timestamp envelope every
-    # entry shares, then append it. The id and leaf are read now, at append time.
-    def append_typed(type, **fields)
-      append_entry(
-        { type: type, id: UUID.short(@by_id), parent_id: @leaf_id,
-          timestamp: Time.now.utc.iso8601(3) }.merge(fields)
-      )
-    end
-
-    # Append a brand-new entry: record it in @entries, index it, and persist the
-    # one line. The constructor indexes entries already in @entries, so the push
-    # lives here and not in index, keeping the two paths from double-adding.
-    def append_entry(entry)
-      @entries << entry
-      index(entry)
-      persist(entry)
-      entry[:id]
-    end
-
-    def persist(entry)
-      unless assistant_entry_seen?
-        append_line(entry) if @flushed
-        return
-      end
-
-      @flushed ? append_line(entry) : flush
-    end
-
-    def assistant_entry_seen?
-      @assistant_entry_seen
-    end
-
-    def append_line(entry)
-      File.open(@file, "a") { |handle| handle.write("#{JSON.generate(entry)}\n") }
-    end
-
-    def write_all_entries
-      FileUtils.mkdir_p(File.dirname(@file))
-      File.open(@file, "wx") do |handle|
-        handle.write("#{JSON.generate(@header)}\n")
-        @entries.each { |entry| handle.write("#{JSON.generate(entry)}\n") }
-      end
-    end
 
     # Walk from a leaf back to the root via parent_id, then reverse into
     # chronological order. An unknown or nil leaf yields an empty path.

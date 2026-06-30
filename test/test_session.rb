@@ -189,6 +189,24 @@ class TestSession < Minitest::Test
     assert_equal "new turn", lines.last.dig("message", "content", 0, "text")
   end
 
+  def test_two_loaded_sessions_append_to_the_latest_file_leaf
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_message(Truffle::Message.user("start"))
+    session.append_message(Truffle::Message.assistant(content: "ready"))
+
+    first = Truffle::Session.load(session.file)
+    second = Truffle::Session.load(session.file)
+    first_id = first.append_message(Truffle::Message.user("from first"))
+    second_id = second.append_message(Truffle::Message.user("from second"))
+    reloaded = Truffle::Session.load(session.file)
+
+    assert_equal ["start", "ready", "from first", "from second"], reloaded.messages.map(&:text)
+    first_entry = reloaded.entry(first_id)
+    second_entry = reloaded.entry(second_id)
+
+    assert_equal first_entry[:id], second_entry[:parent_id]
+  end
+
   def test_load_migrates_v1_entries_to_the_current_tree_shape
     path = write_session_file(
       "v1.jsonl",

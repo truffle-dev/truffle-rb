@@ -43,6 +43,9 @@ All notable changes to Truffle are documented here. The format follows
 - Legacy session migration now writes through a same-directory temp file, keeps
   a `.bak` copy of the original session, and renames the completed rewrite into
   place instead of truncating the only copy in place.
+- Appending to an already-flushed session now locks and refreshes the on-disk
+  entry chain first, so two resumed `Session` instances append to the latest leaf
+  instead of forking and hiding one writer's turn.
 - `Agent#dump` / `Agent.load` now preserve accumulated token usage and cost, so
   a resumed agent continues accounting from the saved session instead of
   restarting totals at zero.
