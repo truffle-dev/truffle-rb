@@ -148,4 +148,80 @@ class TestSkills < Minitest::Test
     assert_includes prompt, "<name>a&amp;b</name>"
     assert_includes prompt, "<description>&lt;d&gt; &quot;q&quot; &apos;x&apos;</description>"
   end
+
+  def names(skills)
+    skills.map(&:name).sort
+  end
+
+  def test_load_dir_loads_a_skill_root_holding_a_skill_md
+    write_skill("deploy/SKILL.md", "---\nname: deploy\ndescription: ship it\n---\n")
+
+    skills, diagnostics = Truffle::Skills.load_dir(File.join(@dir, "deploy"))
+
+    assert_empty diagnostics
+    assert_equal ["deploy"], names(skills)
+  end
+
+  def test_load_dir_stops_recursing_once_a_skill_md_marks_a_root
+    write_skill("kit/SKILL.md", "---\nname: kit\ndescription: the kit\n---\n")
+    write_skill("kit/nested/SKILL.md", "---\nname: nested\ndescription: ignored\n---\n")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "kit"))
+
+    assert_equal ["kit"], names(skills)
+  end
+
+  def test_load_dir_finds_skill_md_roots_in_subdirectories
+    write_skill("skills/deploy/SKILL.md", "---\nname: deploy\ndescription: ship it\n---\n")
+    write_skill("skills/format/SKILL.md", "---\nname: format\ndescription: formats\n---\n")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal %w[deploy format], names(skills)
+  end
+
+  def test_load_dir_loads_direct_md_children_at_the_scan_root_only
+    write_skill("skills/top.md", "---\nname: top\ndescription: a root skill\n---\n")
+    write_skill("skills/sub/loose.md", "---\nname: loose\ndescription: not a skill root\n---\n")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["top"], names(skills)
+  end
+
+  def test_load_dir_skips_dotfiles_and_node_modules
+    write_skill("skills/.hidden/SKILL.md", "---\nname: hidden\ndescription: dot\n---\n")
+    write_skill("skills/node_modules/dep/SKILL.md", "---\nname: dep\ndescription: vendor\n---\n")
+    write_skill("skills/real/SKILL.md", "---\nname: real\ndescription: kept\n---\n")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["real"], names(skills)
+  end
+
+  def test_load_dir_returns_nothing_for_a_missing_directory
+    skills, diagnostics = Truffle::Skills.load_dir(File.join(@dir, "nope"))
+
+    assert_empty skills
+    assert_empty diagnostics
+  end
+
+  def test_load_dir_propagates_diagnostics_from_a_loaded_skill
+    write_skill("skills/bad/SKILL.md", "---\nname: Bad_Name\ndescription: d\n---\n")
+
+    skills, diagnostics = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal ["Bad_Name"], names(skills)
+    assert_includes diagnostics.map(&:message),
+                    "name contains invalid characters (must be lowercase a-z, 0-9, hyphens only)"
+  end
+
+  def test_load_dir_keeps_both_same_named_skills_for_later_collision_handling
+    write_skill("skills/first/calendar/SKILL.md", "---\nname: calendar\ndescription: one\n---\n")
+    write_skill("skills/second/calendar/SKILL.md", "---\nname: calendar\ndescription: two\n---\n")
+
+    skills, = Truffle::Skills.load_dir(File.join(@dir, "skills"))
+
+    assert_equal %w[calendar calendar], names(skills)
+  end
 end

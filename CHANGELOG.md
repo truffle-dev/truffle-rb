@@ -7,17 +7,22 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
-- Skills (first slice). `Truffle::Frontmatter` parses the optional YAML
-  frontmatter at the head of a markdown file and returns it with the trimmed
-  body. `Truffle::Skills` loads one skill file into a `Skill` plus diagnostics:
-  the name comes from the frontmatter and falls back to the parent directory, a
-  blank description drops the skill, and an over-long name/description or invalid
-  name characters warn but still load. `Skills.format_for_prompt` renders the
-  `<available_skills>` block a system prompt advertises, hiding skills with model
-  invocation disabled. Ports pi's `parseFrontmatter`, `loadSkillFromFile`,
-  `validateName`, `validateDescription`, and `formatSkillsForPrompt`; directory
-  discovery, name-collision resolution, and gitignore-style ignore matching stay
-  deferred to later slices.
+- Skills. `Truffle::Frontmatter` parses the optional YAML frontmatter at the head
+  of a markdown file and returns it with the trimmed body. `Truffle::Skills` loads
+  one skill file into a `Skill` plus diagnostics: the name comes from the
+  frontmatter and falls back to the parent directory, a blank description drops the
+  skill, and an over-long name/description or invalid name characters warn but
+  still load. `Skills.load_dir` discovers skills under a directory: a directory
+  holding a `SKILL.md` is a skill root loaded as one skill with no further
+  recursion, while any other directory has its direct `.md` children loaded and its
+  subdirectories recursed into for more `SKILL.md` roots; dotfiles and
+  `node_modules` are skipped and entries walk in sorted order. `Skills.format_for_prompt`
+  renders the `<available_skills>` block a system prompt advertises, hiding skills
+  with model invocation disabled. Ports pi's `parseFrontmatter`,
+  `loadSkillFromFile`, `validateName`, `validateDescription`, `loadSkillsFromDir`,
+  and `formatSkillsForPrompt`; the multi-source `loadSkills` orchestration
+  (name-collision resolution, symlink realpath dedup) and gitignore-style ignore
+  matching stay deferred to later slices.
 - Branch summaries. `Session#branch_with_summary` branches like `Session#branch`
   but also drops a `branch_summary` entry on the new path carrying a digest of the
   turns it came back past. The digest folds into `Session#context` as a user

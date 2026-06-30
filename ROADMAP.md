@@ -280,10 +280,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       (name falls back to the parent directory, a blank description drops the
       skill, other problems warn but load), and `format_for_prompt` renders the
       `<available_skills>` block, hiding skills with model invocation disabled.
-    - [ ] Directory discovery (SKILL.md-root vs .md-children vs recurse) and
-      name-collision resolution across user/project/path sources.
+    - [x] **Directory discovery.** `Skills.load_dir` ports pi's
+      `loadSkillsFromDir`: a `SKILL.md` makes a directory a skill root and stops
+      recursion; otherwise direct `.md` children load and subdirectories recurse
+      for more `SKILL.md` roots, skipping dotfiles and `node_modules`.
+    - [ ] Multi-source `loadSkills` orchestration: name-collision resolution
+      across user/project/path sources and symlink realpath dedup.
     - [ ] Gitignore-style ignore matching (pi's `ignore`-package matcher,
-      hand-rolled zero-dep) and symlink dedup.
+      hand-rolled zero-dep).
 17. **Commands.** User-invocable commands that expand into prompts/actions.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.

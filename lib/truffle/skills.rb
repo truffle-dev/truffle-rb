@@ -59,6 +59,21 @@ module Truffle
       [nil, [Diagnostic.new(type: "warning", message: e.message, path: file_path)]]
     end
 
+    # Discover and load every skill under a directory, returning the skills and
+    # the diagnostics gathered along the way. The discovery rules port pi's
+    # loadSkillsFromDir: a directory that holds a SKILL.md is a skill root, loaded
+    # as one skill with no further recursion; any other directory has its direct
+    # .md children loaded and its subdirectories recursed into looking for more
+    # SKILL.md roots (a stray .md inside a subdirectory is not a skill, only a
+    # SKILL.md is). Dotfiles and node_modules are skipped, and a path that is not a
+    # directory yields nothing. Entries are walked in sorted order so the result is
+    # deterministic rather than filesystem-order dependent. The ignore-file
+    # matching and symlink realpath dedup pi layers on top are deferred to a later
+    # slice; ordinary symlinks resolve naturally through File.file?/File.directory?.
+    def load_dir(dir)
+      load_dir_internal(dir, include_root_files: true)
+    end
+
     # Format skills into the <available_skills> block a system prompt carries,
     # using the XML shape from the Agent Skills standard. Skills with model
     # invocation disabled are left out (they are reachable only by explicit
@@ -87,6 +102,49 @@ module Truffle
       lines << "</available_skills>"
       lines.join("\n")
     end
+
+    # The recursive worker behind load_dir. `include_root_files` is true only at
+    # the directory the caller named: it gates loading direct .md children, so a
+    # bare .md is a skill at a scan root but not when found while recursing for
+    # SKILL.md roots. A SKILL.md short-circuits: the directory is one skill and we
+    # do not descend. Ports pi's loadSkillsFromDirInternal minus the ignore matcher.
+    def load_dir_internal(dir, include_root_files:)
+      return [[], []] unless File.directory?(dir)
+
+      entries = Dir.children(dir).sort
+      skill_md = File.join(dir, "SKILL.md")
+      return load_from(skill_md) if entries.include?("SKILL.md") && File.file?(skill_md)
+
+      skills = []
+      diagnostics = []
+      entries.each do |name|
+        next if name.start_with?(".") || name == "node_modules"
+
+        sub_skills, sub_diags = load_entry(File.join(dir, name), name, include_root_files)
+        skills.concat(sub_skills)
+        diagnostics.concat(sub_diags)
+      end
+      [skills, diagnostics]
+    end
+    private_class_method :load_dir_internal
+
+    # Resolve one directory entry to its skills: descend into a subdirectory, or
+    # load a direct .md child when the scan root permits it. Anything else is empty.
+    def load_entry(full, name, include_root_files)
+      return load_dir_internal(full, include_root_files: false) if File.directory?(full)
+      return load_from(full) if include_root_files && name.end_with?(".md") && File.file?(full)
+
+      [[], []]
+    end
+    private_class_method :load_entry
+
+    # Load one skill file into the [skills, diagnostics] pair the walk accumulates,
+    # dropping the skill (but keeping its diagnostics) when the file did not load.
+    def load_from(file_path)
+      skill, diagnostics = load_file(file_path)
+      [skill ? [skill] : [], diagnostics]
+    end
+    private_class_method :load_from
 
     # The spec errors for a name: too long, characters outside lowercase a-z, 0-9
     # and hyphen, a leading or trailing hyphen, or consecutive hyphens. Ports pi's
