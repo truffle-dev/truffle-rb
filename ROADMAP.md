@@ -252,8 +252,9 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] Provider retry-delay headers: failed HTTP calls parse
       `retry-after-ms` and `retry-after` (seconds or HTTP-date), carry the delay
       on the returned error response, and let the agent prefer it over
-      exponential backoff. Ports the provider-delay behavior pi applies before
-      falling back to exponential retry delays.
+      exponential backoff, capped by `retry_settings[:max_delay_ms]` (60s by
+      default, 0/nil to disable the cap). Ports the provider-delay behavior pi
+      applies before falling back to exponential retry delays.
 14. [x] **Tool middleware.** before/after hooks around tool execution (logging,
     auth, rate limiting) without changing tool definitions. `Agent.new` takes
     `before_tool_call:` (veto a call with `{ block: true, reason: }`) and

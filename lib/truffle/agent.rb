@@ -51,10 +51,16 @@ module Truffle
     EVENTS = %i[agent_start turn_start message tool_call tool_result turn_end
                 agent_end compaction retry].freeze
 
-    # Auto-retry defaults, ported from pi's getRetrySettings (settings-manager.ts):
-    # retry up to three times with exponential backoff from a 2s base, on. A
-    # caller tunes or disables this with retry_settings: at construction.
-    DEFAULT_RETRY_SETTINGS = { enabled: true, max_retries: 3, base_delay_ms: 2000 }.freeze
+    # Auto-retry defaults, ported from pi's getRetrySettings plus its provider
+    # retry-delay cap: retry up to three times with exponential backoff from a 2s
+    # base, and cap any server-requested delay at 60s. A caller tunes or disables
+    # this with retry_settings: at construction.
+    DEFAULT_RETRY_SETTINGS = {
+      enabled: true,
+      max_retries: 3,
+      base_delay_ms: 2000,
+      max_delay_ms: 60_000
+    }.freeze
     TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns,
@@ -116,7 +122,7 @@ module Truffle
       @session = session
       @compaction_settings = compaction_settings
       @auto_compact = auto_compact
-      @retry_settings = retry_settings
+      @retry_settings = DEFAULT_RETRY_SETTINGS.merge(retry_settings || {})
       @tool_execution = normalize_tool_execution(tool_execution)
       # Optional tool-execution middleware, ported from pi's beforeToolCall /
       # afterToolCall seam. Each is a callable handed a single context Hash. The
@@ -425,8 +431,7 @@ module Truffle
         return :none
       end
 
-      delay_ms = response.retry_after_ms ||
-                 (@retry_settings[:base_delay_ms] * (2**(@retry_attempt - 1)))
+      delay_ms = retry_delay_ms(response)
       emit(:retry, attempt: @retry_attempt, max_retries: @retry_settings[:max_retries],
                    delay_ms: delay_ms, error_message: response.error_message)
       backoff(delay_ms, signal)
@@ -434,6 +439,15 @@ module Truffle
       @messages.pop if @messages.last&.role == :assistant
       @last_usage = nil
       :retry
+    end
+
+    def retry_delay_ms(response)
+      delay_ms = response.retry_after_ms ||
+                 (@retry_settings[:base_delay_ms] * (2**(@retry_attempt - 1)))
+      max_delay_ms = @retry_settings[:max_delay_ms]
+      return delay_ms if max_delay_ms.nil? || max_delay_ms <= 0
+
+      [delay_ms, max_delay_ms].min
     end
 
     # Whether a failed turn reads as a transient, retryable error and is not a

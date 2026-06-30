@@ -99,6 +99,47 @@ class TestAgentRetry < Minitest::Test
     assert_equal [25], slept
   end
 
+  def test_retry_after_delay_is_capped
+    agent, = agent_over([transient_error("429 Too Many Requests", retry_after_ms: 5_000),
+                         StubProvider.text("Recovered.")],
+                        base_delay_ms: 1000, max_delay_ms: 50)
+    retry_delays = []
+    agent.on(:retry) { |p| retry_delays << p[:delay_ms] }
+
+    agent.stub(:backoff, ->(_delay_ms, _signal) {}) do
+      agent.run("go")
+    end
+
+    assert_equal [50], retry_delays
+  end
+
+  def test_retry_after_delay_uses_default_cap
+    agent, = agent_over([transient_error("429 Too Many Requests", retry_after_ms: 120_000),
+                         StubProvider.text("Recovered.")])
+    retry_delays = []
+    agent.on(:retry) { |p| retry_delays << p[:delay_ms] }
+
+    agent.stub(:backoff, ->(_delay_ms, _signal) {}) do
+      agent.run("go")
+    end
+
+    assert_equal [60_000], retry_delays
+  end
+
+  def test_retry_delay_cap_can_be_disabled
+    agent, = agent_over([transient_error("429 Too Many Requests", retry_after_ms: 5_000),
+                         StubProvider.text("Recovered.")],
+                        max_delay_ms: 0)
+    retry_delays = []
+    agent.on(:retry) { |p| retry_delays << p[:delay_ms] }
+
+    agent.stub(:backoff, ->(_delay_ms, _signal) {}) do
+      agent.run("go")
+    end
+
+    assert_equal [5_000], retry_delays
+  end
+
   def test_a_non_retryable_error_is_not_retried
     agent, provider = agent_over([transient_error("billing hard limit reached")])
     retried = false
