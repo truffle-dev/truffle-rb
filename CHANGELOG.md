@@ -24,6 +24,15 @@ All notable changes to Truffle are documented here. The format follows
   Dropped the planned `ruby_llm` adapter; every provider is hand-written.
 
 ### Added
+- `Truffle::Overflow.context_overflow?(response, context_window:)` recognizes a
+  turn that failed (or silently degraded) because the prompt exceeded the model's
+  context window, across the three ways providers report it: an error message
+  matching a known overflow phrase (excluding throttle and rate-limit wording that
+  only looks like overflow), a successful turn whose reported input already exceeds
+  the window, and a length stop that produced no output with the window all but
+  full. The window-relative cases fire only when `context_window:` is given.
+  `Overflow.patterns` returns a copy of the phrase list. Ports pi's
+  `isContextOverflow`; foundation for overflow-triggered emergency compaction.
 - Auto-compaction in the agent loop. A `Truffle::Agent` built with a `session:`
   is session-backed: every message it appends to its running history is mirrored
   into the session, and at the top of each turn it checks the previous response's

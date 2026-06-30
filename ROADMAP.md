@@ -210,6 +210,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] Drive compaction from the agent loop: `should_compact?` at the top of
       `Agent#run`, then `compact` and an `append_compaction` entry carrying the
       cut's `first_kept_entry_id` and file-ops `details`, then rebuild context.
+    - [x] `Overflow.context_overflow?`: detect a window-overflowed turn from its
+      error phrase, a silent over-window `stop`, or a zero-output `length` stop.
+      Ports pi's `isContextOverflow`. Foundation for overflow-triggered compaction.
+    - [ ] Drive overflow recovery from the agent loop: on an overflowed turn,
+      run a one-shot emergency compaction and retry (pi's overflow branch +
+      `_overflowRecoveryAttempted`). Needs the provider error surface to carry
+      the overflow signal first.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
 14. **Tool middleware.** before/after hooks around tool execution (logging,
