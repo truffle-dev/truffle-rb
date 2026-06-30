@@ -142,6 +142,32 @@ class TestSession < Minitest::Test
     assert_equal ["kept"], reloaded.messages.map(&:text)
   end
 
+  def test_load_rejects_a_malformed_middle_line
+    path = write_session_file(
+      "corrupt-middle.jsonl",
+      [
+        { type: "session", version: Truffle::Session::SESSION_VERSION,
+          id: "sess-corrupt", timestamp: "2025-01-01T00:00:00Z", cwd: "/work" },
+        { type: "message", id: "11111111", parent_id: nil,
+          timestamp: "2025-01-01T00:00:01Z",
+          message: { role: "user", content: [{ type: "text", text: "kept" }] } }
+      ]
+    )
+    File.open(path, "a") { |handle| handle.write("{not json}\n") }
+    File.open(path, "a") do |handle|
+      handle.write(JSON.generate(
+                     type: "message", id: "22222222", parent_id: "11111111",
+                     timestamp: "2025-01-01T00:00:02Z",
+                     message: { role: "assistant", content: [{ type: "text", text: "hidden" }] }
+                   ))
+      handle.write("\n")
+    end
+
+    error = assert_raises(ArgumentError) { Truffle::Session.load(path) }
+
+    assert_match(/malformed session line 3/, error.message)
+  end
+
   def test_append_after_load_does_not_reparse_unknown_content_blocks
     path = write_session_file(
       "future-content.jsonl",

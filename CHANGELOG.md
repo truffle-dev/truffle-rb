@@ -26,6 +26,9 @@ All notable changes to Truffle are documented here. The format follows
 - Session appends no longer reparse older message content just to decide whether
   the first assistant message has been seen, so sessions containing
   forward-compatible content blocks can still accept new entries.
+- `Session.load` now raises on malformed JSONL before the final line instead of
+  silently dropping the corrupt entry and shortening the resumed conversation.
+  A truncated final line is still tolerated as an interrupted append.
 - `Agent#dump` / `Agent.load` now preserve accumulated token usage and cost, so
   a resumed agent continues accounting from the saved session instead of
   restarting totals at zero.

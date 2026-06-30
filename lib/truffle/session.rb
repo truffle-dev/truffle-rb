@@ -26,18 +26,9 @@ module Truffle
   # wants a partial session persisted. Old v1/v2 files are migrated to the current
   # tree shape on load.
   #
-  # Because entries form a tree, the leaf can be moved back to an earlier entry
-  # (#branch / #reset_leaf) so the next append opens a second child, a new branch
-  # that leaves the abandoned path untouched. #branch_with_summary does the same
-  # but drops a branch_summary entry on the new path, a digest of the turns it
-  # came back past that folds into #context as a user message. Any entry can carry
-  # a user label (#append_label_change / #label), a bookmark that rides along as
-  # its own entry and never enters the model's context.
-  #
-  #   session = Truffle::Session.create(dir: "/tmp/sessions", cwd: Dir.pwd)
-  #   session.append_message(Truffle::Message.user("hello"))
-  #   reloaded = Truffle::Session.load(session.file)
-  #   reloaded.messages # => [#<Truffle::Message role=:user ...>]
+  # Because entries form a tree, #branch and #reset_leaf can move the leaf back
+  # before the next append opens a second child. Branch summaries and labels ride
+  # along as entries while staying out of normal message history.
   class Session
     # Bumped when the on-disk entry shape changes. New sessions are born at this
     # version; older v1/v2 files are upgraded by .load.
@@ -91,12 +82,18 @@ module Truffle
       new(file: file, header: header, entries: [], flushed: false)
     end
 
-    # Read a session file back: parse each JSONL line, skipping any that do not
-    # parse (pi tolerates a truncated final write), then require the first entry
-    # to be a valid session header. The returned Session is bound to the same
-    # file, so a resumed conversation keeps appending to it.
+    # Read a session file back: parse each JSONL line, tolerating a malformed
+    # final line because it may be an interrupted append. Earlier malformed lines
+    # are rejected because dropping one would break the parent_id chain and hide
+    # history loss. The returned Session is bound to the same file, so a resumed
+    # conversation keeps appending to it.
     def self.load(path)
-      parsed = File.read(path).each_line.filter_map { |line| parse_line(line) }
+      lines = File.read(path).each_line.to_a
+      final_entry_index = lines.rindex { |line| !line.strip.empty? }
+      parsed = lines.each_with_index.filter_map do |line, index|
+        parse_line(line, final_entry: index == final_entry_index,
+                         line_number: index + 1, path: path)
+      end
       header = parsed.first
       unless header && header[:type] == "session" && header[:id].is_a?(String)
         raise ArgumentError, "not a valid Truffle session: #{path}"
@@ -109,15 +106,16 @@ module Truffle
       new(file: path, header: header, entries: parsed.drop(1), flushed: true)
     end
 
-    # Parse one JSONL line into an entry with symbol top-level keys. The nested
-    # message Hash keeps its string keys; Message.from_h folds them. Blank and
-    # malformed lines return nil so the caller drops them.
-    def self.parse_line(line)
+    # Parse one JSONL line. Blank lines return nil; a malformed final line is
+    # treated as a partial append, while malformed earlier lines raise.
+    def self.parse_line(line, final_entry:, line_number:, path:)
       return nil if line.strip.empty?
 
       JSON.parse(line).transform_keys(&:to_sym)
-    rescue JSON::ParserError
-      nil
+    rescue JSON::ParserError => e
+      return nil if final_entry
+
+      raise ArgumentError, "malformed session line #{line_number} in #{path}: #{e.message}"
     end
     private_class_method :parse_line
 
@@ -138,14 +136,10 @@ module Truffle
     end
 
     # The session version recorded in the header.
-    def version
-      @header[:version]
-    end
+    def version = @header[:version]
 
     # The entries after the header, in file order (a defensive copy).
-    def entries
-      @entries.dup
-    end
+    def entries = @entries.dup
 
     # Force any buffered header/entries to disk. This keeps the pi optimization
     # for normal runs while letting explicit persistence paths (Agent#dump, tests,
