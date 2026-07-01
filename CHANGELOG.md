@@ -33,6 +33,15 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::MessageTransform.downgrade_unsupported_images` ports the image
+  downgrade pass from pi's `ai/src/api/transform-messages.ts`. For a model with
+  no image input modality it rebuilds user and tool-result messages with each
+  image block replaced by a placeholder text block (`(image omitted: model does
+  not support images)` for user content, `(tool image omitted: ...)` for tool
+  results), collapsing consecutive images to a single placeholder. Vision models
+  and assistant/system messages pass through untouched. The module is
+  provider-agnostic; a provider calls it before serializing a turn so a non-vision
+  model never receives image content its API would reject.
 - `Truffle::TokenBudget` ports pi's per-call token-budget math from
   `ai/src/api/simple-options.ts`. `clamp_max_tokens_to_context` fits a requested
   output cap inside a model's remaining context window (leaving a 4096-token

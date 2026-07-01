@@ -121,6 +121,15 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       1024-token visible-answer floor. Pure and provider-agnostic: the caller
       passes the context estimate as an integer and a provider option builder
       consumes the result when translating a reasoning level into API parameters.
+    - [x] **Non-vision image downgrade.** `Truffle::MessageTransform.
+      downgrade_unsupported_images` ports the image pass of pi's
+      `transform-messages.ts`: for a model without an image input modality, user
+      and tool-result image blocks become a placeholder text block, consecutive
+      images collapsing to one. Provider-agnostic, called before serialization so
+      a non-vision model never receives image content. The rest of
+      `transformMessages` (cross-model thinking, tool-call-id normalization,
+      synthetic tool results) waits on assistant-message provider/model metadata
+      the flat `Message` does not yet carry.
 
 ## Phase 3: the coding-agent surface
 
