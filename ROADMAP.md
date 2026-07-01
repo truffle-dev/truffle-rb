@@ -543,6 +543,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       value.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
+    - [x] **Project initializer.** `truffle init` creates `.truffle/` with
+      `settings.json`, `prompts/`, `extensions/`, `skills/`, and `sessions/`,
+      plus an `AGENTS.md` project memory file when absent. It is idempotent and
+      never overwrites existing project files.
+    - [ ] Load project settings from `.truffle/settings.json` once there is a
+      runtime settings object to apply them to.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
     (sessions, memory) so upgrades are safe.
 

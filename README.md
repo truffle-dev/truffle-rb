@@ -88,12 +88,16 @@ bundle install
 Truffle targets Ruby 3.1 and newer.
 
 Installing the gem also adds a `truffle` command. Today it answers
-`truffle --version`, `truffle --help`, `truffle --list-models`, and one-shot
-`truffle --print` runs. Use `truffle --mode json "..."` when an app wants
-newline-delimited agent events instead of only the final text. Text `@file`
+`truffle --version`, `truffle --help`, `truffle --list-models`, `truffle init`,
+and one-shot `truffle --print` runs. Use `truffle --mode json "..."` when an
+app wants newline-delimited agent events instead of only the final text. Text `@file`
 arguments are included in the first prompt, and supported image `@file`
 arguments attach to that first model turn. Automatic image resizing and the
 interactive REPL are still in progress.
+
+Run `truffle init` in an app repo to create `.truffle/` project state and an
+`AGENTS.md` project memory file. It is safe to rerun; existing files are left
+unchanged.
 
 ## A Real Example
 

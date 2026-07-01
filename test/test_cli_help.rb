@@ -16,6 +16,10 @@ class TestCLIHelp < Minitest::Test
     assert help.start_with?("truffle - AI coding assistant")
   end
 
+  def test_help_shows_the_init_command
+    assert_includes help, "truffle init"
+  end
+
   def test_help_includes_every_section_header
     text = help
 

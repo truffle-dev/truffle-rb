@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "json"
 require "stringio"
 require "tmpdir"
 
@@ -185,6 +186,51 @@ class TestCLIRunner < Minitest::Test
     assert_equal Truffle::CLI::EXIT_NOT_IMPLEMENTED, status
     assert_includes err, "truffle: interactive mode is not implemented yet"
     assert_empty out
+  end
+
+  def test_init_creates_project_state_and_memory_file
+    in_tmpdir do |dir|
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      assert_includes out, "Initialized Truffle project."
+      assert_includes out, "created: .truffle/"
+      assert_includes out, "created: .truffle/settings.json"
+      assert_includes out, "created: AGENTS.md"
+
+      assert_path_exists File.join(dir, ".truffle")
+      assert_path_exists File.join(dir, ".truffle", "prompts")
+      assert_path_exists File.join(dir, ".truffle", "extensions")
+      assert_path_exists File.join(dir, ".truffle", "skills")
+      assert_path_exists File.join(dir, ".truffle", "sessions")
+      settings = JSON.parse(File.read(File.join(dir, ".truffle", "settings.json")))
+
+      assert_equal({ "version" => 1 }, settings)
+      assert_includes File.read(File.join(dir, "AGENTS.md")), "Project Instructions"
+    end
+  end
+
+  def test_init_is_idempotent_and_does_not_clobber_agents_file
+    in_tmpdir do |dir|
+      File.write("AGENTS.md", "keep me")
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      assert_equal "keep me", File.read(File.join(dir, "AGENTS.md"))
+      assert_includes out, "existing: AGENTS.md"
+      assert_includes out, "created: .truffle/"
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      assert_includes out, "existing: .truffle/"
+      assert_includes out, "existing: .truffle/settings.json"
+      refute_includes out, "created:"
+    end
   end
 
   # ---- --print single-shot dispatch ----

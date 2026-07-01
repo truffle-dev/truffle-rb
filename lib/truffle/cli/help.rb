@@ -36,6 +36,7 @@ module Truffle
       <<~SECTION.chomp
         #{bold.call("Usage:")}
           #{APP_NAME} [options] [@files...] [messages...]
+          #{APP_NAME} init
       SECTION
     end
 
@@ -130,6 +131,9 @@ module Truffle
 
       # Non-interactive mode (process and exit)
       #{APP_NAME} -p "List all .rb files in lib/"
+
+      # Initialize project-local Truffle state
+      #{APP_NAME} init
 
       # Continue the previous session
       #{APP_NAME} --continue "What did we discuss?"

@@ -22,7 +22,7 @@ module Truffle
       :no_session, :session, :session_id, :fork, :session_dir, :models,
       :tools, :exclude_tools, :no_tools, :no_builtin_tools, :extensions,
       :no_extensions, :print, :export, :no_skills, :skills, :prompt_templates,
-      :no_prompt_templates, :themes, :no_themes, :no_context_files, :list_models,
+      :no_prompt_templates, :themes, :no_themes, :no_context_files, :list_models, :init,
       :offline, :verbose, :project_trust_override, :messages, :file_args,
       :unknown_flags, :diagnostics,
       keyword_init: true
@@ -80,6 +80,10 @@ module Truffle
     # `arg === "--x" && i + 1 < length` guards.
     def parse_args(argv)
       result = Args.new(messages: [], file_args: [], unknown_flags: {}, diagnostics: [])
+      if argv.first == "init"
+        result.init = true
+        argv = argv[1..] || []
+      end
       index = 0
       index = advance(argv, index, result) while index < argv.length
       result

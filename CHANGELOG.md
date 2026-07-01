@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `truffle init` creates project-local Truffle state without overwriting existing
+  files: `.truffle/` with `settings.json`, `prompts/`, `extensions/`, `skills/`,
+  and `sessions/`, plus an `AGENTS.md` project memory file when one is absent.
 - `Agent#run_stream` drives the normal multi-turn agent loop through provider
   streaming, yielding normalized `Truffle::StreamEvent` objects for token-level
   UI updates while keeping `Agent#run` unchanged. Streamed tool calls still run

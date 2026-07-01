@@ -142,6 +142,21 @@ class TestCLI < Minitest::Test
     assert bare.continue
   end
 
+  def test_init_is_a_command_not_a_prompt
+    args = parse("init")
+
+    assert args.init
+    assert_empty args.messages
+  end
+
+  def test_init_keeps_normal_flag_parsing_after_the_command
+    args = parse("init", "--help")
+
+    assert args.init
+    assert args.help
+    assert_empty args.messages
+  end
+
   def test_approve_sets_trust_override_both_ways
     assert parse("--approve").project_trust_override
     assert parse("-a").project_trust_override

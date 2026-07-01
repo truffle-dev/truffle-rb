@@ -54,6 +54,8 @@ module Truffle
         return 0
       end
 
+      return run_init(out: out) if args.init
+
       if args.mode == "rpc"
         err.puts "#{APP_NAME}: rpc mode is not implemented yet"
         return EXIT_NOT_IMPLEMENTED
@@ -65,6 +67,20 @@ module Truffle
 
       err.puts "#{APP_NAME}: interactive mode is not implemented yet"
       EXIT_NOT_IMPLEMENTED
+    end
+
+    def run_init(out: $stdout)
+      result = Init.project
+      out.puts "Initialized Truffle project."
+      print_init_paths("created", result.created, out)
+      print_init_paths("existing", result.existing, out)
+      0
+    end
+
+    def print_init_paths(label, paths, out)
+      return if paths.empty?
+
+      paths.each { |path| out.puts "#{label}: #{path}" }
     end
 
     # Drive a single-shot `--print` run: build the agent, prompt it with the
@@ -205,7 +221,8 @@ module Truffle
       args.print || args.mode == "json"
     end
 
-    private_class_method :run_print, :final_print_response, :print_input,
+    private_class_method :run_init, :print_init_paths,
+                         :run_print, :final_print_response, :print_input,
                          :print_file_input, :piped_stdin, :build_print_agent, :print_tools,
                          :report_diagnostics, :color?, :print_mode?
   end
