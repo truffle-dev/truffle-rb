@@ -553,6 +553,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       line-oriented REPL. `--session <path|id>` resolves a specific session file
       or unique project session reference. The interactive picker, fork, and
       session-id creation paths remain later CLI slices.
+    - [x] **Default REPL session persistence.** Fresh interactive CLI runs now
+      create a project session by default, record the active model and enabled
+      builtin tool names, and mirror turns through the session-backed agent path.
+      `--no-session` keeps the loop ephemeral; fresh print mode remains
+      sessionless.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

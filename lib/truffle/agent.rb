@@ -61,7 +61,7 @@ module Truffle
     }.freeze
     TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
-    attr_reader :provider, :messages, :toolbox, :system_prompt, :max_turns,
+    attr_reader :provider, :messages, :toolbox, :system_prompt, :model, :max_turns,
                 :usage, :session, :tool_execution, :extensions, :extension_errors
 
     # Resume an agent from a session file. The session carries the conversation

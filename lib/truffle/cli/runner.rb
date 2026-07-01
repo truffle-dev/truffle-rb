@@ -185,10 +185,30 @@ module Truffle
     def build_cli_agent(args, cwd: Dir.pwd)
       return load_cli_agent(args, cwd: cwd) if args.continue || args.session
 
+      tools = print_tools(args, cwd)
+      session = new_cli_session(args, cwd: cwd, tools: tools)
       options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
-                  tools: print_tools(args, cwd) }
+                  tools: tools, session: session }
       options[:api_key] = args.api_key if args.api_key
-      Truffle.agent(**options)
+      agent = Truffle.agent(**options)
+      record_cli_model_change(agent, session)
+      agent
+    end
+
+    def new_cli_session(args, cwd: Dir.pwd, tools: [])
+      return nil if args.no_session || print_mode?(args)
+
+      Truffle::Session.create(cwd: cwd, dir: cli_session_dir(args, cwd),
+                              tools: tools.map(&:name))
+    end
+
+    def record_cli_model_change(agent, session)
+      return unless session
+
+      model = agent.model || (agent.provider.model if agent.provider.respond_to?(:model))
+      return if model.nil? || model.empty?
+
+      session.append_model_change(provider: agent.provider.name, model_id: model)
     end
 
     def load_cli_agent(args, cwd: Dir.pwd)
@@ -289,6 +309,7 @@ module Truffle
     private_class_method :run_init, :print_init_paths,
                          :run_print, :final_print_response, :print_input,
                          :print_file_input, :piped_stdin, :build_cli_agent, :print_tools,
+                         :new_cli_session, :record_cli_model_change,
                          :load_cli_agent, :cli_provider, :cli_provider_options,
                          :continued_session_path, :resolve_session_reference,
                          :cli_session_dir,

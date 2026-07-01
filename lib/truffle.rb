@@ -141,6 +141,7 @@ module Truffle
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
             max_turns: nil, tool_execution: :parallel,
             prompt_templates: [], slash_commands: nil, extensions: nil,
+            session: nil,
             compaction_settings: nil, retry_settings: nil,
             settings: :project, cwd: Dir.pwd,
             **provider_options)
@@ -161,6 +162,7 @@ module Truffle
       tools: tools,
       model: model,
       max_turns: max_turns,
+      session: session,
       compaction_settings: compaction_settings,
       retry_settings: retry_settings,
       tool_execution: tool_execution,

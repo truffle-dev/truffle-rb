@@ -17,6 +17,9 @@ All notable changes to Truffle are documented here. The format follows
   in both print mode and the interactive REPL. `--session <path|id>` resolves a
   specific session file or unique project session reference. The interactive
   picker, fork, and session-id creation paths remain later CLI slices.
+- Fresh interactive CLI runs now create a project session by default, recording
+  the model and enabled builtin tool names before the first turn. `--no-session`
+  keeps the REPL ephemeral, and fresh print-mode runs stay sessionless.
 - A first interactive REPL for the `truffle` binary. A bare `truffle` starts a
   line-oriented loop over one agent, processes any initial CLI messages, reads
   turns until EOF or `/exit`, and renders assistant text with the same final-turn

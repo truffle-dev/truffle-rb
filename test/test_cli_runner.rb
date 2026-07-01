@@ -634,6 +634,43 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_fresh_repl_agent_is_session_backed_by_default
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test"])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_instance_of Truffle::Session, agent.session
+      assert_equal dir, agent.session.cwd
+      assert_equal %w[read write bash edit find grep], agent.session.tools
+
+      model_change = agent.session.entries.first
+
+      assert_equal "model_change", model_change[:type]
+      assert_equal "openai", model_change[:provider]
+      assert_equal "gpt-4o-mini", model_change[:model_id]
+    end
+  end
+
+  def test_no_session_keeps_a_fresh_repl_agent_ephemeral
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                      "--no-session"])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_nil agent.session
+    end
+  end
+
+  def test_fresh_print_agent_stays_sessionless
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                      "--print", "ask"])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_nil agent.session
+    end
+  end
+
   def test_repl_with_an_unresolvable_model_errors_on_stderr_and_exits_one
     status, out, err = run_repl_cli([], input: StringIO.new("/exit\n"))
 
