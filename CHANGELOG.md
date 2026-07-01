@@ -24,6 +24,10 @@ All notable changes to Truffle are documented here. The format follows
   `#append` contract holds the store consistent across its block, so the #32
   flock/leaf-refresh semantics stay in the file store. See
   `examples/custom_session_store.rb` for an illustrative in-memory store.
+- `Agent.load` can rebuild a provider from the provider/model recorded in a
+  session when the provider is available through extensions or the in-process
+  registry. Passing `provider:` still wins, but extension-backed sessions no
+  longer need a caller to manually reconstruct the same provider instance.
 - `script/refresh-models` regenerates `lib/truffle/models.rb` from
   `models.dev/api.json` as an explicit maintenance step. The generator uses
   `Net::HTTP`, filters to provider-backed text-output models Truffle can route,

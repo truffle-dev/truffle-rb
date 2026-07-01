@@ -140,6 +140,42 @@ class TestAgentPersistence < Minitest::Test
     end
   end
 
+  def test_load_can_rebuild_a_recorded_extension_provider
+    Dir.mktmpdir("truffle-agent") do |dir|
+      extension_path = File.join(dir, "provider_ext.rb")
+      File.write(extension_path, <<~RUBY)
+        truffle.register_provider("local", {
+          api: :openai_completions,
+          base_url: "http://localhost:11434/v1",
+          api_key: "test-key",
+          model: "llama3"
+        })
+      RUBY
+      extensions = Truffle::Extensions.load_files([extension_path])
+      session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("ok")]),
+                                  model: "llama3")
+      session.append_model_change(provider: "local", model_id: "llama3")
+
+      agent = Truffle::Agent.load(session.file, extensions: extensions)
+
+      assert_instance_of Truffle::Providers::OpenAI, agent.provider
+      assert_equal "local", agent.provider.name
+      assert_equal "http://localhost:11434/v1", agent.provider.base_url
+      assert_equal "llama3", agent.instance_variable_get(:@model)
+    end
+  end
+
+  def test_load_without_provider_requires_a_recorded_provider
+    Dir.mktmpdir("truffle-agent") do |dir|
+      session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("ok")]))
+
+      error = assert_raises(Truffle::Error) { Truffle::Agent.load(session.file) }
+
+      assert_match(/session has no recorded provider/, error.message)
+      assert_match(/pass provider:/, error.message)
+    end
+  end
+
   def test_dump_records_the_model_and_load_restores_it
     Dir.mktmpdir("truffle-agent") do |dir|
       session = dumped_agent(dir, provider: StubProvider.new([StubProvider.text("ok")]),

@@ -65,20 +65,25 @@ module Truffle
                 :usage, :session, :tool_execution, :extensions, :extension_errors
 
     # Resume an agent from a session file. The session carries the conversation
-    # and, when it was dumped by #dump, the model and the names of the tools the
-    # agent had. The caller re-supplies the live pieces that cannot be serialized:
-    # the provider, the actual tool implementations, and the system prompt (pi
-    # regenerates the system prompt from config rather than storing it, so it is
-    # configuration here too). Tools are rebound by name: every tool the dumped
-    # agent had must be present in `tools`, or load raises. The model defaults to
-    # the one recorded in the session; pass model: to override it.
-    def self.load(path, provider:, tools: [], system_prompt: nil, model: nil,
+    # and, when it was dumped by #dump, the provider/model and the names of the
+    # tools the agent had. The caller re-supplies the live pieces that cannot
+    # always be serialized: the actual tool implementations and the system prompt
+    # (pi regenerates the system prompt from config rather than storing it, so it
+    # is configuration here too). Passing provider: still wins. If provider: is
+    # omitted, Agent.load rebuilds the provider from the session's recorded
+    # model_change entry through Truffle.provider, so extension-registered and
+    # in-process registered providers can resume by name. Tools are rebound by
+    # name: every tool the dumped agent had must be present in `tools`, or load
+    # raises. The model defaults to the one recorded in the session; pass model:
+    # to override it.
+    def self.load(path, provider: nil, tools: [], system_prompt: nil, model: nil,
                   max_turns: DEFAULT_MAX_TURNS, tool_execution: :parallel,
                   prompt_templates: [], slash_commands: nil, extensions: nil,
                   extension_provider_name: nil, extension_provider_overrides: {})
       session = Session.load(path)
       toolbox = rebind_toolbox(session.tools, tools, extensions: extensions)
       context = session.context
+      provider ||= provider_from_session(context, extensions, extension_provider_overrides)
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
                   model: model || context.model&.model_id, max_turns: max_turns,
                   tool_execution: tool_execution, prompt_templates: prompt_templates,
@@ -87,6 +92,17 @@ module Truffle
                   extension_provider_overrides: extension_provider_overrides)
       agent.restore(context.messages, usage: session.usage)
     end
+
+    def self.provider_from_session(context, extensions, provider_options)
+      model = context.model
+      unless model
+        raise Error,
+              "session has no recorded provider; pass provider: to Agent.load"
+      end
+
+      Truffle.provider(model.provider, extensions: extensions, **provider_options)
+    end
+    private_class_method :provider_from_session
 
     # session, when given, makes the agent session-backed: appended messages are
     # mirrored into it and the run auto-compacts against the model's window. The

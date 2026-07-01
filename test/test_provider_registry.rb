@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
+require "tmpdir"
 
 # Programmatic OpenAI-compatible providers use the same normalized config path
 # as extension registrations, without writing a Ruby extension file to disk.
@@ -105,6 +106,22 @@ class TestProviderRegistry < Minitest::Test
 
     assert_equal "local", agent.provider.name
     assert_equal "llama3", agent_model(agent)
+  end
+
+  def test_agent_load_rebuilds_registered_provider_from_session_model_change
+    register_local_provider
+
+    Dir.mktmpdir("truffle-provider-registry") do |dir|
+      session = Truffle::Session.create(dir: dir, cwd: "/work")
+      session.append_model_change(provider: "local", model_id: "llama3")
+      session.flush
+
+      agent = Truffle::Agent.load(session.file)
+
+      assert_equal "local", agent.provider.name
+      assert_equal "llama3", agent_model(agent)
+      assert_equal "http://localhost:11434/v1", agent.provider.base_url
+    end
   end
 
   def test_extension_registration_wins_over_process_registry_for_same_provider

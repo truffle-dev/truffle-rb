@@ -461,8 +461,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       built-in provider names restore the built-in provider with caller overrides,
       while extension-only provider names fail clearly instead of silently reusing
       a stale endpoint.
-    - [ ] Bind provider registration reload/unregister into sessions, plus
-      non-OpenAI custom APIs, OAuth, and `streamSimple`.
+    - [x] **Resume sessions through registered providers.** `Agent.load` now uses
+      the provider recorded in a session's latest `model_change` entry when the
+      caller omits `provider:`. It resolves that provider through extensions or
+      the in-process registry, while an explicit provider still wins.
+    - [ ] Bind provider registration reload/unregister into active session state,
+      plus non-OpenAI custom APIs, OAuth, and `streamSimple`.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

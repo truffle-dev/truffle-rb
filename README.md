@@ -69,9 +69,9 @@ events. Your app owns the tools and business rules.
   retries, compaction, and final answers to build logs, UIs, or audit trails.
 - **Session-aware.** Agents can persist and reload conversation state, branch,
   label, compact old turns, and recover from context-window overflows. Sessions
-  default to a JSONL file but talk to storage through a small seam, so a host can
-  back them with a database or anything else (see
-  `examples/custom_session_store.rb`).
+  record the active provider and model, default to a JSONL file, and talk to
+  storage through a small seam, so a host can back them with a database or
+  anything else (see `examples/custom_session_store.rb`).
 - **No runtime dependencies.** The core uses Ruby's standard library.
 
 ## Install
