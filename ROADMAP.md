@@ -525,6 +525,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       magic-byte detection for JPEG, PNG, GIF, WEBP, and BMP that rejects a
       lossless JPEG and an animated PNG, reading raw bytes from a binary String
       with no image library pulled in.
+    - [x] Unicode surrogate sanitization. `Truffle::UnicodeSanitizer.sanitize_surrogates`
+      ports pi's `utils/sanitize-unicode.ts`: it strips lone surrogate byte
+      sequences (`\xED[\xA0-\xBF][\x80-\xBF]`) so text serializes into a provider
+      request body without JSON errors, while leaving valid characters (astral
+      emoji and the adjacent U+D000-U+D7FF range) untouched and returning a clean
+      string unchanged. Wiring it into the provider serializers is a later slice.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial

@@ -13,6 +13,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::UnicodeSanitizer.sanitize_surrogates` strips lone Unicode surrogate
+  byte sequences from text so it can be serialized into a provider request body
+  without JSON encoding errors. Valid characters, including astral emoji and the
+  adjacent U+D000-U+D7FF range, are left untouched; a clean string is returned
+  unchanged.
 - CLI-built agents now use the shared system prompt builder for fresh and
   resumed runs. `--system-prompt`, repeated `--append-system-prompt`, enabled
   builtin tool descriptions, and AGENTS/CLAUDE context files now flow into the
