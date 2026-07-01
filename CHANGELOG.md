@@ -19,6 +19,14 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::PartialJson.parse` and `.parse_streaming` complete a truncated JSON
+  document mid-stream, so a model's in-flight tool-call arguments become a usable
+  object before the closing token arrives. `parse` is a from-scratch port of the
+  `partial-json` package (0.1.7): a recursive-descent parser gated by an `Allow`
+  bitmask that returns as much structure as it can. `parse_streaming` layers the
+  `JsonRepair` complete-document path over it and always returns an object,
+  porting pi's `parseStreamingJson`. Faithfulness was checked against the
+  reference package across ~600 differential inputs. Zero runtime dependencies.
 - `Truffle::JsonRepair.repair` and `.parse` recover malformed JSON string
   literals in model output. `repair` escapes raw control characters and doubles
   a backslash before an invalid escape, both only inside string literals;

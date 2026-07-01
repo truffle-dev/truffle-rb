@@ -541,8 +541,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the repaired text only when the first parse fails and the repair changed the
       input. OpenAI, Anthropic, and Gemini final tool-call deserializers now run
       string-shaped arguments through `Providers.parse_tool_arguments`; unrepaired
-      JSON still lands under `_raw`. A zero-dep port of pi's `parseStreamingJson`
-      (which needs a from-scratch partial-JSON completer) remains a later slice.
+      JSON still lands under `_raw`.
+    - [x] Streaming partial-JSON completer. `Truffle::PartialJson.parse` is a
+      from-scratch port of the `partial-json` package (0.1.7): a recursive-descent
+      parser that returns as much structure as it can from a truncated document,
+      gated by an `Allow` bitmask. `Truffle::PartialJson.parse_streaming` layers
+      the `JsonRepair` complete-document path over it and always returns an object,
+      porting pi's `parseStreamingJson` so in-flight tool-call arguments are usable
+      before the closing token arrives. Faithfulness verified against the reference
+      package across ~600 differential inputs; provider serializers still wire it.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial
