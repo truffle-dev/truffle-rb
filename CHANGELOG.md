@@ -39,6 +39,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Live provider coverage now includes a shared streaming tool-loop matrix for
+  OpenAI, Anthropic, and Gemini. When the matching API keys are present, the
+  test runs `Agent#run_stream` end to end: streamed tool call, Ruby tool
+  execution, tool result replay, and final assistant answer. The default suite
+  remains offline because each provider case skips without its key.
 - Terminal text mode now uses one event renderer in both the interactive REPL
   and one-shot print runs. Assistant text streams to stdout while provider
   thinking, tool calls/results, retries, and compaction status render on
