@@ -17,8 +17,9 @@ class StreamingStubProvider < Truffle::Providers::Base
     raise "unexpected non-streaming chat: #{[messages, tools, model, options].inspect}"
   end
 
-  def chat_stream(messages:, tools: [], model: nil, signal: nil, **_options)
-    @calls << { messages: messages.map(&:to_h), tools: tools, model: model, signal: signal }
+  def chat_stream(messages:, tools: [], model: nil, signal: nil, **options)
+    @calls << { messages: messages.map(&:to_h), tools: tools, model: model,
+                signal: signal, options: options }
     raise "StreamingStubProvider ran out of scripted responses" if @script.empty?
 
     @script.shift.call(signal) { |event| yield event if block_given? }
@@ -110,6 +111,23 @@ class TestAgentStreaming < Minitest::Test
     agent.run_stream("stream")
 
     assert_equal %i[start text_start text_delta text_end done], observed
+  end
+
+  def test_run_stream_passes_structured_output_options_to_provider
+    schema = Truffle::Schema.build do
+      param :answer, :integer, required: true
+    end
+    provider = StreamingStubProvider.new([StreamingStubProvider.text('{"answer":42}')])
+    agent = Truffle::Agent.new(provider: provider)
+
+    result = agent.run_stream("return the answer", schema: schema,
+                                                   schema_name: "answer", strict: true)
+
+    assert_equal '{"answer":42}', result
+    assert_equal schema, provider.calls.first[:options][:schema]
+    assert_equal "answer", provider.calls.first[:options][:schema_name]
+    assert provider.calls.first[:options][:strict]
+    assert_equal({ "answer" => 42 }, agent.last_response.parsed)
   end
 
   def test_run_stream_handles_streamed_tool_call_then_final_text

@@ -93,6 +93,65 @@ class TestAgentLoop < Minitest::Test
     ], user[:content]
   end
 
+  def test_run_passes_structured_output_options_to_provider
+    schema = Truffle::Schema.build do
+      param :answer, :integer, required: true
+    end
+    provider = StubProvider.new([StubProvider.text('{"answer":42}')])
+    agent = Truffle::Agent.new(provider: provider)
+
+    result = agent.run("return the answer", schema: schema, schema_name: "answer",
+                                            strict: true)
+
+    assert_equal '{"answer":42}', result
+    assert_equal schema, provider.calls.first[:options][:schema]
+    assert_equal "answer", provider.calls.first[:options][:schema_name]
+    assert provider.calls.first[:options][:strict]
+    assert_equal({ "answer" => 42 }, agent.last_response.parsed)
+  end
+
+  def test_run_structured_returns_parsed_validated_response
+    schema = Truffle::Schema.build do
+      param :answer, :integer, required: true
+    end
+    provider = StubProvider.new([StubProvider.text('{"answer":42}')])
+    agent = Truffle::Agent.new(provider: provider)
+
+    parsed = agent.run_structured("return the answer", schema: schema)
+
+    assert_equal({ "answer" => 42 }, parsed)
+    assert_equal schema, provider.calls.first[:options][:schema]
+  end
+
+  def test_run_structured_rejects_schema_invalid_response
+    schema = Truffle::Schema.build do
+      param :answer, :integer, required: true
+    end
+    provider = StubProvider.new([StubProvider.text('{"answer":"forty-two"}')])
+    agent = Truffle::Agent.new(provider: provider)
+
+    error = assert_raises(Truffle::Error) do
+      agent.run_structured("return the answer", schema: schema)
+    end
+
+    assert_includes error.message, "structured response did not match schema"
+    assert_includes error.message, "$.answer must be an integer"
+  end
+
+  def test_run_structured_rejects_invalid_json
+    schema = Truffle::Schema.build do
+      param :answer, :integer, required: true
+    end
+    provider = StubProvider.new([StubProvider.text("not json")])
+    agent = Truffle::Agent.new(provider: provider)
+
+    error = assert_raises(Truffle::Error) do
+      agent.run_structured("return the answer", schema: schema)
+    end
+
+    assert_includes error.message, "structured response was not valid JSON"
+  end
+
   def test_emits_events_in_order
     provider = StubProvider.new([
                                   StubProvider.tool_call(id: "c1", name: "add",

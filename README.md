@@ -210,6 +210,25 @@ image = Truffle::Content::Image.from_file("screenshot.png")
 answer = agent.run("What changed?", images: [image].compact)
 ```
 
+For structured final data, pass a schema through the agent harness instead of
+calling a provider directly. `run_structured` requests native structured output
+from the provider, parses the final JSON, validates it against the schema, and
+returns the parsed Ruby value:
+
+```ruby
+schema = Truffle::Schema.build do
+  param :category, :string, required: true
+  param :priority, :string, enum: %w[low medium high], required: true
+end
+
+data = agent.run_structured("Classify this ticket: #{ticket}", schema: schema)
+# => {"category"=>"billing", "priority"=>"high"}
+```
+
+`run` and `run_stream` accept the same `schema:`, `schema_name:`, and `strict:`
+options when an app wants the raw final text. The full provider response is kept
+on `agent.last_response`.
+
 ### Events
 
 ```ruby

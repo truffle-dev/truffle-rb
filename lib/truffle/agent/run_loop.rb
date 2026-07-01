@@ -10,14 +10,15 @@ module Truffle
 
     private
 
-    def run_loop(user_input, images:, signal:, streaming:, stream_block:)
+    def run_loop(user_input, images:, signal:, streaming:, stream_block:, chat_options:)
       previous_extension_signal = @extension_signal
       @extension_signal = signal
       prepared = prepare_user_input(user_input, images)
       return run_slash_action(prepared.fetch(:command)) if prepared[:action]
 
       start_run(prepared.fetch(:input), images)
-      state = process_turns(streaming, signal, stream_block)
+      state = process_turns(streaming, signal, stream_block, chat_options)
+      @last_response = state.final_response
       emit_agent_end(state.final_text, state.final_response, state.aborted)
       state.final_text
     ensure
@@ -38,7 +39,7 @@ module Truffle
       @retry_attempt = 0
     end
 
-    def process_turns(streaming, signal, stream_block)
+    def process_turns(streaming, signal, stream_block, chat_options)
       state = RunState.new(aborted: false)
       turns = 0
 
@@ -50,7 +51,7 @@ module Truffle
         turns += 1
         return max_turns_state(state) if turns > max_turns
 
-        outcome = run_turn(turns, streaming, signal, stream_block)
+        outcome = run_turn(turns, streaming, signal, stream_block, chat_options)
         state.final_response = outcome.response
         state.aborted = outcome.aborted
         next if outcome.retry
@@ -62,9 +63,9 @@ module Truffle
       state
     end
 
-    def run_turn(turn, streaming, signal, stream_block)
+    def run_turn(turn, streaming, signal, stream_block, chat_options)
       emit(:turn_start, turn: turn)
-      response = request_assistant_turn(streaming, signal, stream_block)
+      response = request_assistant_turn(streaming, signal, stream_block, chat_options)
       record_assistant_response(response)
       if handle_recovery(response, signal) == :retry
         return TurnOutcome.new(response: response, retry: true)
@@ -81,8 +82,12 @@ module Truffle
       end
     end
 
-    def request_assistant_turn(streaming, signal, stream_block)
-      streaming ? stream_current_turn(signal, &stream_block) : chat_current_turn
+    def request_assistant_turn(streaming, signal, stream_block, chat_options)
+      if streaming
+        stream_current_turn(signal, chat_options, &stream_block)
+      else
+        chat_current_turn(chat_options)
+      end
     end
 
     def record_assistant_response(response)

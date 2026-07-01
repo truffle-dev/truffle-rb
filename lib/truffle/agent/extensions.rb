@@ -100,15 +100,16 @@ module Truffle
       maybe_compact(signal)
     end
 
-    def chat_current_turn
+    def chat_current_turn(chat_options)
       refresh_extension_provider
-      @provider.chat(messages: provider_messages, tools: @toolbox.to_schema, model: @model)
+      @provider.chat(messages: provider_messages, tools: @toolbox.to_schema, model: @model,
+                     **chat_options)
     end
 
-    def stream_current_turn(signal)
+    def stream_current_turn(signal, chat_options)
       refresh_extension_provider
       @provider.chat_stream(messages: provider_messages, tools: @toolbox.to_schema, model: @model,
-                            signal: signal) do |event|
+                            signal: signal, **chat_options) do |event|
         emit(:stream, event: event)
         yield event if block_given?
       end

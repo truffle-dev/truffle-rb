@@ -39,6 +39,12 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Agents now expose provider-native structured output through the harness:
+  `run_structured` sends a schema with the provider request, parses the final
+  JSON, validates it against the schema, and returns the parsed Ruby value.
+  `run` and `run_stream` accept the same per-run schema options and keep the
+  final `Response` on `agent.last_response`. Live coverage verifies the path
+  against OpenAI, Anthropic, and Gemini when the matching API keys are present.
 - Extension slash-command handlers now receive a Ruby command context when they
   accept a second argument. The context carries the same runtime fields as event
   handlers plus command metadata (`command`, raw `args_string`, and parsed

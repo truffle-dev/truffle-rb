@@ -63,7 +63,7 @@ module Truffle
 
     attr_reader :provider, :messages, :toolbox, :system_prompt, :model, :model_spec,
                 :max_turns, :usage, :session, :tool_execution, :extensions,
-                :extension_errors
+                :extension_errors, :last_response
 
     # Resume an agent from a session file. The session carries the conversation
     # and, when it was dumped by #dump, the provider/model and the names of the
@@ -156,6 +156,7 @@ module Truffle
       # compact-and-retry attempt. Reset at the start of each run and after any
       # turn that did not overflow, so each distinct overflow gets one recovery.
       @overflow_recovery_attempted = false
+      @last_response = nil
 
       @messages = []
       @messages << Message.system(system_prompt) if system_prompt
@@ -186,8 +187,10 @@ module Truffle
     # Send a user message and run the loop until the model answers. `images:`
     # accepts Truffle::Content::Image blocks for multimodal turns. Pass signal:
     # a Truffle::AbortSignal to stop at turn boundaries.
-    def run(user_input, images: [], signal: nil)
-      run_loop(user_input, images: images, signal: signal, streaming: false, stream_block: nil)
+    def run(user_input, images: [], signal: nil, schema: nil, schema_name: nil, strict: nil)
+      run_loop(user_input, images: images, signal: signal, streaming: false,
+                           stream_block: nil,
+                           chat_options: structured_options(schema, schema_name, strict))
     end
 
     # Streaming counterpart to #run. The agent loop stays the same, including
@@ -196,8 +199,11 @@ module Truffle
     # The block receives Truffle::StreamEvent objects as the provider emits them;
     # host apps can bridge those events to SSE, ActionCable, WebSocket, or logs.
     # Non-streaming #run deliberately remains unchanged.
-    def run_stream(user_input, images: [], signal: nil, &block)
-      run_loop(user_input, images: images, signal: signal, streaming: true, stream_block: block)
+    def run_stream(user_input, images: [], signal: nil, schema: nil, schema_name: nil,
+                   strict: nil, &block)
+      run_loop(user_input, images: images, signal: signal, streaming: true,
+                           stream_block: block,
+                           chat_options: structured_options(schema, schema_name, strict))
     end
 
     # Reset history back to just the system prompt (keeps tools + listeners) and
