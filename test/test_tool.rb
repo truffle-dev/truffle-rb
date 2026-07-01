@@ -197,4 +197,32 @@ class TestTool < Minitest::Test
 
     assert_equal "Infinity", infinite.call({})
   end
+
+  def test_image_content_result_passes_through_for_a_multimodal_tool
+    # A tool can return a Content::Image so the model sees the picture rather than
+    # base64 text; the block passes through unchanged for the tool-result message.
+    shot = Truffle::Tool.define("shot", "Return a screenshot") do
+      run { Truffle::Content::Image.new(data: "AAAA", mime_type: "image/png") }
+    end
+
+    result = shot.call({})
+
+    assert_instance_of Truffle::Content::Image, result
+    assert_equal "image/png", result.mime_type
+  end
+
+  def test_mixed_text_and_image_content_result_passes_through
+    tool = Truffle::Tool.define("annotated_shot", "Return text and a screenshot") do
+      run do
+        [Truffle::Content::Text.new(text: "the hero section"),
+         Truffle::Content::Image.new(data: "AAAA", mime_type: "image/png")]
+      end
+    end
+
+    result = tool.call({})
+
+    assert_equal 2, result.length
+    assert_instance_of Truffle::Content::Text, result[0]
+    assert_instance_of Truffle::Content::Image, result[1]
+  end
 end

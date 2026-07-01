@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "content"
 require_relative "schema"
 require_relative "schema_coercion"
 
@@ -113,17 +114,26 @@ module Truffle
 
     # The model reads tool output as text. A String result is already that text
     # and passes through unchanged, so a handler that formats its own output
-    # keeps working. Any other value (a Hash or Array of structured data, or a
+    # keeps working. A Content block (or an array of them) is a multimodal result
+    # and passes through too, so a tool can return an image the model sees rather
+    # than base64 text. Any other value (a Hash or Array of structured data, or a
     # scalar) is encoded as JSON so the model receives valid JSON rather than
     # Ruby's inspect syntax (`{:a=>1}`), mirroring how pi stringifies a
     # structured tool result with JSON.stringify. A value JSON cannot represent
     # (Infinity, NaN) falls back to its plain string form.
     def serialize_result(result)
-      return result if result.is_a?(String)
+      return result if result.is_a?(String) || content_result?(result)
 
       JSON.generate(result)
     rescue JSON::GeneratorError
       result.to_s
+    end
+
+    # Whether a handler returned Content blocks (text/image) to pass through as a
+    # multimodal tool result, rather than a value to stringify.
+    def content_result?(result)
+      blocks = Array(result)
+      !blocks.empty? && blocks.all? { |block| block.is_a?(Content::Text) || block.is_a?(Content::Image) }
     end
 
     # Collects param declarations and the run block into a JSON Schema + handler.
