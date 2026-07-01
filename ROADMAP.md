@@ -541,6 +541,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `StreamEvent`s for text/thinking/tool-call deltas while preserving tool
       dispatch, abort, retry, compaction, usage accounting, and the final return
       value.
+    - [x] **Initial interactive REPL.** A bare `truffle` now starts a
+      line-oriented terminal loop over one long-lived agent. It processes initial
+      CLI messages first, reads user turns until EOF or `/exit`, renders assistant
+      text through the same final-turn rules as print mode, keeps provider/model
+      and builtin-tool flags wired through the shared CLI agent builder, and is
+      fully testable with injected streams. Pi's richer TUI, resume flags, and RPC
+      runtime remain later slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

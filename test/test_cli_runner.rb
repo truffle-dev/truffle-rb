@@ -85,6 +85,14 @@ class TestCLIRunner < Minitest::Test
     [status, out.string, err.string]
   end
 
+  def run_repl_cli(argv, input:, agent: nil)
+    out = StringIO.new
+    err = StringIO.new
+    builder = agent && ->(_args) { agent }
+    status = Truffle::CLI.run(argv, out: out, err: err, input: input, agent_builder: builder)
+    [status, out.string, err.string]
+  end
+
   # An :agent_end payload whose last message is an assistant turn of plain text.
   def assistant_payload(text, stop_reason: Truffle::StopReason::STOP, error_message: nil)
     message = Truffle::Message.assistant(content: text)
@@ -156,13 +164,15 @@ class TestCLIRunner < Minitest::Test
   end
 
   def test_a_warning_diagnostic_does_not_force_a_nonzero_exit_by_itself
-    # --thinking with an invalid level warns but does not error, so the run
-    # falls through to the not-yet-implemented interactive path.
-    status, _out, err = run_cli(["--thinking", "bogus"])
+    agent = PrintStubAgent.new([])
+
+    status, _out, err = run_repl_cli(["--thinking", "bogus"],
+                                     input: StringIO.new("/exit\n"),
+                                     agent: agent)
 
     assert_includes err, "Warning:"
     refute_includes err, "Error:"
-    assert_equal Truffle::CLI::EXIT_NOT_IMPLEMENTED, status
+    assert_equal 0, status
   end
 
   def test_an_error_short_circuits_before_version_is_printed
@@ -189,12 +199,16 @@ class TestCLIRunner < Minitest::Test
     refute_includes out, "provider"
   end
 
-  def test_no_actionable_flag_reports_the_unimplemented_repl
-    status, out, err = run_cli([])
+  def test_no_actionable_flag_runs_the_interactive_repl
+    agent = PrintStubAgent.new([assistant_payload("hello")])
 
-    assert_equal Truffle::CLI::EXIT_NOT_IMPLEMENTED, status
-    assert_includes err, "truffle: interactive mode is not implemented yet"
-    assert_empty out
+    status, out, err = run_repl_cli([], input: StringIO.new("hi\n/exit\n"), agent: agent)
+
+    assert_equal 0, status
+    assert_empty err
+    assert_includes out, "Truffle interactive. Type /exit to quit."
+    assert_includes out, "truffle> hello\n"
+    assert_equal ["hi"], agent.prompts
   end
 
   def test_init_creates_project_state_and_memory_file
@@ -505,6 +519,62 @@ class TestCLIRunner < Minitest::Test
     assert_equal "truffle: rpc mode is not implemented yet\n", err.string
     assert_empty out.string
     refute built
+  end
+
+  def test_repl_processes_initial_messages_before_the_input_loop
+    agent = PrintStubAgent.new([
+                                 assistant_payload("one reply"),
+                                 assistant_payload("two reply"),
+                                 assistant_payload("three reply")
+                               ])
+
+    status, out, err = run_repl_cli(
+      %w[one two],
+      input: StringIO.new("three\n/exit\n"),
+      agent: agent
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal %w[one two three], agent.prompts
+    assert_includes out, "one reply\n"
+    assert_includes out, "two reply\n"
+    assert_includes out, "three reply\n"
+  end
+
+  def test_repl_ignores_blank_input_and_exits_on_eof
+    agent = PrintStubAgent.new([assistant_payload("unused")])
+
+    status, out, err = run_repl_cli([], input: StringIO.new("\n  \n"), agent: agent)
+
+    assert_equal 0, status
+    assert_empty err
+    assert_includes out, "Truffle interactive."
+    assert_empty agent.prompts
+  end
+
+  def test_repl_reports_error_turns_and_continues
+    agent = PrintStubAgent.new([
+                                 assistant_payload("", stop_reason: Truffle::StopReason::ERROR,
+                                                       error_message: "boom"),
+                                 assistant_payload("recovered")
+                               ])
+
+    status, out, err = run_repl_cli([], input: StringIO.new("bad\ngood\n/exit\n"),
+                                        agent: agent)
+
+    assert_equal 0, status
+    assert_equal "boom\n", err
+    assert_includes out, "recovered\n"
+    assert_equal %w[bad good], agent.prompts
+  end
+
+  def test_repl_with_an_unresolvable_model_errors_on_stderr_and_exits_one
+    status, out, err = run_repl_cli([], input: StringIO.new("/exit\n"))
+
+    assert_equal 1, status
+    assert_empty out
+    assert_includes err, "pass provider:"
   end
 
   def test_print_does_not_read_an_interactive_stdin

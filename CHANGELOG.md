@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- A first interactive REPL for the `truffle` binary. A bare `truffle` starts a
+  line-oriented loop over one agent, processes any initial CLI messages, reads
+  turns until EOF or `/exit`, and renders assistant text with the same final-turn
+  rules as print mode. Provider/model and builtin-tool flags use the shared CLI
+  agent builder; pi's full TUI, resume flags, and RPC runtime remain later work.
 - `Truffle::SessionCwd` checks that a session's recorded working directory still
   exists before a resume. `missing_issue(session_cwd:, fallback_cwd:,
   session_file:)` returns an issue when the directory is gone (nil when there is

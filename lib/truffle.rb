@@ -55,6 +55,7 @@ require_relative "truffle/cli/init"
 require_relative "truffle/cli/models"
 require_relative "truffle/cli/runner"
 require_relative "truffle/cli/print"
+require_relative "truffle/cli/repl"
 
 # Truffle is a complete agent harness for Ruby, built from scratch.
 #

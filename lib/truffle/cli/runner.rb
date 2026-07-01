@@ -4,20 +4,19 @@ module Truffle
   module CLI
     # The thin entry point behind the `truffle` executable. It parses argv,
     # surfaces the parser's diagnostics, and acts on the terminal flags the
-    # harness supports today: `--version`, `--help`, `--list-models`, and the
-    # single-shot print run (`--print` or `--mode json`). This is the Ruby
-    # counterpart of the top of pi's `main.ts` dispatcher, narrowed to the slices
-    # that exist. RPC, the interactive REPL, and `--export` are later slices of
-    # roadmap item 19, so those invocations report that and exit.
+    # harness supports today: `--version`, `--help`, `--list-models`, the
+    # single-shot print run (`--print` or `--mode json`), and the initial
+    # line-oriented interactive REPL. This is the Ruby counterpart of the top of
+    # pi's `main.ts` dispatcher, narrowed to the slices that exist. RPC and
+    # `--export` are later slices of roadmap item 19.
     #
     # `run` takes injectable out/err/input streams and RETURNS an exit status
     # rather than calling `exit`, so the whole dispatch is testable offline with
     # StringIO and the executable stays a one-line caller. `agent_builder:` is an
-    # injection seam: tests hand in a stub agent, production falls back to
-    # `build_print_agent`, which assembles a real provider-backed agent.
+    # injection seam: tests hand in a stub agent, production falls back to a real
+    # provider-backed agent builder.
 
-    # Exit status when the only instruction is a flag the binary cannot act on
-    # yet (the interactive REPL is a later slice).
+    # Exit status when the only instruction is a flag the binary cannot act on yet.
     EXIT_NOT_IMPLEMENTED = 2
 
     # The builtin tools a print run wires by default, in pi's coding-agent order.
@@ -65,8 +64,7 @@ module Truffle
         return run_print(args, out: out, err: err, input: input, agent_builder: agent_builder)
       end
 
-      err.puts "#{APP_NAME}: interactive mode is not implemented yet"
-      EXIT_NOT_IMPLEMENTED
+      run_repl(args, out: out, err: err, input: input, agent_builder: agent_builder)
     end
 
     def run_init(out: $stdout, err: $stderr)
@@ -92,9 +90,9 @@ module Truffle
     # sessionless CLI slice this harness has today. An unresolvable provider/model
     # (or any harness error) surfaces on stderr with exit 1, the analog of pi's
     # `catch`. `agent_builder` lets a test inject a stub agent; production builds
-    # one with `build_print_agent`.
+    # one with `build_cli_agent`.
     def run_print(args, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
-      agent = (agent_builder || method(:build_print_agent)).call(args)
+      agent = (agent_builder || method(:build_cli_agent)).call(args)
       final = nil
       if args.mode == "json"
         agent.on { |event, payload| render_print_json(event, payload, out: out) }
@@ -179,12 +177,12 @@ module Truffle
       content.nil? || content.empty? ? nil : content
     end
 
-    # Build the provider-backed agent a print run drives. The provider is taken
+    # Build the provider-backed agent a CLI mode drives. The provider is taken
     # from `--provider` or inferred from `--model`; an api key flag passes
     # through. Tools are the builtin set filtered by the parsed flags. Raises
     # Truffle::Error when neither a provider nor a model-named provider resolves,
     # which `run_print` turns into a stderr message and exit 1.
-    def build_print_agent(args, cwd: Dir.pwd)
+    def build_cli_agent(args, cwd: Dir.pwd)
       options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
                   tools: print_tools(args, cwd) }
       options[:api_key] = args.api_key if args.api_key
@@ -225,7 +223,7 @@ module Truffle
 
     private_class_method :run_init, :print_init_paths,
                          :run_print, :final_print_response, :print_input,
-                         :print_file_input, :piped_stdin, :build_print_agent, :print_tools,
+                         :print_file_input, :piped_stdin, :build_cli_agent, :print_tools,
                          :report_diagnostics, :color?, :print_mode?
   end
 end
