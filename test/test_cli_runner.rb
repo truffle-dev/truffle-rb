@@ -55,9 +55,11 @@ end
 class StreamingPrintStubAgent
   attr_reader :buffered_prompts, :streamed_prompts
 
-  def initialize(payload, chunks:)
+  def initialize(payload, chunks: [], events: nil)
     @payload = payload
-    @chunks = chunks
+    @events = events || chunks.map do |chunk|
+      Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: chunk)
+    end
     @listeners = Hash.new { |h, k| h[k] = [] }
     @buffered_prompts = []
     @streamed_prompts = []
@@ -74,11 +76,9 @@ class StreamingPrintStubAgent
     ""
   end
 
-  def run_stream(prompt, images: [])
+  def run_stream(prompt, images: [], &block)
     @streamed_prompts << [prompt, images]
-    @chunks.each do |chunk|
-      yield Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: chunk)
-    end
+    @events.each(&block)
     emit(:agent_end, @payload)
     ""
   end
@@ -299,6 +299,41 @@ class TestCLIRunner < Minitest::Test
     assert_equal %w[hel lo], output.writes.grep(/\A(?:hel|lo)\z/)
     assert_operator output.flush_count, :>=, 2
     assert_equal 1, out.scan("hello").length
+  end
+
+  def test_repl_separates_streamed_text_blocks
+    events = [
+      Truffle::StreamEvent.new(type: :text_start, content_index: 0),
+      Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: "first"),
+      Truffle::StreamEvent.new(type: :text_end, content_index: 0, content: "first"),
+      Truffle::StreamEvent.new(type: :text_start, content_index: 1),
+      Truffle::StreamEvent.new(type: :text_end, content_index: 1, content: ""),
+      Truffle::StreamEvent.new(type: :text_start, content_index: 2),
+      Truffle::StreamEvent.new(type: :text_delta, content_index: 2, delta: "second"),
+      Truffle::StreamEvent.new(type: :text_end, content_index: 2, content: "second")
+    ]
+    payload = {
+      messages: [
+        Truffle::Message.assistant(
+          content: [
+            Truffle::Content::Text.new(text: "first"),
+            Truffle::Content::Text.new(text: "second")
+          ]
+        )
+      ],
+      stop_reason: Truffle::StopReason::STOP
+    }
+    agent = StreamingPrintStubAgent.new(payload, events: events)
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      [], input: StringIO.new("hi\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_includes out, "first\nsecond\n"
+    refute_includes out, "firstsecond"
   end
 
   def test_repl_keeps_buffered_output_when_stdout_is_not_a_tty

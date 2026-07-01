@@ -602,6 +602,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       streaming, writing and flushing text deltas as they arrive without
       duplicating the final response. Redirected output keeps the buffered path.
       Thinking/tool rendering and print-mode streaming remain follow-up work.
+    - [x] **TTY REPL text-block boundaries.** Streaming output honors
+      `text_start` events and writes one newline between non-empty text blocks,
+      matching the buffered renderer instead of concatenating separate assistant
+      content blocks.
     - [x] **Initial interactive REPL.** A bare `truffle` now starts a
       line-oriented terminal loop over one long-lived agent. It processes initial
       CLI messages first, reads user turns until EOF or `/exit`, renders assistant

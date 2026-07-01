@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- TTY REPL streaming now preserves boundaries between assistant text content
+  blocks instead of concatenating their deltas. Empty text blocks do not add
+  blank lines.
 - The built-in `read` tool now clamps an explicit non-positive line limit to
   one, so malformed model arguments still return content and advance the
   continuation offset instead of repeating the same read forever.

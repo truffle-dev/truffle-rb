@@ -78,10 +78,20 @@ module Truffle
 
     def run_streaming_repl_turn(agent, prompt, images:, out:, err:, result:)
       wrote_text = false
+      separate_next_text = false
       agent.run_stream(prompt, images: images) do |event|
+        if event.type == :text_start
+          separate_next_text = wrote_text
+          next
+        end
         next unless event.type == :text_delta
 
-        out.write(event.delta.to_s)
+        delta = event.delta.to_s
+        next if delta.empty?
+
+        out.write("\n") if separate_next_text
+        separate_next_text = false
+        out.write(delta)
         out.flush if out.respond_to?(:flush)
         wrote_text = true
       end
