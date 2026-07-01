@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- The built-in `read` tool now clamps an explicit non-positive line limit to
+  one, so malformed model arguments still return content and advance the
+  continuation offset instead of repeating the same read forever.
 - `truffle --name` now writes a `session_info` display-name entry to the active
   session before provider/model validation. Names are trimmed, newlines are
   normalized to spaces, and whitespace-only names fail without mutating the

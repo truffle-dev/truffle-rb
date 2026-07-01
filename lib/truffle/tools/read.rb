@@ -59,7 +59,8 @@ module Truffle
     # model whether more remains. Without a limit, take everything from the start.
     def self.select_lines(all_lines, start_line, limit)
       if limit
-        end_line = [start_line + limit, all_lines.length].min
+        effective_limit = [1, limit.to_i].max
+        end_line = [start_line + effective_limit, all_lines.length].min
         [all_lines[start_line...end_line].join("\n"), end_line - start_line]
       else
         [all_lines[start_line..].join("\n"), nil]

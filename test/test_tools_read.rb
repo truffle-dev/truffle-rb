@@ -98,6 +98,18 @@ class TestToolsRead < Minitest::Test
     refute_includes out, "Use offset"
   end
 
+  def test_non_positive_limit_still_reads_one_line_and_advances
+    write("many.txt", "a\nb\nc\n")
+
+    zero = read_tool.call("path" => "many.txt", "limit" => 0)
+    negative = read_tool.call("path" => "many.txt", "limit" => -2)
+
+    assert_match(/\Aa\n\n/, zero)
+    assert_includes zero, "Use offset=2 to continue."
+    assert_match(/\Aa\n\n/, negative)
+    assert_includes negative, "Use offset=2 to continue."
+  end
+
   def test_offset_beyond_end_raises_with_total_lines
     write("short.txt", "only\n")
     # "only\n" splits to ["only", ""] -> 2 lines, faithful to pi's allLines.
