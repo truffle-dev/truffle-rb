@@ -25,6 +25,10 @@ All notable changes to Truffle are documented here. The format follows
   resumed runs. `--system-prompt`, repeated `--append-system-prompt`, enabled
   builtin tool descriptions, and AGENTS/CLAUDE context files now flow into the
   agent prompt unless `--no-context-files` is passed.
+- Fresh interactive CLI runs now honor `--session-id`: an existing project
+  session with that exact id is reopened, while a missing id creates the new
+  session under that id. Invalid ids and conflicting resume flags fail before
+  any provider call.
 - `truffle --continue` now loads the most recent session for the current project
   in both print mode and the interactive REPL. `--session <path|id>` resolves a
   specific session file or unique project session reference. The interactive

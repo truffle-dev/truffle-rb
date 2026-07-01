@@ -7,6 +7,7 @@ require_relative "config"
 require_relative "uuid"
 require_relative "message"
 require_relative "usage"
+require_relative "session_id"
 require_relative "session_append"
 require_relative "session_migration"
 require_relative "session/file_store"
@@ -78,6 +79,7 @@ module Truffle
     # session is written exactly as pi writes it.
     def self.start(store:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
       id ||= UUID.v7
+      SessionId.assert_valid!(id)
       timestamp = now.utc.iso8601(3)
       header = { type: "session", version: SESSION_VERSION, id: id, timestamp: timestamp, cwd: cwd }
       header[:parent_session] = parent_session if parent_session
@@ -94,6 +96,7 @@ module Truffle
     def self.create(cwd:, dir: Config.default_session_dir(cwd: cwd), id: nil, parent_session: nil,
                     tools: nil, now: Time.now)
       id ||= UUID.v7
+      SessionId.assert_valid!(id)
       timestamp = now.utc.iso8601(3)
       file = File.join(dir, "#{timestamp.gsub(/[:.]/, "-")}_#{id}.jsonl")
 

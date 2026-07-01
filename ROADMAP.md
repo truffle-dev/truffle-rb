@@ -559,8 +559,8 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] **CLI session continue.** `truffle --continue` loads the most recent
       session for the current project and works in both print mode and the
       line-oriented REPL. `--session <path|id>` resolves a specific session file
-      or unique project session reference. The interactive picker, fork, and
-      session-id creation paths remain later CLI slices.
+      or unique project session reference. The interactive picker and fork remain
+      later CLI slices.
     - [x] **Default REPL session persistence.** Fresh interactive CLI runs now
       create a project session by default, record the active model and enabled
       builtin tool names, and mirror turns through the session-backed agent path.
@@ -571,6 +571,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the library. `--system-prompt`, repeated `--append-system-prompt`, enabled
       builtin tool descriptions, and AGENTS/CLAUDE context files are included;
       `--no-context-files` keeps project memory out.
+    - [x] **CLI session-id creation.** Fresh interactive CLI runs honor
+      `--session-id`: an exact existing project session id reopens that session,
+      and a missing id creates the new session under that id. Invalid ids and
+      conflicting resume flags fail before the provider is built.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

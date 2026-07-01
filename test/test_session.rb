@@ -58,6 +58,21 @@ class TestSession < Minitest::Test
     refute_includes name, ":"
   end
 
+  def test_create_accepts_an_explicit_session_id
+    session = Truffle::Session.create(dir: @dir, cwd: "/work", id: "project.1-alpha")
+
+    assert_equal "project.1-alpha", session.id
+    assert_match(/_project\.1-alpha\.jsonl\z/, File.basename(session.file))
+  end
+
+  def test_create_rejects_an_invalid_session_id
+    error = assert_raises(ArgumentError) do
+      Truffle::Session.create(dir: @dir, cwd: "/work", id: "../bad")
+    end
+
+    assert_includes error.message, "Session id must be non-empty"
+  end
+
   def test_create_without_a_dir_lands_in_the_default_per_project_directory
     agent_dir = File.join(@dir, "agent")
     with_env("TRUFFLE_AGENT_DIR" => agent_dir) do

@@ -662,6 +662,22 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_session_id_cannot_be_combined_with_continue
+    status, out, err = run_cli(["--session-id", "project-1", "--continue"])
+
+    assert_equal 1, status
+    assert_empty out
+    assert_includes err, "--session-id cannot be combined with --continue"
+  end
+
+  def test_invalid_session_id_reports_an_error
+    status, out, err = run_cli(["--session-id", "../bad"])
+
+    assert_equal 1, status
+    assert_empty out
+    assert_includes err, "Session id must be non-empty"
+  end
+
   def test_fresh_repl_agent_is_session_backed_by_default
     in_tmpdir do |dir|
       args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test"])
@@ -676,6 +692,36 @@ class TestCLIRunner < Minitest::Test
       assert_equal "model_change", model_change[:type]
       assert_equal "openai", model_change[:provider]
       assert_equal "gpt-4o-mini", model_change[:model_id]
+    end
+  end
+
+  def test_fresh_repl_agent_uses_explicit_session_id
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                      "--session-id", "project.1-alpha"])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_instance_of Truffle::Session, agent.session
+      assert_equal "project.1-alpha", agent.session.id
+      assert_match(/_project\.1-alpha\.jsonl\z/, File.basename(agent.session.file))
+    end
+  end
+
+  def test_fresh_repl_with_existing_session_id_loads_that_session
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+      loaded = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **kwargs|
+        loaded = [path, kwargs]
+        PrintStubAgent.new([assistant_payload("continued")])
+      }) do
+        args = Truffle::CLI.parse_args(["--session-id", session.id])
+        Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+      end
+
+      assert_equal session.file, loaded.first
+      assert_includes loaded.last[:system_prompt], "Current working directory: #{dir}"
     end
   end
 
