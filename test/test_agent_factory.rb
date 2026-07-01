@@ -35,6 +35,7 @@ class AgentFactoryTest < Minitest::Test
 
     assert_instance_of Truffle::Providers::Anthropic, agent.provider
     assert_equal "claude-opus-4-8", agent_model(agent)
+    assert_same Truffle::Models.find("claude-opus-4-8"), agent.model_spec
   end
 
   def test_inferred_provider_routes_each_family
@@ -60,6 +61,13 @@ class AgentFactoryTest < Minitest::Test
 
     assert_instance_of Truffle::Providers::OpenAI, agent.provider
     assert_equal "ft:gpt-4o:acme:custom", agent_model(agent)
+    assert_nil agent.model_spec
+  end
+
+  def test_explicit_provider_retains_matching_catalog_capabilities
+    agent = Truffle.agent(provider: :openai, model: "gpt-4o", api_key: "k")
+
+    assert_same Truffle::Models.find("gpt-4o"), agent.model_spec
   end
 
   def test_no_provider_and_no_model_raises

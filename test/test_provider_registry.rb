@@ -99,6 +99,23 @@ class TestProviderRegistry < Minitest::Test
     assert_equal "llama3", agent_model(agent)
   end
 
+  def test_agent_retains_registered_model_input_capabilities
+    Truffle.register_provider(
+      "local",
+      api: :openai_completions,
+      base_url: "http://localhost:11434/v1",
+      api_key: "test-key",
+      models: [
+        { id: "llama3", api: :openai_completions, input: ["text"] }
+      ]
+    )
+
+    agent = Truffle.agent(model: "local/llama3")
+
+    assert_equal [:text], agent.model_spec.input
+    refute_predicate agent.model_spec, :vision?
+  end
+
   def test_agent_infers_registered_provider_from_unique_bare_model
     register_local_provider
 

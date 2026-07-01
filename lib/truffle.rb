@@ -146,8 +146,9 @@ module Truffle
   # `provider:` is optional when `model:` names a catalog model: the provider is
   # then inferred from the model (Truffle.agent(model: "claude-opus-4-8")), and a
   # canonical "provider/id" reference is reduced to the bare wire id the provider
-  # expects. An explicit `provider:` is left untouched, so an unlisted or custom
-  # model id still works when the provider is named.
+  # expects. Resolved model capability metadata stays attached to the Agent while
+  # Agent#model remains that wire id. An explicit `provider:` still accepts an
+  # unlisted or custom model id.
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
             max_turns: nil, tool_execution: :parallel,
             prompt_templates: [], slash_commands: nil, extensions: nil,
@@ -185,6 +186,9 @@ module Truffle
   end
 
   def resolve_agent_model(provider, model, extensions)
+    if model.is_a?(Model) || model.is_a?(Extensions::ModelReference)
+      return [provider || model.provider, model]
+    end
     return [provider, model] unless provider.nil?
     raise Error, "pass provider:, or a model: that names one" if model.nil?
 
@@ -194,7 +198,7 @@ module Truffle
       raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
     end
 
-    [resolved.provider, resolved.respond_to?(:model_id) ? resolved.model_id : resolved.id]
+    [resolved.provider, resolved]
   end
   private_class_method :resolve_agent_model
 

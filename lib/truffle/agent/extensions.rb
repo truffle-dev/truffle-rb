@@ -24,6 +24,32 @@ module Truffle
 
     private
 
+    def explicit_model_spec(model)
+      return model if model.is_a?(Model) || model.is_a?(Extensions::ModelReference)
+
+      nil
+    end
+
+    def model_id(model)
+      return model.model_id if model.is_a?(Extensions::ModelReference)
+      return model.id if model.is_a?(Model)
+
+      model
+    end
+
+    def inferred_model_spec(provider, model, extensions)
+      wire_id = model || (provider.model if provider.respond_to?(:model))
+      provider_name = provider.name
+      return nil if wire_id.nil? || provider_name.nil?
+
+      reference = "#{provider_name}/#{wire_id}"
+      Models.resolve(reference) ||
+        Extensions.model_reference(extensions, reference) ||
+        ProviderRegistry.model_reference(reference)
+    rescue NoMethodError
+      nil
+    end
+
     def toolbox_for(tools, extensions)
       toolbox = Toolbox.new(Extensions.tool_definitions(extensions))
       supplied = tools.is_a?(Toolbox) ? tools : Toolbox.new(tools)
@@ -56,16 +82,22 @@ module Truffle
 
     def chat_current_turn
       refresh_extension_provider
-      @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
+      @provider.chat(messages: provider_messages, tools: @toolbox.to_schema, model: @model)
     end
 
     def stream_current_turn(signal)
       refresh_extension_provider
-      @provider.chat_stream(messages: @messages, tools: @toolbox.to_schema, model: @model,
+      @provider.chat_stream(messages: provider_messages, tools: @toolbox.to_schema, model: @model,
                             signal: signal) do |event|
         emit(:stream, event: event)
         yield event if block_given?
       end
+    end
+
+    def provider_messages
+      return @messages unless @model_spec
+
+      MessageTransform.downgrade_unsupported_images(@messages, @model_spec)
     end
 
     def default_extension_provider_name(provider)

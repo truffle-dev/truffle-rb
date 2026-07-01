@@ -6,7 +6,22 @@ require_relative "config_values"
 
 module Truffle
   module Extensions
-    ModelReference = Struct.new(:provider, :model_id, keyword_init: true)
+    # The part of a registered model definition the agent needs after provider
+    # resolution. `input` is nil when the registration did not declare
+    # capabilities; unknown stays conservative and is treated as image-capable
+    # so Truffle does not silently discard caller content.
+    class ModelReference
+      attr_reader :provider, :model_id, :input
+
+      def initialize(provider:, model_id:, input: nil)
+        @provider = provider.to_s
+        @model_id = model_id.to_s
+        @input = input.nil? ? nil : Array(input).map(&:to_sym).uniq.freeze
+        freeze
+      end
+
+      def vision? = input.nil? || input.include?(:image)
+    end
 
     OPENAI_COMPATIBLE_APIS = %w[
       openai openai_completions openai-completions
@@ -188,12 +203,22 @@ module Truffle
 
     def provider_model_references(source)
       provider_configs(source).flat_map do |provider, config|
-        ids = []
-        ids << config[:model] if config[:model]
-        ids.concat(Array(config[:models]).filter_map { |model| model_id(model) })
-        ids.uniq.map do |model_id|
-          ModelReference.new(provider: provider, model_id: model_id.to_s)
+        references = {}
+        if config[:model]
+          id = config[:model].to_s
+          references[id] = ModelReference.new(provider: provider, model_id: id)
         end
+        Array(config[:models]).each do |model|
+          id = model_id(model)
+          next unless id
+
+          references[id] = ModelReference.new(
+            provider: provider,
+            model_id: id,
+            input: model_value(model, :input)
+          )
+        end
+        references.values
       end
     end
     private_class_method :provider_model_references

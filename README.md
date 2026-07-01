@@ -250,9 +250,11 @@ Truffle.model("claude-sonnet-4-6")
 The model catalog records provider, model id, context window, max output,
 modalities, reasoning support, and pricing. `Truffle.agent(model: "...")` can
 infer the provider for catalog models; pass `provider:` explicitly for custom or
-OpenAI-compatible endpoints. The examples above use `gpt-5.4-mini` for a fast,
-low-cost default; reach for a flagship such as `gpt-5.5`, `claude-opus-4-8`, or
-`claude-sonnet-4-6` when a task needs deeper reasoning.
+OpenAI-compatible endpoints. The resolved capability record is available as
+`agent.model_spec`, while `agent.model` remains the provider's wire id. The
+examples above use `gpt-5.4-mini` for a fast, low-cost default; reach for a
+flagship such as `gpt-5.5`, `claude-opus-4-8`, or `claude-sonnet-4-6` when a
+task needs deeper reasoning.
 
 Register an OpenAI-compatible endpoint in-process when an app already has the
 connection details and does not need an extension file:
@@ -263,11 +265,18 @@ Truffle.register_provider(
   api: :openai_completions,
   base_url: "http://localhost:11434/v1",
   api_key: "$LOCAL_LLM_API_KEY",
-  model: "llama3"
+  models: [
+    { id: "llama3", input: ["text"] }
+  ]
 )
 
 agent = Truffle.agent(model: "local/llama3")
 ```
+
+Declare `input: ["text"]` for a text-only registered model. Truffle then keeps
+image blocks in session history but replaces them with an omission marker in
+requests to that model. Registrations that omit `input` remain conservative and
+send images unchanged.
 
 ## Testing
 

@@ -59,9 +59,11 @@ All notable changes to Truffle are documented here. The format follows
   image block replaced by a placeholder text block (`(image omitted: model does
   not support images)` for user content, `(tool image omitted: ...)` for tool
   results), collapsing consecutive images to a single placeholder. Vision models
-  and assistant/system messages pass through untouched. The module is
-  provider-agnostic and ready for provider-boundary wiring; propagating model
-  capability metadata into that boundary remains follow-up work.
+  and assistant/system messages pass through untouched. Resolved built-in and
+  registered model capabilities now stay attached to `Agent#model_spec`, and
+  both buffered and streaming requests apply the transform without changing the
+  stored transcript. A registered model with no `input` declaration remains
+  conservative and sends images unchanged.
 - `Truffle::TokenBudget` ports pi's per-call token-budget math from
   `ai/src/api/simple-options.ts`. `clamp_max_tokens_to_context` fits a requested
   output cap inside a model's remaining context window (leaving a 4096-token

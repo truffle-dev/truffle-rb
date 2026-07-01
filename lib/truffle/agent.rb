@@ -61,8 +61,9 @@ module Truffle
     }.freeze
     TOOL_EXECUTION_MODES = %i[parallel sequential].freeze
 
-    attr_reader :provider, :messages, :toolbox, :system_prompt, :model, :max_turns,
-                :usage, :session, :tool_execution, :extensions, :extension_errors
+    attr_reader :provider, :messages, :toolbox, :system_prompt, :model, :model_spec,
+                :max_turns, :usage, :session, :tool_execution, :extensions,
+                :extension_errors
 
     # Resume an agent from a session file. The session carries the conversation
     # and, when it was dumped by #dump, the provider/model and the names of the
@@ -122,7 +123,9 @@ module Truffle
                    extension_provider_name: nil, extension_provider_overrides: {})
       @provider = provider
       @system_prompt = system_prompt
-      @model = model
+      @model_spec = explicit_model_spec(model)
+      @model = model_id(model)
+      @model_spec ||= inferred_model_spec(provider, @model, extensions)
       @max_turns = max_turns
       setup_extensions(extensions, provider, extension_provider_name, extension_provider_overrides)
       @toolbox = toolbox_for(tools, @extensions)
