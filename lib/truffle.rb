@@ -141,6 +141,14 @@ module Truffle
     ProviderRegistry.provider_names
   end
 
+  # Runtime provider collection for embedding apps and extension hosts. It can
+  # inspect registered providers and model references, and it can mutate the
+  # process-local registry when called without extension sources. Request binding
+  # still goes through Truffle.provider.
+  def providers(extensions: nil)
+    ProviderRegistry.collection(extensions: extensions)
+  end
+
   # Convenience constructor: Truffle.agent(provider: :openai, tools: [...], ...).
   # `provider:` may be a symbol, an options-less default, or a provider instance.
   #

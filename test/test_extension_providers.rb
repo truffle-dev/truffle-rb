@@ -425,4 +425,44 @@ class TestExtensionProviders < Minitest::Test
 
     assert_match(/unknown provider/, error.message)
   end
+
+  def test_provider_runtime_facade_reads_loaded_extension_providers
+    extensions = registered_local_provider
+    runtime = Truffle.providers(extensions: extensions)
+
+    provider = runtime.get_provider("LOCAL")
+    model = runtime.get_model("local", "llama3")
+
+    assert_equal "local", provider.name
+    assert_equal "http://localhost:11434/v1", provider.config[:base_url]
+    assert_equal "local", model.provider
+    assert_equal "llama3", model.model_id
+    resolved = runtime.resolve_model("local/llama3")
+
+    assert_equal "local", resolved.provider
+    assert_equal "llama3", resolved.model_id
+    assert_equal ["local"], runtime.provider_names
+  end
+
+  def test_provider_runtime_facade_preserves_non_openai_provider_metadata
+    extensions = load_extensions(<<~RUBY)
+      truffle.register_provider("corp", {
+        api: :anthropic_messages,
+        name: "Corp Claude",
+        base_url: "http://corp.test/v1",
+        api_key: "test-key",
+        models: [{ id: "claude", api: :anthropic_messages }]
+      })
+    RUBY
+
+    runtime = Truffle.providers(extensions: extensions)
+
+    assert_equal ["corp"], runtime.provider_names
+    assert_equal :anthropic_messages, runtime.get_provider("corp").config[:api]
+    assert_equal "claude", runtime.get_model("corp", "claude").model_id
+
+    error = assert_raises(Truffle::Error) { Truffle.provider(:corp, extensions: extensions) }
+
+    assert_match(/unsupported api/, error.message)
+  end
 end

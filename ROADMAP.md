@@ -498,6 +498,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the in-process registry, while an explicit provider still wins.
     - [ ] Bind provider registration reload/unregister into active session state,
       plus non-OpenAI custom APIs, OAuth, and `streamSimple`.
+      - [x] **Provider runtime collection facade.** `Truffle.providers` now
+        exposes a small pi-style provider runtime view for Ruby hosts:
+        process-local providers can be listed, upserted, deleted, and resolved
+        to model references; loaded extension provider registrations can be
+        inspected through the same facade. Unsupported non-OpenAI APIs remain
+        metadata-only until a later request-transport slice binds them.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.

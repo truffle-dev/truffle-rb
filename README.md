@@ -292,6 +292,30 @@ Truffle.register_provider(
 agent = Truffle.agent(model: "local/llama3")
 ```
 
+`Truffle.providers` returns a small runtime registry facade for embedding apps
+and extension hosts:
+
+```ruby
+providers = Truffle.providers
+providers.provider_names
+providers.resolve_model("local/llama3")
+providers.set_provider("local", api: :openai_completions, base_url: "...", model: "llama3")
+providers.delete_provider("local")
+```
+
+Passing `extensions:` makes the facade read loaded extension registrations too:
+
+```ruby
+providers = Truffle.providers(extensions: loaded_extensions)
+providers.get_provider("local")
+providers.get_model("local", "llama3")
+```
+
+The facade can inspect non-OpenAI provider metadata, but request execution is
+still implemented for built-in providers and OpenAI-compatible chat endpoints.
+OAuth flows, dynamic remote model refresh, non-chat APIs, and pi's
+`streamSimple` transport remain future provider-runtime slices.
+
 Declare `input: ["text"]` for a text-only registered model. Truffle then keeps
 image blocks in session history but replaces them with an omission marker in
 requests to that model. Registrations that omit `input` remain conservative and

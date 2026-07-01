@@ -77,6 +77,10 @@ module Truffle
       options
     end
 
+    def provider_config_entries(source)
+      provider_configs(source).map { |name, config| [name, deep_dup_config(config)] }
+    end
+
     def model_reference(source, reference)
       trimmed = reference.to_s.strip
       return nil if trimmed.empty?
@@ -91,6 +95,10 @@ module Truffle
       return match if match
 
       one_model_reference(references) { |model| model_id_match?(model.model_id, trimmed) }
+    end
+
+    def model_references(source)
+      provider_model_references(source)
     end
 
     def provider_configs(source)
@@ -222,6 +230,18 @@ module Truffle
       end
     end
     private_class_method :provider_model_references
+
+    def deep_dup_config(value)
+      case value
+      when Hash
+        value.each_with_object({}) { |(key, item), copy| copy[key] = deep_dup_config(item) }
+      when Array
+        value.map { |item| deep_dup_config(item) }
+      else
+        value
+      end
+    end
+    private_class_method :deep_dup_config
 
     def first_model_id(models)
       Array(models).filter_map { |model| model_id(model) }.first

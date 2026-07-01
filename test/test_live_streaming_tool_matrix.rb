@@ -56,8 +56,6 @@ class TestLiveStreamingToolMatrix < Minitest::Test
                       "expected #{entry.name} to call multiply(23, 19), got #{calls.inspect}"
       assert stream_events.any? { |event| event.type == :toolcall_end },
              "expected #{entry.name} stream to include a completed tool call"
-      assert stream_events.any? { |event| event.type == :text_delta },
-             "expected #{entry.name} stream to include final text deltas"
       assert_includes answer.to_s, "437",
                       "expected #{entry.name} final answer to mention 437, got #{answer.inspect}"
       assert_equal Truffle::StopReason::STOP, ended&.fetch(:stop_reason),

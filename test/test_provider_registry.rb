@@ -192,4 +192,43 @@ class TestProviderRegistry < Minitest::Test
 
     assert_equal ["local"], Truffle.registered_provider_names
   end
+
+  def test_provider_runtime_lists_process_registered_providers_and_models
+    register_local_provider
+
+    runtime = Truffle.providers
+
+    assert_equal ["local"], runtime.provider_names
+    assert_equal ["local"], runtime.providers.map(&:name)
+    model_references = runtime.model_references.map do |model|
+      "#{model.provider}/#{model.model_id}"
+    end
+
+    assert_equal ["local/llama3"], model_references
+    assert_equal "llama3", runtime.get_model("local", "llama3").model_id
+    assert_equal "llama3", runtime.resolve_model("llama3").model_id
+  end
+
+  def test_provider_runtime_can_upsert_and_delete_process_providers
+    runtime = Truffle.providers
+
+    runtime.set_provider(
+      "local",
+      api: :openai_completions,
+      base_url: "http://first.test/v1",
+      api_key: "test-key",
+      models: [{ id: "llama3", api: :openai_completions }]
+    )
+    runtime.set_provider("LOCAL", baseUrl: "http://second.test/v1")
+
+    provider = Truffle.provider(:local)
+
+    assert_equal "http://second.test/v1", provider.base_url
+    assert_equal ["local"], runtime.provider_names
+
+    runtime.delete_provider("LOCAL")
+
+    assert_empty runtime.provider_names
+    assert_raises(Truffle::Error) { Truffle.provider(:local) }
+  end
 end

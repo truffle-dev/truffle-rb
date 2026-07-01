@@ -39,6 +39,12 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle.providers` now exposes a provider runtime facade for Ruby hosts:
+  list registered providers, inspect loaded extension provider metadata, resolve
+  registered model references, and upsert/delete process-local provider
+  registrations. Request execution is still limited to built-in providers and
+  OpenAI-compatible chat endpoints; non-OpenAI custom APIs, OAuth, and
+  `streamSimple` remain future slices.
 - Extension command contexts now expose bound Ruby actions for the runtime Truffle
   can support without a full TUI: `set_session_name`, `session_name`, `compact`,
   `get_system_prompt`, `available_models`, `models_for_provider`, and
