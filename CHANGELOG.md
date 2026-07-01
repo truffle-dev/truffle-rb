@@ -33,6 +33,16 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::TokenBudget` ports pi's per-call token-budget math from
+  `ai/src/api/simple-options.ts`. `clamp_max_tokens_to_context` fits a requested
+  output cap inside a model's remaining context window (leaving a 4096-token
+  safety margin, never dropping below one token), `clamp_reasoning` folds the
+  `xhigh` reasoning level to `high`, and `adjust_max_tokens_for_thinking` splits
+  an output cap into a thinking budget plus room for the visible answer, shrinking
+  the budget to keep a 1024-token answer floor when the cap is tight. The module
+  is pure and provider-agnostic: it takes the context estimate as an integer so
+  the caller owns the estimator, and a provider option builder consumes it when
+  translating a reasoning level into API parameters.
 - `Truffle::ShortHash.of` folds a string into a compact base-36 token,
   reproducing pi's `shortHash` (`ai/src/utils/hash.ts`) byte for byte. pi bakes
   this into rewritten tool-call and message ids (`fc_#{hash}`, `msg_#{hash}`)

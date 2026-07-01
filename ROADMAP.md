@@ -113,6 +113,14 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       (`fc_#{hash}`, `msg_#{hash}`). UTF-16 code-unit iteration and 32-bit
       `Math.imul`/shift semantics reproduced; verified against pi across 27
       inputs including astral emoji surrogate pairs.
+    - [x] **Per-call token-budget math.** `Truffle::TokenBudget` ports pi's
+      `simple-options.ts`: `clamp_max_tokens_to_context` fits an output cap inside
+      the remaining context window (4096-token safety margin, one-token floor),
+      `clamp_reasoning` folds `xhigh` to `high`, and
+      `adjust_max_tokens_for_thinking` splits a cap into a thinking budget plus a
+      1024-token visible-answer floor. Pure and provider-agnostic: the caller
+      passes the context estimate as an integer and a provider option builder
+      consumes the result when translating a reasoning level into API parameters.
 
 ## Phase 3: the coding-agent surface
 
