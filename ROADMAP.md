@@ -533,6 +533,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       string unchanged. OpenAI, Anthropic, and Gemini serializers now run outbound
       system, user, assistant, thinking, and tool-result text through it at the
       provider boundary.
+    - [x] JSON repair for malformed model output. `Truffle::JsonRepair.repair`
+      and `.parse` port the dependency-free half of pi's `utils/json-parse.ts`
+      (`repairJson`, `parseJsonWithRepair`): inside string literals, raw control
+      characters are escaped and a backslash before an invalid escape is doubled,
+      so a model's tool-call arguments parse instead of crashing. `.parse` retries
+      the repaired text only when the first parse fails and the repair changed the
+      input. Wiring it into the provider `parse_arguments` paths, and a zero-dep
+      port of pi's `parseStreamingJson` (which needs a from-scratch partial-JSON
+      completer), are later slices.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial

@@ -16,6 +16,12 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::JsonRepair.repair` and `.parse` recover malformed JSON string
+  literals in model output. `repair` escapes raw control characters and doubles
+  a backslash before an invalid escape, both only inside string literals;
+  `parse` retries with the repaired text only when the first parse fails and the
+  repair changed the input, otherwise it re-raises the original error. Port of
+  the dependency-free half of pi's json-parse.ts.
 - `Truffle::UnicodeSanitizer.sanitize_surrogates` strips lone Unicode surrogate
   byte sequences from text so it can be serialized into a provider request body
   without JSON encoding errors. Valid characters, including astral emoji and the
