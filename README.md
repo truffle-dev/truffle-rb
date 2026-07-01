@@ -339,9 +339,15 @@ end
 
 The context exposes the active agent, session, provider, model id, model
 metadata, usage, system prompt, cwd, abort signal, command metadata, model
-catalog helpers, session display-name helpers, and manual compaction. UI-heavy
-pi actions such as session switching, tree navigation, overlays, and RPC remain
-future runtime slices.
+catalog helpers, provider registry access, session display-name helpers, and
+manual compaction. UI-heavy pi actions such as session switching, tree
+navigation, overlays, and RPC remain future runtime slices.
+
+```ruby
+truffle.register_command("providers", description: "List runtime providers") do |_args, ctx|
+  ctx.model_registry.provider_names.join("\n")
+end
+```
 
 ## Testing
 

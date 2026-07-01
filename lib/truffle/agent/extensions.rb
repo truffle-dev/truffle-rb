@@ -5,6 +5,16 @@ module Truffle
   # readable. Loaded extension tools are defaults; application tools win on name
   # conflicts.
   class Agent
+    # Provider/model registry view for this agent's extension runtime. This is
+    # the Ruby counterpart to pi's ExtensionContext.modelRegistry: extension
+    # registrations stay scoped to the loaded extension source while the
+    # process-local registry remains visible for embedding apps.
+    def provider_registry
+      Truffle.providers(extensions: @extension_source)
+    end
+
+    alias model_registry provider_registry
+
     # Build the toolbox a resumed agent runs with, checking that every tool the
     # dumped agent relied on is among the ones supplied now. The session stores
     # only names; the implementations are rebound here. A required tool that was

@@ -9,11 +9,13 @@ require "fileutils"
 # commands join the command registry.
 class TestAgentExtensions < Minitest::Test
   def setup
+    Truffle::ProviderRegistry.clear
     @dir = Dir.mktmpdir("truffle-agent-extensions")
   end
 
   def teardown
     FileUtils.remove_entry(@dir)
+    Truffle::ProviderRegistry.clear
   end
 
   def write_extension(rel, body)
@@ -159,6 +161,64 @@ class TestAgentExtensions < Minitest::Test
         "session_name=",
         "models=true",
         "system_reader=Be precise"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
+  def test_extension_command_context_exposes_provider_runtime_registry
+    log_path = File.join(@dir, "provider_registry.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.register_provider("local", {
+        api: :openai_completions,
+        base_url: "http://localhost:11434/v1",
+        api_key: "test-key",
+        models: [
+          { id: "llama3", api: :openai_completions, input: ["text"] }
+        ]
+      })
+
+      truffle.register_command("models", description: "Inspect models") do |_args, ctx|
+        truffle.register_provider("dynamic", {
+          api: :openai_completions,
+          base_url: "http://dynamic.test/v1",
+          api_key: "dynamic-key",
+          model: "dyno"
+        })
+
+        registry = ctx.model_registry
+        local = registry.resolve_model("local/llama3")
+        dynamic = registry.resolve_model("dynamic/dyno")
+        provider = registry.get_provider("LOCAL")
+
+        File.open(log_path, "w") do |file|
+          file.puts "registry=\#{registry.class.name}"
+          file.puts "aliases=\#{ctx.provider_registry.equal?(registry)}:\#{ctx.providers.equal?(registry)}"
+          file.puts "names=\#{registry.provider_names.join('|')}"
+          file.puts "provider=\#{provider.name}:\#{provider.api}:\#{provider.model_ids.join('|')}"
+          file.puts "local=\#{local.provider}/\#{local.model_id}/\#{local.input.join('|')}"
+          file.puts "dynamic=\#{dynamic.provider}/\#{dynamic.model_id}"
+        end
+
+        "models listed"
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("should not be used")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    assert_equal "models listed", agent.run("/models")
+    assert_empty provider.calls
+    assert_empty Truffle.registered_provider_names
+    assert_equal(
+      [
+        "registry=Truffle::ProviderRegistry::Collection",
+        "aliases=true:true",
+        "names=local|dynamic",
+        "provider=local:openai_completions:llama3",
+        "local=local/llama3/text",
+        "dynamic=dynamic/dyno"
       ],
       File.readlines(log_path, chomp: true)
     )
@@ -477,6 +537,45 @@ class TestAgentExtensions < Minitest::Test
         "ui=false:true",
         "trusted=false",
         "pending=false"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
+  def test_extension_event_context_exposes_provider_runtime_registry
+    log_path = File.join(@dir, "event_provider_registry.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.register_provider("events", {
+        api: :openai_completions,
+        base_url: "http://events.test/v1",
+        api_key: "events-key",
+        models: [
+          { id: "event-model", api: :openai_completions, input: ["text"] }
+        ]
+      })
+
+      truffle.on("agent_start") do |_event, ctx|
+        registry = ctx.model_registry
+        model = registry.get_model("events", "event-model")
+
+        File.open(log_path, "w") do |file|
+          file.puts "aliases=\#{ctx.provider_registry.equal?(registry)}:\#{ctx.providers.equal?(registry)}"
+          file.puts "names=\#{registry.provider_names.join('|')}"
+          file.puts "model=\#{model.provider}/\#{model.model_id}/\#{model.input.join('|')}"
+        end
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("done")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+
+    assert_equal "done", agent.run("hello")
+    assert_equal(
+      [
+        "aliases=true:true",
+        "names=events",
+        "model=events/event-model/text"
       ],
       File.readlines(log_path, chomp: true)
     )

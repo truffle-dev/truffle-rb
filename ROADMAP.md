@@ -524,6 +524,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         same session-backed compactor as the agent loop, read the effective
         system prompt, and inspect the model catalog. Missing session state
         raises clearly instead of pretending a TUI/session action succeeded.
+      - [x] **Provider registry context access.** Extension event and command
+        contexts expose `model_registry` (plus `provider_registry` /
+        `providers` aliases) backed by the active agent's provider runtime
+        collection. Handlers can inspect extension-registered providers and
+        resolve model references, including command-time provider registrations,
+        without mutating process-global provider state.
 
 ## Phase 5: adoption + the CLI
 

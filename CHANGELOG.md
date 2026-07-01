@@ -39,6 +39,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Extension event and command contexts now expose `model_registry`, plus
+  `provider_registry` and `providers` aliases, backed by the active agent's
+  provider runtime collection. Handlers can inspect extension-registered
+  provider names and resolve model references without promoting those
+  registrations to process-global state.
 - `Truffle.providers` now exposes a provider runtime facade for Ruby hosts:
   list registered providers, inspect loaded extension provider metadata, resolve
   registered model references, and upsert/delete process-local provider

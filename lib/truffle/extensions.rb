@@ -93,6 +93,22 @@ module Truffle
         Models.for_provider(provider)
       end
 
+      def model_registry
+        @model_registry ||= if agent.respond_to?(:model_registry)
+                              agent.model_registry
+                            else
+                              Truffle.providers
+                            end
+      end
+
+      def provider_registry
+        model_registry
+      end
+
+      def providers
+        model_registry
+      end
+
       def compact(custom_instructions: nil, signal: nil)
         unless agent.respond_to?(:compact)
           raise Error, "compact requires an agent that supports compaction"
