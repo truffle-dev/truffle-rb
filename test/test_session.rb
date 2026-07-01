@@ -58,6 +58,30 @@ class TestSession < Minitest::Test
     refute_includes name, ":"
   end
 
+  def test_create_without_a_dir_lands_in_the_default_per_project_directory
+    agent_dir = File.join(@dir, "agent")
+    with_env("TRUFFLE_AGENT_DIR" => agent_dir) do
+      session = Truffle::Session.create(cwd: "/home/ada/proj")
+
+      expected_dir = Truffle::Config.default_session_dir(cwd: "/home/ada/proj",
+                                                         agent_dir: agent_dir)
+
+      assert_equal expected_dir, File.dirname(session.file)
+      assert_equal File.join(agent_dir, "sessions", "--home-ada-proj--"), expected_dir
+    end
+  end
+
+  def with_env(overrides)
+    previous = overrides.transform_values { |_| :__absent__ }
+    overrides.each_key { |key| previous[key] = ENV.fetch(key, :__absent__) }
+    overrides.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value == :__absent__ ? ENV.delete(key) : ENV[key] = value
+    end
+  end
+
   def test_create_records_an_optional_parent_session
     session = Truffle::Session.create(dir: @dir, cwd: "/work", parent_session: "abc123")
     session.flush

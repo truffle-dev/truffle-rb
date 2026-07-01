@@ -30,5 +30,19 @@ module Truffle
     def project_prompts_dir(cwd: Dir.pwd)
       File.join(project_dir(cwd: cwd), "prompts")
     end
+
+    # The agent-level directory that holds one session subdirectory per project.
+    def sessions_dir(agent_dir: self.agent_dir)
+      File.join(File.expand_path(agent_dir), "sessions")
+    end
+
+    # The default session directory for a working directory, matching pi's
+    # getDefaultSessionDirPath: the cwd is encoded into a single path-safe segment
+    # by stripping its leading separator and folding `/`, `\`, and `:` to `-`, then
+    # wrapped in `--...--` so two projects never share a session directory.
+    def default_session_dir(cwd: Dir.pwd, agent_dir: self.agent_dir)
+      encoded = File.expand_path(cwd).sub(%r{\A[/\\]}, "").gsub(%r{[/\\:]}, "-")
+      File.join(sessions_dir(agent_dir: agent_dir), "--#{encoded}--")
+    end
   end
 end

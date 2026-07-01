@@ -7,6 +7,13 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Sessions now have a default per-project directory. `Config.default_session_dir`
+  puts a session's JSONL under `~/.truffle/agent/sessions/--<encoded-cwd>--/`,
+  encoding the working directory the way pi does (leading separator stripped,
+  `/`, `\`, and `:` folded to `-`) so two projects never share a directory.
+  `Session.create` and `Agent#dump` default `dir:` to it, so a caller gets
+  per-project session history without naming a directory; passing `dir:`
+  explicitly still works.
 - `truffle init` creates project-local Truffle state without overwriting existing
   files: `.truffle/` with `settings.json`, `prompts/`, `extensions/`, `skills/`,
   and `sessions/`, plus an `AGENTS.md` project memory file when one is absent.

@@ -547,6 +547,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `settings.json`, `prompts/`, `extensions/`, `skills/`, and `sessions/`,
       plus an `AGENTS.md` project memory file when absent. It is idempotent and
       never overwrites existing project files.
+    - [x] **Default session directory.** `Config.default_session_dir(cwd:)` puts a
+      session's JSONL under `~/.truffle/agent/sessions/--<encoded-cwd>--/`,
+      encoding the cwd the way pi does so two projects never collide.
+      `Session.create` and `Agent#dump` default `dir:` to it, so a caller gets
+      per-project session history without naming a directory.
     - [ ] Load project settings from `.truffle/settings.json` once there is a
       runtime settings object to apply them to.
 21. **Migrations.** A versioned migration path for a host project's on-disk state

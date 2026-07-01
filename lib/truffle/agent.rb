@@ -204,13 +204,15 @@ module Truffle
       self
     end
 
-    # Write this agent's state to a new session file under `dir` and return the
-    # Session. The conversation is persisted (the system prompt is left out, since
-    # it is regenerated from config on resume, as in pi); the model is recorded as
-    # a model_change so a resumed session restarts on it; and the toolbox names go
-    # in the header so Agent.load can rebind the tools by name. cwd is metadata
-    # only, the working directory the session belongs to.
-    def dump(dir:, cwd: Dir.pwd)
+    # Write this agent's state to a new session file and return the Session. When
+    # `dir` is omitted the session lands in the default per-project directory
+    # (Config.default_session_dir), so a caller gets automatic session history
+    # keyed by cwd. The conversation is persisted (the system prompt is left out,
+    # since it is regenerated from config on resume, as in pi); the model is
+    # recorded as a model_change so a resumed session restarts on it; and the
+    # toolbox names go in the header so Agent.load can rebind the tools by name.
+    # cwd is metadata only, the working directory the session belongs to.
+    def dump(cwd: Dir.pwd, dir: Config.default_session_dir(cwd: cwd))
       session = Session.create(dir: dir, cwd: cwd, tools: @toolbox.names)
       session.append_model_change(provider: @provider.name, model_id: @model) if @model
       conversation.each { |message| session.append_message(message) }

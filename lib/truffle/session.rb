@@ -3,6 +3,7 @@
 require "json"
 require "time"
 require "fileutils"
+require_relative "config"
 require_relative "uuid"
 require_relative "message"
 require_relative "usage"
@@ -87,8 +88,11 @@ module Truffle
 
     # Start a new session backed by the default JSONL file store. The file name
     # carries the timestamp and id, with the colons and dots of the ISO timestamp
-    # folded to dashes so it is path-safe, matching pi.
-    def self.create(dir:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
+    # folded to dashes so it is path-safe, matching pi. When `dir` is omitted the
+    # session lands in the default per-project directory (Config.default_session_dir),
+    # so a caller gets automatic session history keyed by cwd.
+    def self.create(cwd:, dir: Config.default_session_dir(cwd: cwd), id: nil, parent_session: nil,
+                    tools: nil, now: Time.now)
       id ||= UUID.v7
       timestamp = now.utc.iso8601(3)
       file = File.join(dir, "#{timestamp.gsub(/[:.]/, "-")}_#{id}.jsonl")

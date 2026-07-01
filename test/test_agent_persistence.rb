@@ -50,6 +50,34 @@ class TestAgentPersistence < Minitest::Test
     end
   end
 
+  def test_dump_without_a_dir_writes_to_the_default_per_project_directory
+    Dir.mktmpdir("truffle-agent") do |home|
+      agent_dir = File.join(home, "agent")
+      with_env("TRUFFLE_AGENT_DIR" => agent_dir) do
+        agent = Truffle::Agent.new(provider: StubProvider.new([StubProvider.text("ok")]))
+        agent.run("hello")
+
+        session = agent.dump(cwd: "/home/ada/proj")
+
+        expected = Truffle::Config.default_session_dir(cwd: "/home/ada/proj", agent_dir: agent_dir)
+
+        assert_equal expected, File.dirname(session.file)
+        assert_path_exists session.file
+      end
+    end
+  end
+
+  def with_env(overrides)
+    previous = {}
+    overrides.each_key { |key| previous[key] = ENV.fetch(key, :__absent__) }
+    overrides.each { |key, value| ENV[key] = value }
+    yield
+  ensure
+    previous.each do |key, value|
+      value == :__absent__ ? ENV.delete(key) : ENV[key] = value
+    end
+  end
+
   def test_dump_then_load_preserves_accumulated_usage
     Dir.mktmpdir("truffle-agent") do |dir|
       first_usage = usage_for(input: 100, output: 10)

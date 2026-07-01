@@ -99,6 +99,11 @@ Run `truffle init` in an app repo to create `.truffle/` project state and an
 `AGENTS.md` project memory file. It is safe to rerun; existing files are left
 unchanged.
 
+Sessions have a default home. `Agent#dump` and `Session.create` without a `dir:`
+write under `~/.truffle/agent/sessions/--<encoded-cwd>--/`, a per-project
+directory keyed by the working directory, so you get session history without
+choosing a path (pass `dir:` to override, or set `TRUFFLE_AGENT_DIR`).
+
 ## A Real Example
 
 The support-triage example shows the shape Truffle is built for: a Ruby app
