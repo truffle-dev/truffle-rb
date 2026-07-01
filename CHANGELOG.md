@@ -12,6 +12,18 @@ All notable changes to Truffle are documented here. The format follows
   UI updates while keeping `Agent#run` unchanged. Streamed tool calls still run
   tools and continue the loop, aborts end with `stop_reason: :aborted`, and the
   final return value remains the assistant text.
+- A pluggable session store seam lets a host back conversations with its own
+  persistence (a database, Redis, anything) without Truffle taking a dependency.
+  `Session` talks to storage through a small interface (`#read`, `#write`,
+  `#append`, `#exists?`, `#path`); `Session::FileStore` is the default conformer
+  and keeps the JSONL format, the interrupted-final-line tolerance, and the
+  v1/v2 migration as its own concern. `Session.start(store:, cwd:, ...)` and
+  `Session.open(store)` are the store-generic entry points, while
+  `Session.create(dir:)`, `Session.load(path)`, `session.file`, and
+  `Agent.load(path)` are unchanged and now build a file store internally. The
+  `#append` contract holds the store consistent across its block, so the #32
+  flock/leaf-refresh semantics stay in the file store. See
+  `examples/custom_session_store.rb` for an illustrative in-memory store.
 - `script/refresh-models` regenerates `lib/truffle/models.rb` from
   `models.dev/api.json` as an explicit maintenance step. The generator uses
   `Net::HTTP`, filters to provider-backed text-output models Truffle can route,

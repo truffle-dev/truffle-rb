@@ -68,7 +68,10 @@ events. Your app owns the tools and business rules.
 - **Observable loop.** Subscribe to tool calls, tool results, turn boundaries,
   retries, compaction, and final answers to build logs, UIs, or audit trails.
 - **Session-aware.** Agents can persist and reload conversation state, branch,
-  label, compact old turns, and recover from context-window overflows.
+  label, compact old turns, and recover from context-window overflows. Sessions
+  default to a JSONL file but talk to storage through a small seam, so a host can
+  back them with a database or anything else (see
+  `examples/custom_session_store.rb`).
 - **No runtime dependencies.** The core uses Ruby's standard library.
 
 ## Install

@@ -8,6 +8,7 @@ require_relative "message"
 require_relative "usage"
 require_relative "session_append"
 require_relative "session_migration"
+require_relative "session/file_store"
 
 module Truffle
   # An append-only session store, ported from pi's session manager. A session is
@@ -62,68 +63,61 @@ module Truffle
     # (compaction applied), plus the thinking level and model in force at the leaf.
     Context = Struct.new(:messages, :thinking_level, :model, keyword_init: true)
 
-    attr_reader :file, :id, :cwd, :parent_session, :tools, :leaf_id
+    attr_reader :store, :id, :cwd, :parent_session, :tools, :leaf_id
 
-    # Start a new session: mint an id (a time-ordered uuidv7 unless one is given),
-    # write the header, and return a Session bound to the file so messages can be
-    # appended. The file name carries the timestamp and id, with the colons and
-    # dots of the ISO timestamp folded to dashes so it is path-safe, matching pi.
+    # Start a new session on a store: mint an id (a time-ordered uuidv7 unless one
+    # is given), build the header, and return an unflushed Session bound to the
+    # store so messages can be appended. This is the store-generic entry point; a
+    # host with its own store calls it directly, while .create wraps it for the
+    # default JSONL file.
     #
     # tools records the names of the tools the producing agent had, so a resumed
     # agent can rebind its toolbox by name (Agent.dump/load). It is a Truffle
     # extension to pi's header and is omitted when empty, so a plain message
     # session is written exactly as pi writes it.
-    def self.create(dir:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
+    def self.start(store:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
       id ||= UUID.v7
       timestamp = now.utc.iso8601(3)
       header = { type: "session", version: SESSION_VERSION, id: id, timestamp: timestamp, cwd: cwd }
       header[:parent_session] = parent_session if parent_session
       header[:tools] = tools if tools && !tools.empty?
 
+      new(store: store, header: header, entries: [], flushed: false)
+    end
+
+    # Start a new session backed by the default JSONL file store. The file name
+    # carries the timestamp and id, with the colons and dots of the ISO timestamp
+    # folded to dashes so it is path-safe, matching pi.
+    def self.create(dir:, cwd:, id: nil, parent_session: nil, tools: nil, now: Time.now)
+      id ||= UUID.v7
+      timestamp = now.utc.iso8601(3)
       file = File.join(dir, "#{timestamp.gsub(/[:.]/, "-")}_#{id}.jsonl")
 
-      new(file: file, header: header, entries: [], flushed: false)
+      start(store: FileStore.new(file), cwd: cwd, id: id,
+            parent_session: parent_session, tools: tools, now: now)
     end
 
-    # Read a session file back: parse each JSONL line, tolerating a malformed
-    # final line because it may be an interrupted append. Earlier malformed lines
-    # are rejected because dropping one would break the parent_id chain and hide
-    # history loss. The returned Session is bound to the same file, so a resumed
-    # conversation keeps appending to it.
-    def self.load(path)
-      lines = File.read(path).each_line.to_a
-      final_entry_index = lines.rindex { |line| !line.strip.empty? }
-      parsed = lines.each_with_index.filter_map do |line, index|
-        parse_line(line, final_entry: index == final_entry_index,
-                         line_number: index + 1, path: path)
-      end
-      header = parsed.first
+    # Open a session from a store: read its current state and return a Session
+    # bound to it, so a resumed conversation keeps appending. This is the
+    # store-generic counterpart to .load; the store owns any format and migration
+    # concerns (the file store parses JSONL and upgrades old versions).
+    def self.open(store)
+      state = store.read
+      header = state[:header]
       unless header && header[:type] == "session" && header[:id].is_a?(String)
-        raise ArgumentError, "not a valid Truffle session: #{path}"
+        raise ArgumentError, "not a valid Truffle session: #{store.path}"
       end
 
-      if SessionMigration.migrate_to_current_version(parsed, current_version: SESSION_VERSION)
-        SessionMigration.rewrite_file(path, parsed)
-      end
-
-      new(file: path, header: header, entries: parsed.drop(1), flushed: true)
+      new(store: store, header: header, entries: state[:entries], flushed: true)
     end
 
-    # Parse one JSONL line. Blank lines return nil; a malformed final line is
-    # treated as a partial append, while malformed earlier lines raise.
-    def self.parse_line(line, final_entry:, line_number:, path:)
-      return nil if line.strip.empty?
-
-      JSON.parse(line).transform_keys(&:to_sym)
-    rescue JSON::ParserError => e
-      return nil if final_entry
-
-      raise ArgumentError, "malformed session line #{line_number} in #{path}: #{e.message}"
+    # Read a session back from the default JSONL file store.
+    def self.load(path)
+      self.open(FileStore.new(path))
     end
-    private_class_method :parse_line
 
-    def initialize(file:, header:, entries:, flushed: true)
-      @file = file
+    def initialize(store:, header:, entries:, flushed: true)
+      @store = store
       @header = header
       @id = header[:id]
       @cwd = header[:cwd]
@@ -138,6 +132,11 @@ module Truffle
       @leaf_explicitly_set = false
       entries.each { |entry| index(entry) }
     end
+
+    # The store's stable identifier. For the default file store this is the JSONL
+    # path, so callers that read the file directly keep working; a custom store
+    # returns whatever identifier it chose.
+    def file = @store.path
 
     # The session version recorded in the header.
     def version = @header[:version]

@@ -209,6 +209,16 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `load` rebinds the toolbox by name (raising on a missing tool), restores the
       model, and replays the history. The provider, tools, and system prompt are
       re-supplied since they cannot be serialized.
+    - [x] **Pluggable store seam.** `Session` talks to persistence through a small
+      interface (`#read`, `#write`, `#append`, `#exists?`, `#path`), so a host can
+      back conversations with a database or anything else without Truffle taking a
+      dependency. `Session::FileStore` is the default conformer and keeps the JSONL
+      format, interrupted-line tolerance, and v1/v2 migration as its own concern;
+      the `#append` contract holds the store consistent across its block, keeping
+      the flock/leaf-refresh semantics in the file store. `Session.start(store:)` /
+      `Session.open(store)` are the store-generic entry points, while `create`,
+      `load`, `session.file`, and `Agent.load` are unchanged. See
+      `examples/custom_session_store.rb`.
 12. **Compaction.** Summarize old turns to stay under context, preserving a
     locked, non-removable head (system prompt, pinned facts), mirroring how pi
     compacts.

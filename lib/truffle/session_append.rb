@@ -20,16 +20,13 @@ module Truffle
         return id
       end
 
-      File.open(@file, File::RDWR) do |handle|
-        handle.flock(File::LOCK_EX)
-        refresh_from_file(preserve_leaf: @leaf_explicitly_set)
+      @store.append do
+        resync(preserve_leaf: @leaf_explicitly_set)
         entry = new_entry(type, fields)
         @entries << entry
         index(entry)
         @leaf_explicitly_set = false
-        handle.seek(0, IO::SEEK_END)
-        handle.write("#{JSON.generate(entry)}\n")
-        entry[:id]
+        entry
       end
     end
 
@@ -52,12 +49,18 @@ module Truffle
       flush if @assistant_entry_seen
     end
 
-    def refresh_from_file(preserve_leaf:)
+    # Reload the persisted state from the store and rebuild the in-memory index,
+    # so an append chains from the latest leaf a concurrent writer may have added.
+    # Runs inside the store's append lock. preserve_leaf keeps an explicitly set
+    # leaf (a branch or reset) instead of snapping to the last entry.
+    def resync(preserve_leaf:)
       leaf_id = @leaf_id if preserve_leaf
-      fresh = self.class.load(@file)
-      raise ArgumentError, "session id changed while refreshing #{@file}" unless fresh.id == @id
+      state = @store.read
+      unless state[:header][:id] == @id
+        raise ArgumentError, "session id changed while resyncing #{@store.path}"
+      end
 
-      @entries = fresh.entries
+      @entries = state[:entries]
       @by_id = {}
       @labels_by_id = {}
       @leaf_id = nil
@@ -67,11 +70,7 @@ module Truffle
     end
 
     def write_all_entries
-      FileUtils.mkdir_p(File.dirname(@file))
-      File.open(@file, "wx") do |handle|
-        handle.write("#{JSON.generate(@header)}\n")
-        @entries.each { |entry| handle.write("#{JSON.generate(entry)}\n") }
-      end
+      @store.write(header: @header, entries: @entries)
     end
   end
 end
