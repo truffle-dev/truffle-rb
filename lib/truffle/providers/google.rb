@@ -113,7 +113,9 @@ module Truffle
       def self.build_body(messages, tools, options = {})
         system, conversation = extract_system(messages)
         body = { contents: convert_messages(conversation) }
-        body[:systemInstruction] = { parts: [{ text: system }] } unless system.empty?
+        unless system.empty?
+          body[:systemInstruction] = { parts: [{ text: Providers.sanitize_text(system) }] }
+        end
         unless tools.empty?
           body[:tools] = convert_tools(tools)
           if (choice = options[:tool_choice])
@@ -177,7 +179,7 @@ module Truffle
       def self.user_parts(blocks)
         blocks.filter_map do |block|
           case block.type
-          when :text then { text: block.text }
+          when :text then { text: Providers.sanitize_text(block.text) }
           when :image then { inlineData: { mimeType: block.mime_type, data: block.data } }
           end
         end
@@ -194,15 +196,17 @@ module Truffle
         message.content.each do |block|
           case block.type
           when :text
-            next if block.text.strip.empty?
+            text = Providers.sanitize_text(block.text)
+            next if text.strip.empty?
 
-            part = { text: block.text }
+            part = { text: text }
             part[:thoughtSignature] = block.signature if valid_signature?(block.signature)
             parts << part
           when :thinking
-            next if block.thinking.strip.empty?
+            thinking = Providers.sanitize_text(block.thinking)
+            next if thinking.strip.empty?
 
-            parts << thinking_part(block)
+            parts << thinking_part(block, thinking)
           when :tool_call
             parts << { functionCall: { name: block.name, args: block.arguments || {} } }
           end
@@ -210,13 +214,13 @@ module Truffle
         parts
       end
 
-      def self.thinking_part(block)
+      def self.thinking_part(block, thinking = Providers.sanitize_text(block.thinking))
         if valid_signature?(block.signature)
-          { thought: true, text: block.thinking, thoughtSignature: block.signature }
+          { thought: true, text: thinking, thoughtSignature: block.signature }
         else
           # Gemini rejects a thought part without a valid signature on replay, so
           # an unsigned (or foreign-model) thinking block becomes plain text.
-          { text: block.thinking }
+          { text: thinking }
         end
       end
 
@@ -247,7 +251,9 @@ module Truffle
       end
 
       def self.tool_result_text(blocks)
-        blocks.select { |b| b.type == :text }.map(&:text).join("\n")
+        blocks.select { |b| b.type == :text }
+              .map { |block| Providers.sanitize_text(block.text) }
+              .join("\n")
       end
 
       # Convert provider-neutral tool schemas (Toolbox#to_schema) into Gemini

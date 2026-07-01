@@ -177,7 +177,7 @@ module Truffle
         messages.map do |m|
           case m.role
           when :assistant
-            h = { role: "assistant", content: m.text }
+            h = { role: "assistant", content: Providers.sanitize_text(m.text) }
             unless m.tool_calls.empty?
               h[:tool_calls] = m.tool_calls.map do |tc|
                 {
@@ -189,7 +189,8 @@ module Truffle
             end
             h
           when :tool
-            { role: "tool", tool_call_id: m.tool_call_id, content: m.text.to_s }
+            { role: "tool", tool_call_id: m.tool_call_id,
+              content: Providers.sanitize_text(m.text.to_s) }
           else
             { role: m.role.to_s, content: serialize_user_content(m) }
           end
@@ -197,14 +198,17 @@ module Truffle
       end
 
       def serialize_user_content(message)
-        return message.text.to_s unless message.content.any?(Content::Image)
+        unless message.content.any?(Content::Image)
+          return Providers.sanitize_text(message.text.to_s)
+        end
 
         message.content.filter_map do |block|
           case block
           when Content::Text
-            next if block.text.empty?
+            text = Providers.sanitize_text(block.text)
+            next if text.empty?
 
-            { type: "text", text: block.text }
+            { type: "text", text: text }
           when Content::Image
             { type: "image_url",
               image_url: { url: "data:#{block.mime_type};base64,#{block.data}" } }

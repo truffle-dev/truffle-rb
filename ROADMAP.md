@@ -530,7 +530,9 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       sequences (`\xED[\xA0-\xBF][\x80-\xBF]`) so text serializes into a provider
       request body without JSON errors, while leaving valid characters (astral
       emoji and the adjacent U+D000-U+D7FF range) untouched and returning a clean
-      string unchanged. Wiring it into the provider serializers is a later slice.
+      string unchanged. OpenAI, Anthropic, and Gemini serializers now run outbound
+      system, user, assistant, thinking, and tool-result text through it at the
+      provider boundary.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial

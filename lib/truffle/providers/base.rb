@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require_relative "../unicode_sanitizer"
 
 module Truffle
   module Providers
@@ -12,6 +13,16 @@ module Truffle
     # builders (Anthropic, Google) can all reach it.
     def self.schema_definition(schema)
       schema.respond_to?(:to_h) ? schema.to_h : schema
+    end
+
+    # Provider request bodies can reject or fail to encode text containing lone
+    # surrogate byte sequences. Keep sanitization at the provider boundary so the
+    # in-memory transcript remains unchanged while every outbound text field is
+    # JSON-safe.
+    def self.sanitize_text(text)
+      return text if text.nil?
+
+      UnicodeSanitizer.sanitize_surrogates(text.to_s)
     end
 
     # The contract every provider implements. This single seam is what makes

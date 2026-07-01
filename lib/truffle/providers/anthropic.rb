@@ -113,7 +113,7 @@ module Truffle
           max_tokens: max_tokens,
           messages: convert_messages(conversation)
         }
-        body[:system] = system unless system.empty?
+        body[:system] = Providers.sanitize_text(system) unless system.empty?
         unless tools.empty?
           body[:tools] = convert_tools(tools)
           if (choice = options[:tool_choice])
@@ -187,7 +187,8 @@ module Truffle
         message.content.each do |block|
           case block.type
           when :text
-            blocks << { type: "text", text: block.text } unless block.text.strip.empty?
+            text = Providers.sanitize_text(block.text)
+            blocks << { type: "text", text: text } unless text.strip.empty?
           when :thinking
             blocks.concat(thinking_blocks(block))
           when :tool_call
@@ -200,12 +201,14 @@ module Truffle
 
       def self.thinking_blocks(block)
         return [{ type: "redacted_thinking", data: block.signature }] if block.redacted?
-        return [] if block.thinking.strip.empty?
+
+        thinking = Providers.sanitize_text(block.thinking)
+        return [] if thinking.strip.empty?
 
         if block.signature.nil? || block.signature.strip.empty?
-          [{ type: "text", text: block.thinking }]
+          [{ type: "text", text: thinking }]
         else
-          [{ type: "thinking", thinking: block.thinking, signature: block.signature }]
+          [{ type: "thinking", thinking: thinking, signature: block.signature }]
         end
       end
 
@@ -228,10 +231,11 @@ module Truffle
       def self.to_anthropic_content(blocks, placeholder: false)
         texts = blocks.select { |b| b.type == :text }
         images = blocks.select { |b| b.type == :image }
-        return texts.map(&:text).join("\n") if images.empty?
+        text_values = texts.map { |t| Providers.sanitize_text(t.text) }
+        return text_values.join("\n") if images.empty?
 
         out = []
-        texts.each { |t| out << { type: "text", text: t.text } unless t.text.strip.empty? }
+        text_values.each { |text| out << { type: "text", text: text } unless text.strip.empty? }
         images.each do |img|
           out << { type: "image",
                    source: { type: "base64", media_type: img.mime_type, data: img.data } }

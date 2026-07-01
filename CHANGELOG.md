@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Built-in provider serializers now sanitize outbound system, user, assistant,
+  thinking, and tool-result text before building JSON request bodies, matching
+  pi's provider boundary behavior and avoiding invalid UTF-8 surrogate errors.
 - `Agent.load` now reattaches the loaded session to the resumed agent. New turns
   appended after a resume are persisted to the same session file instead of only
   living in memory, and session-backed runs write an updated usage checkpoint at
