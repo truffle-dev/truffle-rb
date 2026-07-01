@@ -43,8 +43,8 @@ All notable changes to Truffle are documented here. The format follows
   not support images)` for user content, `(tool image omitted: ...)` for tool
   results), collapsing consecutive images to a single placeholder. Vision models
   and assistant/system messages pass through untouched. The module is
-  provider-agnostic; a provider calls it before serializing a turn so a non-vision
-  model never receives image content its API would reject.
+  provider-agnostic and ready for provider-boundary wiring; propagating model
+  capability metadata into that boundary remains follow-up work.
 - `Truffle::TokenBudget` ports pi's per-call token-budget math from
   `ai/src/api/simple-options.ts`. `clamp_max_tokens_to_context` fits a requested
   output cap inside a model's remaining context window (leaving a 4096-token

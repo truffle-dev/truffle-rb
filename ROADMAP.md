@@ -125,8 +125,9 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       downgrade_unsupported_images` ports the image pass of pi's
       `transform-messages.ts`: for a model without an image input modality, user
       and tool-result image blocks become a placeholder text block, consecutive
-      images collapsing to one. Provider-agnostic, called before serialization so
-      a non-vision model never receives image content. The rest of
+      images collapsing to one. The provider-agnostic transform is ready for
+      provider-boundary wiring; capability propagation and that wiring remain a
+      follow-up. The rest of
       `transformMessages` (cross-model thinking, tool-call-id normalization,
       synthetic tool results) waits on assistant-message provider/model metadata
       the flat `Message` does not yet carry.
