@@ -557,6 +557,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       to resume, newest-first, filtered by recorded cwd; `Session.read_header`
       reads a header without loading the conversation. Port of pi's
       findMostRecentSession.
+    - [x] **Session cwd validation.** `Truffle::SessionCwd` reports when a
+      session's recorded working directory no longer exists so a resume can warn
+      and fall back to the current directory. `missing_issue` returns an issue
+      (nil when there is no session file, no recorded cwd, or the directory is
+      present), `format_error` / `format_prompt` build the messages, and
+      `assert_exists` raises `SessionCwd::MissingError`. Port of pi's
+      core/session-cwd.ts, taking the cwd and file as values rather than pi's
+      getter-object.
     - [x] **Project settings load.** `Truffle::Settings.load_project` reads
       `.truffle/settings.json` into a read-only runtime settings object, mapping
       pi-style `defaultProvider` / `defaultModel`, `compaction`, and `retry`

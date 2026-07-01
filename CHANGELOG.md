@@ -7,6 +7,13 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::SessionCwd` checks that a session's recorded working directory still
+  exists before a resume. `missing_issue(session_cwd:, fallback_cwd:,
+  session_file:)` returns an issue when the directory is gone (nil when there is
+  no session file, no recorded cwd, or the directory is present),
+  `format_error` / `format_prompt` build the user-facing strings, and
+  `assert_exists` raises `SessionCwd::MissingError` carrying the issue. Port of
+  pi's core/session-cwd.ts.
 - `Truffle::Migrations.run_project` adds the first project-local migration
   runner. `truffle init` now runs it after scaffolding, stamping existing
   unversioned `.truffle/settings.json` objects with the current version while
