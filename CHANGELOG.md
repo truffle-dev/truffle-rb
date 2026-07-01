@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- README CLI documentation now reflects the implemented line-oriented REPL
+  session picker, fork, session-id, and cross-project session lookup behavior
+  instead of listing completed slices as in progress.
 - OpenAI and Anthropic streaming tool-call deltas now parse partial argument
   buffers with `Truffle::PartialJson.parse_streaming`, and completed streaming
   arguments use the shared `Providers.parse_tool_arguments` repair path.

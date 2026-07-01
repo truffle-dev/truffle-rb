@@ -95,9 +95,11 @@ instead of only the final text. Text `@file` arguments are included in the first
 prompt, and supported image `@file` arguments attach to that first model turn.
 Interactive runs create a session by default; pass `--no-session` for an
 ephemeral loop. `truffle --continue` loads the most recent session for the
-current project, and `--session <path|id>` loads a specific one. Automatic image
-resizing, RPC mode, the interactive session picker, fork, and session-id
-creation are still in progress.
+current project. `truffle --resume` opens a numbered picker, `--session
+<path|id>` loads a session file or unique session id across projects, and
+`--fork <path|id>` branches an existing session into the current project. Use
+`--session-id <id>` to name a new or forked session. Automatic image resizing,
+RPC mode, all-session browsing, and a richer TUI are still in progress.
 
 Run `truffle init` in an app repo to create `.truffle/` project state and an
 `AGENTS.md` project memory file. It is safe to rerun; existing files are left
