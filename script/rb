@@ -20,6 +20,13 @@ BUNDLE_VOLUME="${TRUFFLE_BUNDLE_VOLUME:-truffle_rb_bundle}"
 CONFIG_DIR="${TRUFFLE_CONFIG_DIR:-$HOME/.config/truffle}"
 
 env_args=()
+docker_args=(run --rm -i)
+
+# Preserve a real terminal for the interactive CLI without forcing one in CI,
+# redirected commands, or other non-interactive callers.
+if [[ -t 0 && -t 1 ]]; then
+  docker_args+=(-t)
+fi
 
 # Load local development secrets when present. This file is ignored locally and
 # should contain simple shell assignments such as OPENAI_API_KEY=...
@@ -62,7 +69,7 @@ else
   container_workdir="$WORKDIR"
 fi
 
-exec docker run --rm -i \
+exec docker "${docker_args[@]}" \
   "${repo_mount[@]}" \
   -v "${BUNDLE_VOLUME}:/usr/local/bundle" \
   -w "$container_workdir" \

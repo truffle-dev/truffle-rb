@@ -18,7 +18,10 @@ module Truffle
       agent.on(:agent_end) { |payload| current_response = final_print_response(payload) }
       reset_response = -> { current_response = nil }
       read_response = -> { current_response }
-      stream = repl_streaming?(agent, out)
+      renderer =
+        if terminal_streaming?(agent, out, disabled: args.no_stream)
+          TerminalRenderer.new(out: out, err: err).attach(agent)
+        end
 
       out.puts "Truffle interactive. Type /exit to quit."
       initial_input = repl_input(args)
@@ -31,7 +34,7 @@ module Truffle
           err: err,
           response: reset_response,
           result: read_response,
-          stream: stream
+          renderer: renderer
         )
       end
 
@@ -50,10 +53,13 @@ module Truffle
           err: err,
           response: reset_response,
           result: read_response,
-          stream: stream
+          renderer: renderer
         )
       end
 
+      0
+    rescue Interrupt
+      out.puts
       0
     rescue Truffle::Error => e
       err.puts e.message
@@ -61,62 +67,32 @@ module Truffle
     end
 
     def run_repl_turn(agent, prompt, images: [], out: $stdout, err: $stderr,
-                      response: nil, result: nil, stream: false)
+                      response: nil, result: nil, renderer: nil)
       response&.call
-      if stream
+      if renderer
         return run_streaming_repl_turn(
-          agent, prompt, images: images, out: out, err: err, result: result
+          agent, prompt, images: images, renderer: renderer, result: result
         )
       end
 
       agent.run(prompt, images: images)
       render_print_text(result&.call, out: out, err: err)
     rescue Truffle::Error => e
+      renderer&.finish(nil)
       err.puts e.message
       1
     end
 
-    def run_streaming_repl_turn(agent, prompt, images:, out:, err:, result:)
-      wrote_text = false
-      separate_next_text = false
-      agent.run_stream(prompt, images: images) do |event|
-        if event.type == :text_start
-          separate_next_text = wrote_text
-          next
+    def run_streaming_repl_turn(agent, prompt, images:, renderer:, result:)
+      renderer.start_turn
+      signal = AbortSignal.new
+      with_interrupt_abort(signal) do
+        agent.run_stream(prompt, images: images, signal: signal) do |event|
+          renderer.stream(event)
         end
-        next unless event.type == :text_delta
-
-        delta = event.delta.to_s
-        next if delta.empty?
-
-        out.write("\n") if separate_next_text
-        separate_next_text = false
-        out.write(delta)
-        out.flush if out.respond_to?(:flush)
-        wrote_text = true
       end
 
-      final = result&.call
-      out.write("\n") if wrote_text
-      return render_print_text(final, out: out, err: err) if final_response_failed?(final)
-      return 0 if wrote_text
-
-      render_print_text(final, out: out, err: err)
-    end
-
-    def final_response_failed?(response)
-      response && PRINT_FAILURE_STOP_REASONS.include?(response.stop_reason)
-    end
-
-    def repl_streaming?(agent, out)
-      return false unless out.respond_to?(:tty?) && out.tty?
-      return false unless agent.respond_to?(:run_stream)
-      return true unless agent.respond_to?(:provider)
-
-      provider = agent.provider
-      return provider.respond_to?(:chat_stream) unless provider.is_a?(Providers::Base)
-
-      provider.method(:chat_stream).owner != Providers::Base
+      renderer.finish(result&.call)
     end
 
     def repl_input(args)
@@ -134,7 +110,6 @@ module Truffle
     end
 
     private_class_method :run_repl_turn, :run_streaming_repl_turn,
-                         :final_response_failed?, :repl_streaming?,
                          :repl_input, :repl_exit_command?
   end
 end

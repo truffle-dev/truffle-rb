@@ -93,6 +93,10 @@ one-shot `truffle --print` runs, and a line-oriented interactive REPL. Use
 `truffle --mode json "..."` when an app wants newline-delimited agent events
 instead of only the final text. Text `@file` arguments are included in the first
 prompt, and supported image `@file` arguments attach to that first model turn.
+On a terminal, assistant text streams to stdout while thinking, tool activity,
+retry notices, and compaction status go to stderr. Pass `--no-stream` for
+buffered output. Ctrl-C cancels the active request; in the REPL it returns to
+the prompt for the next turn.
 Interactive runs create a session by default; pass `--no-session` for an
 ephemeral loop. `truffle --continue` loads the most recent session for the
 current project. `truffle --resume` opens a numbered picker, `--session
@@ -296,7 +300,11 @@ without printing secrets:
 ```sh
 script/rb rake test
 script/rb ruby examples/support_triage.rb
+script/rb ruby -Ilib exe/truffle --no-session
 ```
+
+Interactive `script/rb` invocations preserve the terminal, so the last command
+uses the same streaming and Ctrl-C path as the installed executable.
 
 Coverage is opt-in:
 

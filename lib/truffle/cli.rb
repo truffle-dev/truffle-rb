@@ -23,7 +23,7 @@ module Truffle
       :tools, :exclude_tools, :no_tools, :no_builtin_tools, :extensions,
       :no_extensions, :print, :export, :no_skills, :skills, :prompt_templates,
       :no_prompt_templates, :themes, :no_themes, :no_context_files, :list_models, :init,
-      :offline, :verbose, :project_trust_override, :messages, :file_args,
+      :offline, :verbose, :no_stream, :project_trust_override, :messages, :file_args,
       :unknown_flags, :diagnostics,
       keyword_init: true
     )
@@ -38,7 +38,8 @@ module Truffle
       "--no-skills" => :no_skills, "-ns" => :no_skills,
       "--no-prompt-templates" => :no_prompt_templates, "-np" => :no_prompt_templates,
       "--no-themes" => :no_themes, "--no-context-files" => :no_context_files,
-      "-nc" => :no_context_files, "--verbose" => :verbose, "--offline" => :offline
+      "-nc" => :no_context_files, "--no-stream" => :no_stream,
+      "--verbose" => :verbose, "--offline" => :offline
     }.freeze
 
     # Project-trust overrides: --approve enables, --no-approve disables.

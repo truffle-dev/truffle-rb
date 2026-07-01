@@ -55,14 +55,17 @@ end
 class StreamingPrintStubAgent
   attr_reader :buffered_prompts, :streamed_prompts
 
-  def initialize(payload, chunks: [], events: nil)
-    @payload = payload
+  def initialize(payload, chunks: [], events: nil, agent_events: [], buffered_agent_events: [])
+    @payloads = payload.is_a?(Array) ? payload : [payload]
     @events = events || chunks.map do |chunk|
       Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: chunk)
     end
+    @agent_events = agent_events
+    @buffered_agent_events = buffered_agent_events
     @listeners = Hash.new { |h, k| h[k] = [] }
     @buffered_prompts = []
     @streamed_prompts = []
+    @run = 0
   end
 
   def on(event = nil, &block)
@@ -72,18 +75,26 @@ class StreamingPrintStubAgent
 
   def run(prompt, images: [])
     @buffered_prompts << [prompt, images]
-    emit(:agent_end, @payload)
+    @buffered_agent_events.each { |event, payload| emit(event, payload) }
+    emit(:agent_end, next_payload)
     ""
   end
 
-  def run_stream(prompt, images: [], &block)
+  def run_stream(prompt, images: [], signal: nil, &block)
     @streamed_prompts << [prompt, images]
     @events.each(&block)
-    emit(:agent_end, @payload)
+    @agent_events.each { |event, payload| emit(event, payload) }
+    emit(:agent_end, next_payload)
     ""
   end
 
   private
+
+  def next_payload
+    payload = @payloads[@run] || @payloads.last
+    @run += 1
+    payload
+  end
 
   def emit(event, payload)
     @listeners[event].each { |listener| listener.call(payload) }
@@ -128,6 +139,31 @@ class RecordingTTYOutput < StringIO
   end
 end
 
+class InterruptingStreamingStubAgent < StreamingPrintStubAgent
+  def initialize(aborted_payload, completed_payload)
+    super([aborted_payload, completed_payload])
+  end
+
+  def run_stream(prompt, images: [], signal: nil)
+    @streamed_prompts << [prompt, images]
+    if @streamed_prompts.length == 1
+      interrupter = Thread.new do
+        sleep 0.02
+        Process.kill("INT", Process.pid)
+      end
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
+      sleep 0.005 until signal&.aborted? ||
+                        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+      interrupter.join
+      raise "SIGINT did not abort the turn" unless signal&.aborted?
+    else
+      yield Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: "recovered")
+    end
+    emit(:agent_end, next_payload)
+    ""
+  end
+end
+
 # Tests for the `truffle` binary entry point (Truffle::CLI.run): the thin
 # dispatcher that parses argv, surfaces diagnostics, and acts on the terminal
 # flags the harness supports today.
@@ -142,8 +178,7 @@ class TestCLIRunner < Minitest::Test
   # Drive a `--print` dispatch offline: an empty stdin unless one is given, and
   # an injected agent unless the test wants the real builder (to exercise the
   # unresolvable-model path).
-  def run_print_cli(argv, input: StringIO.new(""), agent: nil)
-    out = StringIO.new
+  def run_print_cli(argv, input: StringIO.new(""), agent: nil, out: StringIO.new)
     err = StringIO.new
     builder = agent && ->(_args) { agent }
     status = Truffle::CLI.run(argv, out: out, err: err, input: input, agent_builder: builder)
@@ -364,6 +399,69 @@ class TestCLIRunner < Minitest::Test
     assert_equal 1, out.scan("partial").length
   end
 
+  def test_repl_no_stream_uses_the_buffered_path_on_a_tty
+    agent = StreamingPrintStubAgent.new(assistant_payload("hello"), chunks: %w[hel lo])
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      ["--no-stream"], input: StringIO.new("hi\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["hi", []]], agent.buffered_prompts
+    assert_empty agent.streamed_prompts
+    assert_includes out, "hello\n"
+  end
+
+  def test_repl_renders_thinking_and_tool_activity_on_stderr
+    call = Truffle::ToolCall.new(
+      id: "call-1", name: "read", arguments: { "path" => "README.md" }
+    )
+    events = [
+      Truffle::StreamEvent.new(type: :thinking_start, content_index: 0),
+      Truffle::StreamEvent.new(type: :thinking_delta, content_index: 0, delta: "inspect"),
+      Truffle::StreamEvent.new(type: :thinking_end, content_index: 0, content: "inspect"),
+      Truffle::StreamEvent.new(type: :text_delta, content_index: 1, delta: "done")
+    ]
+    agent = StreamingPrintStubAgent.new(
+      assistant_payload("done"),
+      events: events,
+      agent_events: [
+        [:tool_call, { call: call }],
+        [:tool_result, { call: call, result: "contents" }]
+      ]
+    )
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      [], input: StringIO.new("hi\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_includes out, "done\n"
+    assert_includes err, "thinking> inspect\n"
+    assert_includes err, "tool> read {\"path\":\"README.md\"}\n"
+    assert_includes err, "tool< read: contents\n"
+  end
+
+  def test_ctrl_c_aborts_only_the_current_repl_turn
+    aborted = assistant_payload("", stop_reason: Truffle::StopReason::ABORTED)
+    completed = assistant_payload("recovered")
+    agent = InterruptingStreamingStubAgent.new(aborted, completed)
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      [], input: StringIO.new("cancel\nagain\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_equal [["cancel", []], ["again", []]], agent.streamed_prompts
+    assert_includes err, "Request aborted\n"
+    assert_includes out, "recovered\n"
+    assert_includes out, "truffle> "
+  end
+
   def test_init_creates_project_state_and_memory_file
     in_tmpdir do |dir|
       status, out, err = run_cli(["init"])
@@ -545,6 +643,85 @@ class TestCLIRunner < Minitest::Test
     assert_equal 0, status
     assert_equal %w[one two], agent.prompts
     assert_equal "second reply\n", out
+  end
+
+  def test_print_streams_only_the_last_prompt_on_a_tty
+    agent = StreamingPrintStubAgent.new(
+      [assistant_payload("first reply"), assistant_payload("second reply")],
+      chunks: ["second reply"]
+    )
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_print_cli(
+      ["-p", "one", "two"], agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["one", []]], agent.buffered_prompts
+    assert_equal [["two", []]], agent.streamed_prompts
+    assert_equal "second reply\n", out
+    assert_equal 1, out.scan("second reply").length
+  end
+
+  def test_print_does_not_render_tool_activity_from_buffered_setup_prompts
+    call = Truffle::ToolCall.new(id: "call-1", name: "read", arguments: {})
+    agent = StreamingPrintStubAgent.new(
+      [assistant_payload("first reply"), assistant_payload("second reply")],
+      chunks: ["second reply"],
+      buffered_agent_events: [
+        [:tool_call, { call: call }],
+        [:tool_result, { call: call, result: "setup result" }]
+      ]
+    )
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_print_cli(
+      ["-p", "one", "two"], agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_equal "second reply\n", out
+    assert_empty err
+  end
+
+  def test_print_keeps_the_buffered_path_when_stdout_is_not_a_tty
+    agent = StreamingPrintStubAgent.new(assistant_payload("answer"), chunks: ["answer"])
+
+    status, out, err = run_print_cli(["-p", "ask"], agent: agent)
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["ask", []]], agent.buffered_prompts
+    assert_empty agent.streamed_prompts
+    assert_equal "answer\n", out
+  end
+
+  def test_print_no_stream_keeps_the_buffered_path_on_a_tty
+    agent = StreamingPrintStubAgent.new(assistant_payload("answer"), chunks: ["answer"])
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_print_cli(
+      ["-p", "ask", "--no-stream"], agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["ask", []]], agent.buffered_prompts
+    assert_empty agent.streamed_prompts
+    assert_equal "answer\n", out
+  end
+
+  def test_ctrl_c_aborts_streaming_print_mode_with_a_failure_status
+    aborted = assistant_payload("", stop_reason: Truffle::StopReason::ABORTED)
+    agent = InterruptingStreamingStubAgent.new(aborted, assistant_payload("unused"))
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_print_cli(["-p", "cancel"], agent: agent, out: output)
+
+    assert_equal 1, status
+    assert_empty out
+    assert_equal "Request aborted\n", err
   end
 
   def test_print_splices_text_file_arguments_into_the_initial_prompt

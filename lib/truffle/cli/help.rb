@@ -89,6 +89,7 @@ module Truffle
       --append-system-prompt <text>  Append text to the system prompt (repeatable)
       --mode <mode>                  Output mode: text (default), json, or rpc
       --print, -p                    Non-interactive mode: process prompt and exit
+      --no-stream                    Disable live terminal streaming
       --continue, -c                 Continue previous session
       --resume, -r                   Select a session to resume
       --session <path|id>            Use specific session file or partial UUID

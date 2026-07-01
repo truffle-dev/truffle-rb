@@ -601,11 +601,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `Agent#run_stream` when stdout is a terminal and the provider implements
       streaming, writing and flushing text deltas as they arrive without
       duplicating the final response. Redirected output keeps the buffered path.
-      Thinking/tool rendering and print-mode streaming remain follow-up work.
+      The terminal event-rendering slice below extends this path.
     - [x] **TTY REPL text-block boundaries.** Streaming output honors
       `text_start` events and writes one newline between non-empty text blocks,
       matching the buffered renderer instead of concatenating separate assistant
       content blocks.
+    - [x] **Terminal event rendering.** One line-oriented renderer now drives
+      terminal REPL turns and the final prompt in print mode. Assistant text
+      streams to stdout; thinking, tool calls/results, retries, and compaction
+      status go to stderr; `--no-stream` keeps a buffered path. Ctrl-C aborts
+      the current request through `AbortSignal` and returns an interactive run
+      to its prompt. Redirected text and newline-delimited JSON output remain
+      unchanged.
     - [x] **Initial interactive REPL.** A bare `truffle` now starts a
       line-oriented terminal loop over one long-lived agent. It processes initial
       CLI messages first, reads user turns until EOF or `/exit`, renders assistant

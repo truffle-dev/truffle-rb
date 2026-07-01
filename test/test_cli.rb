@@ -81,7 +81,8 @@ class TestCLI < Minitest::Test
 
   def test_no_toggles
     args = parse("--no-session", "--no-tools", "--no-builtin-tools", "--no-extensions",
-                 "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files")
+                 "--no-skills", "--no-prompt-templates", "--no-themes", "--no-context-files",
+                 "--no-stream")
 
     assert args.no_session
     assert args.no_tools
@@ -91,6 +92,7 @@ class TestCLI < Minitest::Test
     assert args.no_prompt_templates
     assert args.no_themes
     assert args.no_context_files
+    assert args.no_stream
   end
 
   def test_accumulator_flags_collect_in_order

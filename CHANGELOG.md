@@ -39,6 +39,16 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Terminal text mode now uses one event renderer in both the interactive REPL
+  and one-shot print runs. Assistant text streams to stdout while provider
+  thinking, tool calls/results, retries, and compaction status render on
+  stderr. `--no-stream` restores buffered output, redirected output and JSON
+  mode keep their existing contracts, and Ctrl-C aborts the active request
+  through `AbortSignal` without ending an interactive session.
+- `script/rb` now preserves an attached terminal when invoked interactively, so
+  the containerized `truffle` REPL and print mode exercise the same TTY
+  streaming path as a locally installed gem. CI and redirected commands remain
+  non-TTY.
 - The interactive REPL now writes and flushes assistant text deltas as they
   arrive when stdout is a terminal and the provider supports streaming. It
   renders the captured final response only as a fallback or failure, avoiding

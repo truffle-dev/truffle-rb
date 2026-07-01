@@ -88,6 +88,7 @@ class TestCLIHelp < Minitest::Test
     assert_includes flags, "-p"
     assert_includes flags, "--no-context-files"
     assert_includes flags, "-nc"
+    assert_includes flags, "--no-stream"
   end
 
   private

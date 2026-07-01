@@ -91,34 +91,6 @@ module Truffle
       paths.each { |path| out.puts "#{label}: #{path}" }
     end
 
-    # Drive a single-shot `--print` run: build the agent, prompt it with the
-    # assembled messages in order, and render either the final assistant turn
-    # (`--mode text`) or each agent event as newline-delimited JSON (`--mode json`).
-    # Faithful to the text/JSON branches of pi's `runPrintMode`, narrowed to the
-    # sessionless CLI slice this harness has today. An unresolvable provider/model
-    # (or any harness error) surfaces on stderr with exit 1, the analog of pi's
-    # `catch`. `agent_builder` lets a test inject a stub agent; production builds
-    # one with `build_cli_agent`.
-    def run_print(args, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
-      agent = (agent_builder || method(:build_cli_agent)).call(args)
-      final = nil
-      if args.mode == "json"
-        agent.on { |event, payload| render_print_json(event, payload, out: out) }
-      else
-        agent.on(:agent_end) { |payload| final = final_print_response(payload) }
-      end
-      print_input = print_input(args, input)
-      print_input.prompts.each_with_index do |prompt, index|
-        agent.run(prompt, images: index.zero? ? print_input.images : [])
-      end
-      return 0 if args.mode == "json"
-
-      render_print_text(final, out: out, err: err)
-    rescue Truffle::Error => e
-      err.puts e.message
-      1
-    end
-
     # The Response a print run renders: pi reads the last conversation message
     # and only renders it when it is the assistant's, so a run that ended on a
     # tool result or produced no assistant turn renders nothing. Rebuilt from the
@@ -372,7 +344,7 @@ module Truffle
     end
 
     private_class_method :run_init, :print_init_paths,
-                         :run_print, :final_print_response, :print_input,
+                         :final_print_response, :print_input,
                          :print_file_input, :piped_stdin, :build_cli_agent, :print_tools,
                          :new_cli_session, :record_cli_model_change,
                          :load_cli_agent, :cli_system_prompt, :cli_append_system_prompt,
