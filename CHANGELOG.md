@@ -6,12 +6,22 @@ All notable changes to Truffle are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `Agent.load` now reattaches the loaded session to the resumed agent. New turns
+  appended after a resume are persisted to the same session file instead of only
+  living in memory, and session-backed runs write an updated usage checkpoint at
+  agent end so later reloads resume cost accounting too.
+
 ### Added
+- `truffle --continue` now loads the most recent session for the current project
+  in both print mode and the interactive REPL. `--session <path|id>` resolves a
+  specific session file or unique project session reference. The interactive
+  picker, fork, and session-id creation paths remain later CLI slices.
 - A first interactive REPL for the `truffle` binary. A bare `truffle` starts a
   line-oriented loop over one agent, processes any initial CLI messages, reads
   turns until EOF or `/exit`, and renders assistant text with the same final-turn
   rules as print mode. Provider/model and builtin-tool flags use the shared CLI
-  agent builder; pi's full TUI, resume flags, and RPC runtime remain later work.
+  agent builder; pi's full TUI and RPC runtime remain later work.
 - `Truffle::SessionCwd` checks that a session's recorded working directory still
   exists before a resume. `missing_issue(session_cwd:, fallback_cwd:,
   session_file:)` returns an issue when the directory is gone (nil when there is

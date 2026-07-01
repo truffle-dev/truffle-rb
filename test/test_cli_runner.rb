@@ -113,6 +113,15 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def create_cli_session(cwd)
+    dir = Truffle::Config.default_session_dir(cwd: cwd, agent_dir: ENV.fetch("TRUFFLE_AGENT_DIR"))
+    session = Truffle::Session.create(cwd: cwd, dir: dir)
+    session.append_model_change(provider: "openai", model_id: "gpt-4o-mini")
+    session.append_message(Truffle::Message.user("hello"))
+    session.append_message(Truffle::Message.assistant(content: "hi"))
+    session.flush
+  end
+
   def test_version_flag_prints_version_text_and_exits_zero
     status, out, err = run_cli(["--version"])
 
@@ -567,6 +576,62 @@ class TestCLIRunner < Minitest::Test
     assert_equal "boom\n", err
     assert_includes out, "recovered\n"
     assert_equal %w[bad good], agent.prompts
+  end
+
+  def test_continue_print_loads_the_most_recent_session
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("continued")])
+      loaded = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **kwargs|
+        loaded = [path, kwargs]
+        agent
+      }) do
+        status, out, err = run_print_cli(["--continue", "-p", "again"])
+
+        assert_equal 0, status
+        assert_equal "continued\n", out
+        assert_empty err
+      end
+
+      assert_equal session.file, loaded.first
+      assert_nil loaded.last[:provider]
+      assert_nil loaded.last[:model]
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_continue_repl_loads_the_most_recent_session
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("continued")])
+      loaded_path = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **_kwargs|
+        loaded_path = path
+        agent
+      }) do
+        status, out, err = run_repl_cli(["--continue"], input: StringIO.new("again\n/exit\n"))
+
+        assert_equal 0, status
+        assert_includes out, "continued\n"
+        assert_empty err
+      end
+
+      assert_equal session.file, loaded_path
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_continue_without_a_session_reports_an_error
+    in_tmpdir do
+      status, out, err = run_print_cli(["--continue", "-p", "again"])
+
+      assert_equal 1, status
+      assert_empty out
+      assert_includes err, "no session found"
+    end
   end
 
   def test_repl_with_an_unresolvable_model_errors_on_stderr_and_exits_one

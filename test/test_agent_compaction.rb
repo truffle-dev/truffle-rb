@@ -72,9 +72,10 @@ class TestAgentCompaction < Minitest::Test
       # four conversation messages the run produced, in order.
       assert_empty provider.summary_calls
       types = agent.session.entries.map { |e| e[:type] }
-      roles = agent.session.entries.map { |e| Truffle::Message.from_h(e[:message]).role }
+      messages = agent.session.entries.select { |e| e[:type] == "message" }
+      roles = messages.map { |e| Truffle::Message.from_h(e[:message]).role }
 
-      assert_equal %w[message message message message], types
+      assert_equal %w[message message message message usage], types
 
       assert_equal %i[user assistant tool assistant], roles
     end
@@ -95,7 +96,9 @@ class TestAgentCompaction < Minitest::Test
       # compaction entry. The session still mirrors the conversation.
       assert_empty provider.summary_calls
       assert(agent.session.entries.none? { |entry| entry[:type] == "compaction" })
-      assert_equal 4, agent.session.entries.size
+      types = agent.session.entries.map { |entry| entry[:type] }
+
+      assert_equal %w[message message message message usage], types
     end
   end
 end

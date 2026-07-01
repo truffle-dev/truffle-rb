@@ -183,10 +183,75 @@ module Truffle
     # Truffle::Error when neither a provider nor a model-named provider resolves,
     # which `run_print` turns into a stderr message and exit 1.
     def build_cli_agent(args, cwd: Dir.pwd)
+      return load_cli_agent(args, cwd: cwd) if args.continue || args.session
+
       options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
                   tools: print_tools(args, cwd) }
       options[:api_key] = args.api_key if args.api_key
       Truffle.agent(**options)
+    end
+
+    def load_cli_agent(args, cwd: Dir.pwd)
+      raise Truffle::Error, "cannot use --continue with --no-session" if args.no_session
+
+      path = continued_session_path(args, cwd: cwd)
+      provider = cli_provider(args)
+      Truffle::Agent.load(
+        path,
+        provider: provider,
+        model: args.model,
+        system_prompt: args.system_prompt,
+        tools: print_tools(args, cwd),
+        extension_provider_overrides: cli_provider_options(args)
+      )
+    end
+
+    def cli_provider(args)
+      return nil unless args.provider
+
+      Truffle.provider(args.provider.to_sym, **cli_provider_options(args))
+    end
+
+    def cli_provider_options(args)
+      args.api_key ? { api_key: args.api_key } : {}
+    end
+
+    def continued_session_path(args, cwd: Dir.pwd)
+      path =
+        if args.session
+          resolve_session_reference(args.session, args, cwd: cwd)
+        else
+          Truffle::Session.most_recent(cwd: cwd, dir: cli_session_dir(args, cwd))
+        end
+      raise Truffle::Error, "no session found for #{cwd}" unless path
+
+      header = Truffle::Session.read_header(path)
+      raise Truffle::Error, "not a valid Truffle session: #{path}" unless header
+
+      Truffle::SessionCwd.assert_exists(session_cwd: header[:cwd], fallback_cwd: cwd,
+                                        session_file: path)
+      path
+    end
+
+    def resolve_session_reference(reference, args, cwd: Dir.pwd)
+      path = File.expand_path(reference, cwd)
+      return path if File.file?(path)
+
+      matches = Truffle::Session.list(cwd: cwd, dir: cli_session_dir(args, cwd)).select do |summary|
+        summary.id.start_with?(reference) || File.basename(summary.path).include?(reference)
+      end
+      return matches.first.path if matches.length == 1
+      return nil if matches.empty?
+
+      raise Truffle::Error, "session reference is ambiguous: #{reference}"
+    end
+
+    def cli_session_dir(args, cwd)
+      if args.session_dir
+        File.expand_path(args.session_dir, cwd)
+      else
+        Truffle::Config.default_session_dir(cwd: cwd)
+      end
     end
 
     # The builtin tools a print run exposes, filtered by the parsed flags. No
@@ -224,6 +289,9 @@ module Truffle
     private_class_method :run_init, :print_init_paths,
                          :run_print, :final_print_response, :print_input,
                          :print_file_input, :piped_stdin, :build_cli_agent, :print_tools,
+                         :load_cli_agent, :cli_provider, :cli_provider_options,
+                         :continued_session_path, :resolve_session_reference,
+                         :cli_session_dir,
                          :report_diagnostics, :color?, :print_mode?
   end
 end

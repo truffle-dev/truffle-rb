@@ -86,7 +86,8 @@ module Truffle
       provider ||= provider_from_session(context, extensions, extension_provider_overrides)
       agent = new(provider: provider, system_prompt: system_prompt, tools: toolbox,
                   model: model || context.model&.model_id, max_turns: max_turns,
-                  tool_execution: tool_execution, prompt_templates: prompt_templates,
+                  session: session, tool_execution: tool_execution,
+                  prompt_templates: prompt_templates,
                   slash_commands: slash_commands, extensions: extensions,
                   extension_provider_name: extension_provider_name,
                   extension_provider_overrides: extension_provider_overrides)
@@ -244,8 +245,16 @@ module Truffle
 
     def emit_agent_end(final_text, final_response, aborted)
       reason = aborted ? StopReason::ABORTED : final_response&.stop_reason
+      persist_usage_checkpoint
       emit(:agent_end, output: final_text, messages: @messages, stop_reason: reason,
                        error_message: aborted ? nil : final_response&.error_message, usage: @usage)
+    end
+
+    def persist_usage_checkpoint
+      return unless @session
+      return if @usage == Usage.zero || @session.usage == @usage
+
+      @session.append_usage(@usage)
     end
 
     def max_turns_error_message = "exceeded max_turns (#{max_turns}) without a final answer"

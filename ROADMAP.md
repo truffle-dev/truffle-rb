@@ -546,8 +546,13 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       CLI messages first, reads user turns until EOF or `/exit`, renders assistant
       text through the same final-turn rules as print mode, keeps provider/model
       and builtin-tool flags wired through the shared CLI agent builder, and is
-      fully testable with injected streams. Pi's richer TUI, resume flags, and RPC
-      runtime remain later slices.
+      fully testable with injected streams. Pi's richer TUI and RPC runtime remain
+      later slices.
+    - [x] **CLI session continue.** `truffle --continue` loads the most recent
+      session for the current project and works in both print mode and the
+      line-oriented REPL. `--session <path|id>` resolves a specific session file
+      or unique project session reference. The interactive picker, fork, and
+      session-id creation paths remain later CLI slices.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

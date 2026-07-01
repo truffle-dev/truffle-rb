@@ -40,6 +40,8 @@ class TestAgentPersistence < Minitest::Test
       agent = Truffle::Agent.load(session.file, provider: resumed, system_prompt: "be brief")
       agent.run("are you there?")
 
+      assert_equal session.file, agent.session.file
+
       # The first chat call on the resumed agent must see the whole prior
       # conversation, system prompt first, then the new user turn.
       seen = resumed.calls.first[:messages]
@@ -47,6 +49,11 @@ class TestAgentPersistence < Minitest::Test
 
       assert_equal %i[system user assistant user], roles
       assert_equal "hello", Truffle::Message.from_h(seen[1]).text
+
+      persisted = Truffle::Session.load(session.file).messages
+
+      assert_equal ["hello", "Hi there.", "are you there?", "Still here."],
+                   persisted.map(&:text)
     end
   end
 
