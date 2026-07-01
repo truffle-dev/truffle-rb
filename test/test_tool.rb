@@ -27,6 +27,21 @@ class TestTool < Minitest::Test
     assert_equal "5", @add.call("a" => 2, "b" => 3)
   end
 
+  def test_call_coerces_arguments_toward_schema_types
+    tool = Truffle::Tool.define("normalize", "Normalize model JSON arguments") do
+      param :age, :integer, required: true
+      param :enabled, :boolean, required: true
+      param :external_id, :string, required: true
+      run do |age:, enabled:, external_id:|
+        { age: age, enabled: enabled, external_id: external_id }
+      end
+    end
+    arguments = { "age" => "42", "enabled" => "true", "external_id" => 7 }
+
+    assert_equal '{"age":42,"enabled":true,"external_id":"7"}', tool.call(arguments)
+    assert_equal({ "age" => "42", "enabled" => "true", "external_id" => 7 }, arguments)
+  end
+
   def test_call_returns_string
     result = @add.call("a" => 10, "b" => 20)
 

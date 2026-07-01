@@ -27,6 +27,22 @@ class TestAgentLoop < Minitest::Test
     assert_equal 2, provider.calls.length
   end
 
+  def test_tool_execution_coerces_model_arguments_before_calling_handler
+    provider = StubProvider.new([
+                                  StubProvider.tool_call(id: "call_1", name: "add",
+                                                         arguments: { "a" => "2", "b" => "3" }),
+                                  StubProvider.text("The answer is 5.")
+                                ])
+    agent = Truffle::Agent.new(provider: provider, tools: [@add])
+
+    agent.run("What is 2 + 3?")
+    assistant = agent.messages.find { |message| message.role == :assistant }
+    tool_msg = agent.messages.find { |message| message.role == :tool }
+
+    assert_equal "5", tool_msg.text
+    assert_equal({ "a" => "2", "b" => "3" }, assistant.tool_calls.first.arguments)
+  end
+
   def test_history_contains_tool_result_linked_by_id
     provider = StubProvider.new([
                                   StubProvider.tool_call(id: "call_9", name: "add",

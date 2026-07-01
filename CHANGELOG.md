@@ -7,6 +7,10 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Tool execution now coerces model-supplied arguments toward the declared tool
+  JSON Schema before calling the Ruby handler. A model string such as `"42"`
+  now reaches an `:integer` parameter as `42`, while the original tool-call
+  record remains unchanged for history and events.
 - README CLI documentation now reflects the implemented line-oriented REPL
   session picker, fork, session-id, and cross-project session lookup behavior
   instead of listing completed slices as in progress.

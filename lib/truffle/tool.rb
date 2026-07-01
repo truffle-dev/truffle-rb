@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "schema"
+require_relative "schema_coercion"
 
 module Truffle
   # A tool the agent can call.
@@ -54,10 +56,11 @@ module Truffle
     # they are symbolized so the handler can use keyword arguments. The handler's
     # return value is serialized for the model by #serialize_result.
     def call(arguments)
-      validation_error = validate_arguments(arguments || {})
+      arguments = SchemaCoercion.coerce(arguments || {}, parameters)
+      validation_error = validate_arguments(arguments)
       return validation_error if validation_error
 
-      kwargs = (arguments || {}).each_with_object({}) { |(k, v), h| h[k.to_sym] = v }
+      kwargs = arguments.each_with_object({}) { |(k, v), h| h[k.to_sym] = v }
       serialize_result(handler.call(**kwargs))
     end
 
