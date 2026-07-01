@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Gem metadata now uses distinct homepage, source, changelog, and issue links so
+  `gem build truffle.gemspec` is warning-free and RubyGems can show each public
+  project link separately.
 - TTY REPL streaming now preserves boundaries between assistant text content
   blocks instead of concatenating their deltas. Empty text blocks do not add
   blank lines.
