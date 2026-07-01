@@ -39,6 +39,10 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Extension event and command contexts now expose `abort`, `has_ui?`,
+  `has_pending_messages?`, `get_context_usage`, and `system_prompt_text`
+  helpers. `abort` trips the active run's `AbortSignal` and raises clearly when
+  no run signal is available, matching Truffle's cooperative cancellation model.
 - Extension event and command contexts now expose `model_registry`, plus
   `provider_registry` and `providers` aliases, backed by the active agent's
   provider runtime collection. Handlers can inspect extension-registered

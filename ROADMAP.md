@@ -530,6 +530,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         collection. Handlers can inspect extension-registered providers and
         resolve model references, including command-time provider registrations,
         without mutating process-global provider state.
+      - [x] **Context cancellation helpers.** Extension event and command
+        contexts expose `abort`, `has_ui?`, `has_pending_messages?`,
+        `get_context_usage`, and `system_prompt_text` helpers. `abort` trips the
+        active run's `AbortSignal` and fails clearly when no run signal is
+        available; shutdown, TUI overlays, and session-switch actions remain
+        future interactive-runtime work.
 
 ## Phase 5: adoption + the CLI
 

@@ -66,9 +66,32 @@ module Truffle
 
       # Pi extensions expose JavaScript-style command context helpers. Keep those
       # names stable so extensions port cleanly.
-      # rubocop:disable Naming/AccessorMethodName, Naming/PredicateMethod
+      # rubocop:disable Naming/AccessorMethodName, Naming/PredicateMethod, Naming/PredicatePrefix
+      def has_ui?
+        ui?
+      end
+
+      def has_pending_messages?
+        pending_messages?
+      end
+
       def get_system_prompt
         system_prompt.to_s
+      end
+
+      def system_prompt_text
+        get_system_prompt
+      end
+
+      def get_context_usage
+        context_usage
+      end
+
+      def abort(reason = AbortSignal::DEFAULT_REASON)
+        raise Error, "abort requires an active run signal" unless signal.respond_to?(:abort)
+
+        signal.abort(reason)
+        true
       end
 
       def session_name
@@ -120,7 +143,7 @@ module Truffle
       def wait_for_idle
         true
       end
-      # rubocop:enable Naming/AccessorMethodName, Naming/PredicateMethod
+      # rubocop:enable Naming/AccessorMethodName, Naming/PredicateMethod, Naming/PredicatePrefix
 
       private
 

@@ -505,12 +505,14 @@ class TestAgentExtensions < Minitest::Test
           file.puts "cwd=\#{ctx.cwd}"
           file.puts "system=\#{ctx.system_prompt}"
           file.puts "usage=\#{ctx.context_usage.input}"
+          file.puts "usage_reader=\#{ctx.get_context_usage.input}"
           file.puts "signal=\#{ctx.signal.class.name}"
           file.puts "mode=\#{ctx.mode}"
           file.puts "idle=\#{ctx.idle?}"
-          file.puts "ui=\#{ctx.ui?}:\#{ctx.ui.nil?}"
+          file.puts "ui=\#{ctx.ui?}:\#{ctx.has_ui?}:\#{ctx.ui.nil?}"
           file.puts "trusted=\#{ctx.project_trusted?}"
-          file.puts "pending=\#{ctx.pending_messages?}"
+          file.puts "pending=\#{ctx.pending_messages?}:\#{ctx.has_pending_messages?}"
+          file.puts "system_reader=\#{ctx.system_prompt_text}"
         end
       end
     RUBY
@@ -531,15 +533,64 @@ class TestAgentExtensions < Minitest::Test
         "cwd=#{@dir}",
         "system=Be precise",
         "usage=0",
+        "usage_reader=0",
         "signal=Truffle::AbortSignal",
         "mode=print",
         "idle=false",
-        "ui=false:true",
+        "ui=false:false:true",
         "trusted=false",
-        "pending=false"
+        "pending=false:false",
+        "system_reader=Be precise"
       ],
       File.readlines(log_path, chomp: true)
     )
+  end
+
+  def test_extension_event_context_can_abort_active_run
+    log_path = File.join(@dir, "abort.log")
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.on("agent_start") do |_event, ctx|
+        result = ctx.abort("extension requested abort")
+        File.open(log_path, "w") do |file|
+          file.puts "abort=\#{result}"
+          file.puts "aborted=\#{ctx.signal.aborted?}"
+          file.puts "reason=\#{ctx.signal.reason}"
+        end
+      end
+    RUBY
+    signal = Truffle::AbortSignal.new
+    provider = StubProvider.new([StubProvider.text("should not be used")])
+    agent = Truffle::Agent.new(provider: provider, extensions: extensions)
+    events = []
+    agent.on(:agent_end) { |payload| events << payload }
+
+    assert_nil agent.run("hello", signal: signal)
+
+    assert_empty provider.calls
+    assert_predicate signal, :aborted?
+    assert_equal "extension requested abort", signal.reason
+    assert_equal Truffle::StopReason::ABORTED, events.fetch(0)[:stop_reason]
+    assert_equal(
+      [
+        "abort=true",
+        "aborted=true",
+        "reason=extension requested abort"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
+  def test_context_abort_requires_active_signal
+    context = Truffle::Extensions::EventContext.new(
+      agent: Object.new,
+      usage: Truffle::Usage.zero
+    )
+
+    error = assert_raises(Truffle::Error) { context.abort }
+
+    assert_match(/abort requires an active run signal/, error.message)
   end
 
   def test_extension_event_context_exposes_provider_runtime_registry
