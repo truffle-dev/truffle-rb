@@ -93,6 +93,8 @@ All notable changes to Truffle are documented here. The format follows
   image resizing, and the interactive REPL remain later slices.
 
 ### Fixed
+- The `find` tool now clamps a non-positive `limit` to one result instead of
+  returning an empty body with a nonsensical `0 results limit reached` notice.
 - Tool calls with missing required params or undeclared keyword params now return
   model-readable tool results such as `missing keyword: path` or
   `unknown keyword: cwd` before the handler runs, instead of surfacing Ruby's

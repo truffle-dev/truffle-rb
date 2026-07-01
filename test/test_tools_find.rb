@@ -135,6 +135,16 @@ class TestToolsFind < Minitest::Test
     assert_equal "1.log\n2.log\n3.log", find("*.log", limit: 5)
   end
 
+  def test_non_positive_limit_clamps_to_one
+    touch("1.log")
+    touch("2.log")
+
+    assert_equal "1.log\n\n[1 results limit reached. " \
+                 "Use limit=2 for more, or refine pattern]", find("*.log", limit: 0)
+    assert_equal "1.log\n\n[1 results limit reached. " \
+                 "Use limit=2 for more, or refine pattern]", find("*.log", limit: -10)
+  end
+
   def test_absolute_path_is_accepted
     touch("only.rb")
 

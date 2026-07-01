@@ -23,7 +23,7 @@ module Truffle
         root = Path.resolve(path.nil? || path.empty? ? "." : path, cwd)
         raise "Path not found: #{root}" unless File.exist?(root)
 
-        effective_limit = limit.nil? ? DEFAULT_LIMIT : limit.to_i
+        effective_limit = [1, limit.nil? ? DEFAULT_LIMIT : limit.to_i].max
         matches = search(pattern, root)
         return "No files found matching pattern" if matches.empty?
 
