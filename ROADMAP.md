@@ -597,6 +597,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `StreamEvent`s for text/thinking/tool-call deltas while preserving tool
       dispatch, abort, retry, compaction, usage accounting, and the final return
       value.
+    - [x] **TTY REPL text streaming.** Interactive runs now drive
+      `Agent#run_stream` when stdout is a terminal and the provider implements
+      streaming, writing and flushing text deltas as they arrive without
+      duplicating the final response. Redirected output keeps the buffered path.
+      Thinking/tool rendering and print-mode streaming remain follow-up work.
     - [x] **Initial interactive REPL.** A bare `truffle` now starts a
       line-oriented terminal loop over one long-lived agent. It processes initial
       CLI messages first, reads user turns until EOF or `/exit`, renders assistant

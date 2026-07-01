@@ -50,6 +50,47 @@ class PrintStubAgent
   end
 end
 
+# A REPL agent that supports both buffered and streaming runs. Streaming emits
+# text deltas before the same agent_end payload the CLI uses for final status.
+class StreamingPrintStubAgent
+  attr_reader :buffered_prompts, :streamed_prompts
+
+  def initialize(payload, chunks:)
+    @payload = payload
+    @chunks = chunks
+    @listeners = Hash.new { |h, k| h[k] = [] }
+    @buffered_prompts = []
+    @streamed_prompts = []
+  end
+
+  def on(event = nil, &block)
+    @listeners[event || :_all] << block
+    self
+  end
+
+  def run(prompt, images: [])
+    @buffered_prompts << [prompt, images]
+    emit(:agent_end, @payload)
+    ""
+  end
+
+  def run_stream(prompt, images: [])
+    @streamed_prompts << [prompt, images]
+    @chunks.each do |chunk|
+      yield Truffle::StreamEvent.new(type: :text_delta, content_index: 0, delta: chunk)
+    end
+    emit(:agent_end, @payload)
+    ""
+  end
+
+  private
+
+  def emit(event, payload)
+    @listeners[event].each { |listener| listener.call(payload) }
+    @listeners[:_all].each { |listener| listener.call(event, payload) }
+  end
+end
+
 # An input stream that claims to be a terminal. `piped_stdin` must skip it
 # without reading, so a `read` here returns content the dispatch should never
 # splice into a prompt.
@@ -60,6 +101,30 @@ class FakeTTYInput
 
   def read
     "LEAK"
+  end
+end
+
+# Captures each write while presenting itself as a terminal, so REPL tests can
+# distinguish incremental deltas from one buffered final write.
+class RecordingTTYOutput < StringIO
+  attr_reader :writes, :flush_count
+
+  def initialize
+    super
+    @writes = []
+    @flush_count = 0
+  end
+
+  def tty? = true
+
+  def write(string)
+    @writes << string
+    super
+  end
+
+  def flush
+    @flush_count += 1
+    super
   end
 end
 
@@ -85,8 +150,7 @@ class TestCLIRunner < Minitest::Test
     [status, out.string, err.string]
   end
 
-  def run_repl_cli(argv, input:, agent: nil)
-    out = StringIO.new
+  def run_repl_cli(argv, input:, agent: nil, out: StringIO.new)
     err = StringIO.new
     builder = agent && ->(_args) { agent }
     status = Truffle::CLI.run(argv, out: out, err: err, input: input, agent_builder: builder)
@@ -218,6 +282,51 @@ class TestCLIRunner < Minitest::Test
     assert_includes out, "Truffle interactive. Type /exit to quit."
     assert_includes out, "truffle> hello\n"
     assert_equal ["hi"], agent.prompts
+  end
+
+  def test_repl_streams_text_deltas_once_when_stdout_is_a_tty
+    agent = StreamingPrintStubAgent.new(assistant_payload("hello"), chunks: %w[hel lo])
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      [], input: StringIO.new("hi\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["hi", []]], agent.streamed_prompts
+    assert_empty agent.buffered_prompts
+    assert_equal %w[hel lo], output.writes.grep(/\A(?:hel|lo)\z/)
+    assert_operator output.flush_count, :>=, 2
+    assert_equal 1, out.scan("hello").length
+  end
+
+  def test_repl_keeps_buffered_output_when_stdout_is_not_a_tty
+    agent = StreamingPrintStubAgent.new(assistant_payload("hello"), chunks: %w[hel lo])
+
+    status, out, err = run_repl_cli([], input: StringIO.new("hi\n/exit\n"), agent: agent)
+
+    assert_equal 0, status
+    assert_empty err
+    assert_equal [["hi", []]], agent.buffered_prompts
+    assert_empty agent.streamed_prompts
+    assert_includes out, "hello\n"
+  end
+
+  def test_repl_streaming_still_reports_error_turns
+    payload = assistant_payload("", stop_reason: Truffle::StopReason::ERROR,
+                                    error_message: "boom")
+    agent = StreamingPrintStubAgent.new(payload, chunks: ["partial"])
+    output = RecordingTTYOutput.new
+
+    status, out, err = run_repl_cli(
+      [], input: StringIO.new("hi\n/exit\n"), agent: agent, out: output
+    )
+
+    assert_equal 0, status
+    assert_equal "boom\n", err
+    assert_includes out, "partial\n"
+    assert_equal 1, out.scan("partial").length
   end
 
   def test_init_creates_project_state_and_memory_file

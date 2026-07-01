@@ -36,6 +36,10 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- The interactive REPL now writes and flushes assistant text deltas as they
+  arrive when stdout is a terminal and the provider supports streaming. It
+  renders the captured final response only as a fallback or failure, avoiding
+  duplicated text; redirected output keeps the existing buffered path.
 - `Truffle::MessageTransform.downgrade_unsupported_images` ports the image
   downgrade pass from pi's `ai/src/api/transform-messages.ts`. For a model with
   no image input modality it rebuilds user and tool-result messages with each
