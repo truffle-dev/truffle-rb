@@ -77,7 +77,7 @@ module Truffle
         @commands.find { |command| command.invocation_name == invocation_name }
       end
 
-      def resolve(text)
+      def resolve(text, context: nil)
         parsed = parse(text)
         return nil unless parsed
 
@@ -85,6 +85,7 @@ module Truffle
         return nil unless command
 
         args = PromptTemplates.parse_command_args(parsed[:args_string])
+        command_context = build_command_context(context, command, parsed[:args_string], args)
         case command.source
         when :prompt
           Result.new(
@@ -100,7 +101,7 @@ module Truffle
             command: command,
             args_string: parsed[:args_string],
             args: args,
-            content: command.handler.call(parsed[:args_string])
+            content: call_handler(command.handler, parsed[:args_string], command_context)
           )
         end
       end
@@ -132,6 +133,23 @@ module Truffle
           first = @commands.find { |existing| existing.name == command.name }
           first.invocation_name = "#{command.name}:1" if first&.invocation_name == command.name
           command.invocation_name = "#{command.name}:#{count}"
+        end
+      end
+
+      def build_command_context(context, command, args_string, args)
+        return context unless context.respond_to?(:with_command)
+
+        context.with_command(command: command, args_string: args_string, args: args)
+      end
+
+      def call_handler(handler, args_string, context)
+        case handler.arity
+        when 0
+          handler.call
+        when 1, -1
+          handler.call(args_string)
+        else
+          handler.call(args_string, context)
         end
       end
     end

@@ -104,6 +104,60 @@ class TestAgentExtensions < Minitest::Test
     assert_empty provider.calls
   end
 
+  def test_extension_command_receives_runtime_command_context
+    log_path = File.join(@dir, "command_context.log")
+    session = Truffle::Session.create(dir: File.join(@dir, "sessions"), cwd: @dir)
+    model = Truffle::Models.find("gpt-4o-mini")
+    signal = Truffle::AbortSignal.new
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.register_command("inspect", description: "Inspect context") do |args, ctx|
+        File.open(log_path, "w") do |file|
+          file.puts "args=\#{args}"
+          file.puts "context=\#{ctx.class.name}"
+          file.puts "command=\#{ctx.command.name}:\#{ctx.command.invocation_name}"
+          file.puts "parsed=\#{ctx.args.join("|")}"
+          file.puts "agent=\#{ctx.agent.class.name}"
+          file.puts "provider=\#{ctx.provider.name}"
+          file.puts "model=\#{ctx.model}"
+          file.puts "model_spec=\#{ctx.model_spec.name}"
+          file.puts "session_cwd=\#{ctx.session.cwd}"
+          file.puts "cwd=\#{ctx.cwd}"
+          file.puts "system=\#{ctx.system_prompt}"
+          file.puts "usage=\#{ctx.context_usage.input}"
+          file.puts "signal=\#{ctx.signal.class.name}"
+        end
+        "inspected \#{ctx.args_string}"
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("should not be used")])
+    agent = Truffle::Agent.new(provider: provider, model: model,
+                               system_prompt: "Be precise",
+                               session: session, extensions: extensions)
+
+    assert_equal "inspected alpha beta", agent.run("/inspect alpha beta", signal: signal)
+    assert_empty provider.calls
+    assert_equal(
+      [
+        "args=alpha beta",
+        "context=Truffle::Extensions::CommandContext",
+        "command=inspect:inspect",
+        "parsed=alpha|beta",
+        "agent=Truffle::Agent",
+        "provider=stub",
+        "model=gpt-4o-mini",
+        "model_spec=GPT-4o mini",
+        "session_cwd=#{@dir}",
+        "cwd=#{@dir}",
+        "system=Be precise",
+        "usage=0",
+        "signal=Truffle::AbortSignal"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
   def test_extension_commands_share_duplicate_suffixing
     first = load_extension("truffle.register_command('dupe') { 'one' }")
     second = load_extension("truffle.register_command('dupe') { 'two' }")

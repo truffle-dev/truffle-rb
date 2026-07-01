@@ -507,6 +507,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         usage, system prompt, cwd, mode, and abort signal. UI, project trust,
         pending-message, idle, and context-usage helpers are present with
         conservative values until the richer runtime slices land.
+      - [x] **Command handler context dispatch.** Extension slash-command
+        handlers that accept a second argument now receive a Ruby command
+        context with the same runtime fields plus command metadata: the command
+        object, raw argument string, and parsed arguments. Session/UI command
+        actions from pi's full `ExtensionCommandContext` remain later work.
 
 ## Phase 5: adoption + the CLI
 

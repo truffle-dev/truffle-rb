@@ -39,6 +39,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Extension slash-command handlers now receive a Ruby command context when they
+  accept a second argument. The context carries the same runtime fields as event
+  handlers plus command metadata (`command`, raw `args_string`, and parsed
+  `args`), while zero- and one-argument command handlers keep their existing
+  calling contract.
 - Extension event handlers now receive a Ruby runtime context as their second
   argument, matching pi's event handler shape. The first context slice exposes
   the active agent, session, provider, model id, model metadata, usage,

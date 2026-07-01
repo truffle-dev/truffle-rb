@@ -39,11 +39,7 @@ module Truffle
     LoadError = Struct.new(:path, :error, keyword_init: true)
     HandlerError = Struct.new(:extension_path, :event, :error, :exception, keyword_init: true)
     LoadResult = Struct.new(:extensions, :errors, :runtime, keyword_init: true)
-    EventContext = Struct.new(
-      :agent, :session, :provider, :model, :model_spec, :usage, :system_prompt,
-      :cwd, :mode, :signal, :idle, :has_ui, :project_trusted, :pending_messages,
-      keyword_init: true
-    ) do
+    module ContextHelpers
       def idle?
         !!idle
       end
@@ -67,6 +63,44 @@ module Truffle
       def context_usage
         usage
       end
+    end
+
+    EventContext = Struct.new(
+      :agent, :session, :provider, :model, :model_spec, :usage, :system_prompt,
+      :cwd, :mode, :signal, :idle, :has_ui, :project_trusted, :pending_messages,
+      keyword_init: true
+    ) do
+      include ContextHelpers
+
+      def with_command(command:, args_string:, args:)
+        CommandContext.new(
+          agent: agent,
+          session: session,
+          provider: provider,
+          model: model,
+          model_spec: model_spec,
+          usage: usage,
+          system_prompt: system_prompt,
+          cwd: cwd,
+          mode: mode,
+          signal: signal,
+          idle: idle,
+          has_ui: has_ui,
+          project_trusted: project_trusted,
+          pending_messages: pending_messages,
+          command: command,
+          args_string: args_string,
+          args: args
+        )
+      end
+    end
+    CommandContext = Struct.new(
+      :agent, :session, :provider, :model, :model_spec, :usage, :system_prompt,
+      :cwd, :mode, :signal, :idle, :has_ui, :project_trusted, :pending_messages,
+      :command, :args_string, :args,
+      keyword_init: true
+    ) do
+      include ContextHelpers
     end
 
     STALE_CONTEXT_MESSAGE =
@@ -186,14 +220,14 @@ module Truffle
       private
 
       def command_handler(callable)
-        lambda do |args_string|
+        lambda do |args_string, context = nil|
           case callable.arity
           when 0
             callable.call
           when 1, -1
             callable.call(args_string)
           else
-            callable.call(args_string, nil)
+            callable.call(args_string, context)
           end
         end
       end

@@ -17,7 +17,7 @@ module Truffle
     end
 
     def resolve_slash_command(user_input)
-      @slash_commands&.resolve(user_input)
+      @slash_commands&.resolve(user_input, context: extension_event_context)
     end
 
     def run_slash_action(result)

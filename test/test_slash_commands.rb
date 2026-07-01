@@ -54,6 +54,29 @@ class TestSlashCommands < Minitest::Test
     assert_equal "queued production now", result.content
   end
 
+  def test_handler_command_receives_context_when_accepted
+    seen = nil
+    context = Truffle::Extensions::EventContext.new(model: "gpt-4o-mini",
+                                                    usage: Truffle::Usage.zero,
+                                                    system_prompt: "base")
+    registry = Registry.new
+    registry.register("deploy", description: "Deploy") do |args, ctx|
+      seen = ctx
+      "queued #{args} with #{ctx.model}"
+    end
+
+    result = registry.resolve(%(/deploy "production now"), context: context)
+
+    assert_equal 'queued "production now" with gpt-4o-mini', result.content
+    assert_instance_of Truffle::Extensions::CommandContext, seen
+    assert_equal "deploy", seen.command.name
+    assert_equal "deploy", seen.command.invocation_name
+    assert_equal '"production now"', seen.args_string
+    assert_equal ["production now"], seen.args
+    assert_equal "base", seen.system_prompt
+    assert_equal 0, seen.context_usage.input
+  end
+
   def test_duplicate_handler_commands_get_invocation_suffixes
     registry = Registry.new
     registry.register("deploy", description: "first") { "first" }
