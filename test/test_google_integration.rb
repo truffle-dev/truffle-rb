@@ -26,7 +26,7 @@ class TestGoogleIntegration < Minitest::Test
 
     agent = Truffle.agent(
       provider: :google,
-      model: "gemini-2.5-flash-lite",
+      model: Truffle::Providers::Google::DEFAULT_MODEL,
       system_prompt: "You are a precise assistant. Always use the multiply " \
                      "tool for any multiplication. Answer with the final number.",
       tools: [multiply]

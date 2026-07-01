@@ -14,7 +14,7 @@ class TestGoogleStreamIntegration < Minitest::Test
   end
 
   def test_streams_text_from_real_model
-    provider = Truffle::Providers::Google.new(model: "gemini-2.5-flash-lite")
+    provider = Truffle::Providers::Google.new(model: Truffle::Providers::Google::DEFAULT_MODEL)
     messages = [
       Truffle::Message.user(
         "Return exactly the four lowercase letters pong. " \
