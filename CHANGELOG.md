@@ -14,8 +14,12 @@ All notable changes to Truffle are documented here. The format follows
   `format_error` / `format_prompt` build the user-facing strings, and
   `assert_exists` raises `SessionCwd::MissingError` carrying the issue. Port of
   pi's core/session-cwd.ts.
+- `Truffle::Migrations` renames legacy project and global `commands/`
+  directories to `prompts/` when no `prompts/` directory exists, matching pi's
+  `migrateCommandsToPrompts`. `truffle init` now runs migrations before
+  scaffolding missing paths so this safe rename can happen.
 - `Truffle::Migrations.run_project` adds the first project-local migration
-  runner. `truffle init` now runs it after scaffolding, stamping existing
+  runner. `truffle init` now runs it before scaffolding, stamping existing
   unversioned `.truffle/settings.json` objects with the current version while
   preserving other keys. Malformed or newer settings are left untouched with a
   warning.

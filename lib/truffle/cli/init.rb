@@ -29,6 +29,7 @@ module Truffle
         root = File.expand_path(cwd)
         created = []
         existing = []
+        migrations = Migrations.run(cwd: root, agent_dir: agent_dir)
 
         ensure_dir(Config.project_dir(cwd: root), created, existing)
         %w[prompts extensions skills sessions].each do |name|
@@ -38,7 +39,6 @@ module Truffle
                     created, existing)
         ensure_file(File.join(root, "AGENTS.md"), MEMORY_TEMPLATE, created, existing)
 
-        migrations = Migrations.run(cwd: root, agent_dir: agent_dir)
         Result.new(created: relative_paths(created, root),
                    existing: relative_paths(existing, root),
                    migrated: relative_paths(migrations.applied, root),

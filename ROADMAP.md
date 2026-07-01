@@ -575,7 +575,7 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     (sessions, memory) so upgrades are safe.
     - [x] **Project settings version migration.** `Truffle::Migrations.run_project`
       provides the first project-local migration runner, grounded in pi's
-      idempotent startup migrations. `truffle init` runs it after scaffolding,
+      idempotent startup migrations. `truffle init` runs it before scaffolding,
       stamping existing unversioned `.truffle/settings.json` objects with the
       current version while preserving other keys; malformed or newer settings
       are left untouched with a warning.
@@ -585,6 +585,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       directory based on their header `cwd`. Malformed files and existing targets
       are skipped, and `truffle init` runs the migration with the project
       migration pass.
+    - [x] **Legacy commands directory migration.** `Truffle::Migrations` ports pi's
+      `migrateCommandsToPrompts`: project `.truffle/commands/` and global
+      agent-dir `commands/` are renamed to `prompts/` only when a `prompts/`
+      directory does not already exist. `truffle init` runs this before it creates
+      missing project directories so legacy prompts are not stranded.
 
 ## Guiding constraints
 

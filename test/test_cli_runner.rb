@@ -262,6 +262,22 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_init_migrates_legacy_project_commands_before_scaffolding_prompts
+    in_tmpdir do |dir|
+      FileUtils.mkdir_p(".truffle/commands")
+      File.write(".truffle/commands/deploy.md", "deploy safely")
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      assert_includes out, "migrated: .truffle/prompts/"
+      assert_includes out, "existing: .truffle/prompts/"
+      refute_path_exists File.join(dir, ".truffle", "commands")
+      assert_equal "deploy safely", File.read(File.join(dir, ".truffle", "prompts", "deploy.md"))
+    end
+  end
+
   def test_init_reports_unmigrated_malformed_project_settings
     in_tmpdir do
       FileUtils.mkdir_p(".truffle")

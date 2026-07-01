@@ -6,7 +6,8 @@ require "securerandom"
 require_relative "config"
 
 module Truffle
-  # One-time, idempotent migrations for project-local `.truffle/` state.
+  # One-time, idempotent migrations for project-local `.truffle/` and agent-dir
+  # state.
   #
   # This mirrors pi's startup migration shape: each migration is small,
   # non-destructive, skips files it cannot safely understand, and reports what
@@ -23,6 +24,8 @@ module Truffle
     def run(cwd: Dir.pwd, agent_dir: Config.agent_dir)
       result = Result.new(applied: [], warnings: [])
       migrate_project_settings(cwd: cwd, result: result)
+      migrate_commands_to_prompts(base_dir: Config.project_dir(cwd: cwd), result: result)
+      migrate_commands_to_prompts(base_dir: agent_dir, result: result)
       migrate_root_sessions(agent_dir: agent_dir, result: result)
       result
     end
@@ -30,11 +33,13 @@ module Truffle
     def run_project(cwd: Dir.pwd)
       result = Result.new(applied: [], warnings: [])
       migrate_project_settings(cwd: cwd, result: result)
+      migrate_commands_to_prompts(base_dir: Config.project_dir(cwd: cwd), result: result)
       result
     end
 
     def run_agent(agent_dir: Config.agent_dir)
       result = Result.new(applied: [], warnings: [])
+      migrate_commands_to_prompts(base_dir: agent_dir, result: result)
       migrate_root_sessions(agent_dir: agent_dir, result: result)
       result
     end
@@ -70,6 +75,20 @@ module Truffle
       result.warnings << "could not migrate #{path}: #{e.message}"
     end
     private_class_method :migrate_project_settings
+
+    def migrate_commands_to_prompts(base_dir:, result:)
+      commands_dir = File.join(base_dir, "commands")
+      prompts_dir = File.join(base_dir, "prompts")
+
+      return unless File.exist?(commands_dir)
+      return if File.exist?(prompts_dir)
+
+      File.rename(commands_dir, prompts_dir)
+      result.applied << prompts_dir
+    rescue SystemCallError => e
+      result.warnings << "could not migrate #{commands_dir} to #{prompts_dir}: #{e.message}"
+    end
+    private_class_method :migrate_commands_to_prompts
 
     def migrate_root_sessions(agent_dir:, result:)
       root_files(agent_dir).each do |path|

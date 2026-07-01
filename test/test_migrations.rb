@@ -31,6 +31,39 @@ class TestMigrations < Minitest::Test
     end
   end
 
+  def test_project_commands_directory_moves_to_prompts
+    Dir.mktmpdir("truffle-migrations") do |dir|
+      commands = File.join(dir, ".truffle", "commands")
+      prompts = File.join(dir, ".truffle", "prompts")
+      FileUtils.mkdir_p(commands)
+      File.write(File.join(commands, "review.md"), "review this")
+
+      result = Truffle::Migrations.run_project(cwd: dir)
+
+      assert_equal [prompts], result.applied
+      assert_empty result.warnings
+      refute_path_exists commands
+      assert_equal "review this", File.read(File.join(prompts, "review.md"))
+    end
+  end
+
+  def test_project_commands_migration_skips_when_prompts_exists
+    Dir.mktmpdir("truffle-migrations") do |dir|
+      commands = File.join(dir, ".truffle", "commands")
+      prompts = File.join(dir, ".truffle", "prompts")
+      FileUtils.mkdir_p([commands, prompts])
+      File.write(File.join(commands, "old.md"), "old")
+      File.write(File.join(prompts, "new.md"), "new")
+
+      result = Truffle::Migrations.run_project(cwd: dir)
+
+      assert_empty result.applied
+      assert_empty result.warnings
+      assert_equal "old", File.read(File.join(commands, "old.md"))
+      assert_equal "new", File.read(File.join(prompts, "new.md"))
+    end
+  end
+
   def test_unversioned_project_settings_are_stamped
     Dir.mktmpdir("truffle-migrations") do |dir|
       write_settings(dir, "#{JSON.pretty_generate({ "defaultProvider" => "openai" })}\n")
@@ -88,6 +121,23 @@ class TestMigrations < Minitest::Test
 
       assert_empty result.applied
       assert_empty result.warnings
+    end
+  end
+
+  def test_agent_commands_directory_moves_to_prompts
+    Dir.mktmpdir("truffle-migrations") do |dir|
+      agent_dir = File.join(dir, "agent")
+      commands = File.join(agent_dir, "commands")
+      prompts = File.join(agent_dir, "prompts")
+      FileUtils.mkdir_p(commands)
+      File.write(File.join(commands, "triage.md"), "triage")
+
+      result = Truffle::Migrations.run_agent(agent_dir: agent_dir)
+
+      assert_equal [prompts], result.applied
+      assert_empty result.warnings
+      refute_path_exists commands
+      assert_equal "triage", File.read(File.join(prompts, "triage.md"))
     end
   end
 
