@@ -20,15 +20,16 @@ module Truffle
   # from a leaf back to the root. This is what lets an agent pause and resume: the
   # message history is the file, and reloading it rebuilds the same Message list.
   #
-  # The file also carries settings entries (the active model and thinking level)
-  # and a compaction entry (a summary that stands in for the turns before it).
-  # #context walks the path and applies them: it recovers the live model and
-  # thinking level and, when the path was compacted, returns the summary followed
-  # by the kept tail instead of the full history. New sessions buffer their first
-  # entries until an assistant message arrives, so abandoned one-user-turn starts
-  # do not leave files behind; .flush forces the write when a caller explicitly
-  # wants a partial session persisted. Old v1/v2 files are migrated to the current
-  # tree shape on load.
+  # The file also carries settings entries (the active model and thinking level),
+  # session metadata entries (for example the display name), and a compaction
+  # entry (a summary that stands in for the turns before it). #context walks the
+  # path and applies them: it recovers the live model and thinking level and,
+  # when the path was compacted, returns the summary followed by the kept tail
+  # instead of the full history. New sessions buffer their first entries until an
+  # assistant message arrives, so abandoned one-user-turn starts do not leave
+  # files behind; .flush forces the write when a caller explicitly wants a partial
+  # session persisted. Old v1/v2 files are migrated to the current tree shape on
+  # load.
   #
   # Because entries form a tree, #branch and #reset_leaf can move the leaf back
   # before the next append opens a second child. Branch summaries and labels ride
@@ -489,4 +490,5 @@ module Truffle
   end
 end
 
+require_relative "session_info"
 require_relative "session_discovery"

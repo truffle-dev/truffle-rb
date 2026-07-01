@@ -98,8 +98,9 @@ ephemeral loop. `truffle --continue` loads the most recent session for the
 current project. `truffle --resume` opens a numbered picker, `--session
 <path|id>` loads a session file or unique session id across projects, and
 `--fork <path|id>` branches an existing session into the current project. Use
-`--session-id <id>` to name a new or forked session. Automatic image resizing,
-RPC mode, all-session browsing, and a richer TUI are still in progress.
+`--session-id <id>` to choose the session id and `--name <name>` to set its
+display name. Automatic image resizing, RPC mode, all-session browsing, and a
+richer TUI are still in progress.
 
 Run `truffle init` in an app repo to create `.truffle/` project state and an
 `AGENTS.md` project memory file. It is safe to rerun; existing files are left

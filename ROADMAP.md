@@ -620,6 +620,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `--session <id>` / `--fork <id>` now resolve a unique exact or prefix match
       from the current project first and then from all projects. Direct file
       paths still win before ID lookup.
+    - [x] **CLI session display name.** `truffle --name <name>` now appends a
+      pi-compatible `session_info` entry to the active session before runtime
+      provider/model validation, trims edge whitespace, normalizes newlines to
+      spaces, and rejects whitespace-only names without changing the session.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

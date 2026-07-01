@@ -130,10 +130,27 @@ module Truffle
       args.diagnostics << { type: :error, message: e.message }
     end
 
+    def validate_session_name_args(args)
+      return if args.name.nil?
+      return unless Truffle::Session.sanitize_session_name(args.name).empty?
+
+      args.diagnostics << { type: :error, message: "--name requires a non-empty value" }
+    end
+
+    def apply_cli_session_name(session, args)
+      return unless session && args.name
+
+      session.append_session_info(args.name)
+      session.flush
+    rescue ArgumentError => e
+      raise Truffle::Error, e.message
+    end
+
     private_class_method :fork_cli_session, :validate_session_path,
                          :exact_session_id_path, :select_resume_session?,
                          :resume_session_label, :parse_resume_selection,
                          :validate_fork_args, :validate_resume_args,
-                         :validate_session_id_args
+                         :validate_session_id_args, :validate_session_name_args,
+                         :apply_cli_session_name
   end
 end

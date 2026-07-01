@@ -7,6 +7,10 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `truffle --name` now writes a `session_info` display-name entry to the active
+  session before provider/model validation. Names are trimmed, newlines are
+  normalized to spaces, and whitespace-only names fail without mutating the
+  session file.
 - Tool execution now coerces model-supplied arguments toward the declared tool
   JSON Schema before calling the Ruby handler. A model string such as `"42"`
   now reaches an `:integer` parameter as `42`, while the original tool-call

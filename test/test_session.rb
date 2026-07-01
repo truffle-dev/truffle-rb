@@ -401,6 +401,29 @@ class TestSession < Minitest::Test
     assert_equal %w[one two], context.messages.map(&:text)
   end
 
+  def test_append_session_info_sets_a_normalized_display_name
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+
+    entry_id = session.append_session_info("  hello\nworld\r\nagain  ")
+
+    assert_equal entry_id, session.leaf_id
+    assert_equal "hello world again", session.session_name
+    assert_equal "session_info", session.entry(entry_id)[:type]
+    assert_equal "hello world again", session.entry(entry_id)[:name]
+    assert_empty session.context.messages
+  end
+
+  def test_session_name_survives_reload_and_empty_name_clears_it
+    session = Truffle::Session.create(dir: @dir, cwd: "/work")
+    session.append_session_info("kept")
+
+    assert_equal "kept", load_session(session).session_name
+
+    session.append_session_info("   ")
+
+    assert_nil load_session(session).session_name
+  end
+
   def test_context_after_compaction_returns_summary_then_kept_tail
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     session.append_message(Truffle::Message.user("old one"))

@@ -39,6 +39,7 @@ module Truffle
       validate_fork_args(args)
       validate_resume_args(args)
       validate_session_id_args(args)
+      validate_session_name_args(args)
       report_diagnostics(args.diagnostics, err)
       return 1 if args.diagnostics.any? { |diagnostic| diagnostic[:type] == :error }
 
@@ -204,6 +205,7 @@ module Truffle
 
       tools = print_tools(args, cwd)
       session = new_cli_session(args, cwd: cwd, tools: tools)
+      apply_cli_session_name(session, args)
       system_prompt = cli_system_prompt(args, cwd: cwd, tools: tools)
       options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
                   system_prompt: system_prompt, tools: tools, session: session }
@@ -233,6 +235,7 @@ module Truffle
       raise Truffle::Error, "cannot use --continue with --no-session" if args.no_session
 
       path = validate_session_path(path || continued_session_path(args, cwd: cwd), cwd: cwd)
+      apply_cli_session_name(Truffle::Session.load(path), args)
       provider = cli_provider(args)
       tools = print_tools(args, cwd)
       Truffle::Agent.load(
@@ -382,6 +385,7 @@ module Truffle
                          :cli_session_dir,
                          :report_diagnostics, :color?, :print_mode?,
                          :select_resume_session?, :validate_fork_args,
-                         :validate_resume_args, :validate_session_id_args
+                         :validate_resume_args, :validate_session_id_args,
+                         :validate_session_name_args
   end
 end

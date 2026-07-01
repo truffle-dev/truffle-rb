@@ -833,6 +833,19 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_fresh_repl_agent_records_session_name
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                      "--name", "  Named\nRun  "])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+      entry_types = agent.session.entries.map { |entry| entry[:type] }
+
+      assert_equal "Named Run", agent.session.session_name
+      assert_path_exists agent.session.file
+      assert_equal %w[session_info model_change], entry_types
+    end
+  end
+
   def test_fresh_repl_with_existing_session_id_loads_that_session
     in_tmpdir do |dir|
       session = create_cli_session(dir)
@@ -848,6 +861,36 @@ class TestCLIRunner < Minitest::Test
 
       assert_equal session.file, loaded.first
       assert_includes loaded.last[:system_prompt], "Current working directory: #{dir}"
+    end
+  end
+
+  def test_name_is_written_to_selected_session_before_agent_load_failure
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+
+      Truffle::Agent.stub(:load, ->(_path, **_kwargs) { raise Truffle::Error, "bad model" }) do
+        status, out, err = run_print_cli(["--session", session.file, "--name",
+                                          "  CLI Named Session  ", "-p", "hi"])
+
+        assert_equal 1, status
+        assert_empty out
+        assert_equal "bad model\n", err
+      end
+
+      assert_equal "CLI Named Session", Truffle::Session.load(session.file).session_name
+    end
+  end
+
+  def test_whitespace_only_name_is_rejected_without_appending_metadata
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+
+      status, out, err = run_print_cli(["--session", session.file, "--name", "   ", "-p", "hi"])
+
+      assert_equal 1, status
+      assert_empty out
+      assert_includes err, "--name requires a non-empty value"
+      assert_nil Truffle::Session.load(session.file).session_name
     end
   end
 
