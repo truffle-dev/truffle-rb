@@ -63,6 +63,56 @@ module Truffle
       def context_usage
         usage
       end
+
+      # Pi extensions expose JavaScript-style command context helpers. Keep those
+      # names stable so extensions port cleanly.
+      # rubocop:disable Naming/AccessorMethodName, Naming/PredicateMethod
+      def get_system_prompt
+        system_prompt.to_s
+      end
+
+      def session_name
+        session&.session_name
+      end
+
+      def set_session_name(name)
+        require_session!("set_session_name")
+        normalized = Session.sanitize_session_name(name)
+        raise Error, "set_session_name requires a non-empty name" if normalized.empty?
+
+        session.append_session_info(normalized)
+        session.flush
+        normalized
+      end
+
+      def available_models
+        Models.all
+      end
+
+      def models_for_provider(provider)
+        Models.for_provider(provider)
+      end
+
+      def compact(custom_instructions: nil, signal: nil)
+        unless agent.respond_to?(:compact)
+          raise Error, "compact requires an agent that supports compaction"
+        end
+
+        agent.compact(custom_instructions: custom_instructions, signal: signal || self.signal)
+      end
+
+      def wait_for_idle
+        true
+      end
+      # rubocop:enable Naming/AccessorMethodName, Naming/PredicateMethod
+
+      private
+
+      def require_session!(action)
+        return session if session
+
+        raise Error, "#{action} requires a session-backed agent"
+      end
     end
 
     EventContext = Struct.new(

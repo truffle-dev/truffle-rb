@@ -39,6 +39,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Extension command contexts now expose bound Ruby actions for the runtime Truffle
+  can support without a full TUI: `set_session_name`, `session_name`, `compact`,
+  `get_system_prompt`, `available_models`, `models_for_provider`, and
+  `wait_for_idle`. `Agent#compact` is also public for host apps that want an
+  explicit session compaction action.
 - Agents now expose provider-native structured output through the harness:
   `run_structured` sends a schema with the provider request, parses the final
   JSON, validates it against the schema, and returns the parsed Ruby value.

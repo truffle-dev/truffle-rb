@@ -512,6 +512,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         context with the same runtime fields plus command metadata: the command
         object, raw argument string, and parsed arguments. Session/UI command
         actions from pi's full `ExtensionCommandContext` remain later work.
+      - [x] **Command context runtime actions.** Command contexts now bind the
+        useful actions Truffle can support in the current line-oriented runtime:
+        read/set the session display name, trigger manual compaction through the
+        same session-backed compactor as the agent loop, read the effective
+        system prompt, and inspect the model catalog. Missing session state
+        raises clearly instead of pretending a TUI/session action succeeded.
 
 ## Phase 5: adoption + the CLI
 

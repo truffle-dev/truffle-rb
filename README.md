@@ -297,6 +297,28 @@ image blocks in session history but replaces them with an omission marker in
 requests to that model. Registrations that omit `input` remain conservative and
 send images unchanged.
 
+### Extensions
+
+Ruby extension files can register tools, slash commands, event handlers, and
+OpenAI-compatible providers. A command handler can accept a second argument for
+the live runtime context:
+
+```ruby
+truffle.register_command("compact", description: "Compact this session") do |_args, ctx|
+  ctx.compact ? "Session compacted" : "Nothing to compact"
+end
+
+truffle.register_command("name", description: "Set the session name") do |args, ctx|
+  "Named #{ctx.set_session_name(args)}"
+end
+```
+
+The context exposes the active agent, session, provider, model id, model
+metadata, usage, system prompt, cwd, abort signal, command metadata, model
+catalog helpers, session display-name helpers, and manual compaction. UI-heavy
+pi actions such as session switching, tree navigation, overlays, and RPC remain
+future runtime slices.
+
 ## Testing
 
 For local Ruby:

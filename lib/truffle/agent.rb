@@ -206,6 +206,21 @@ module Truffle
                            chat_options: structured_options(schema, schema_name, strict))
     end
 
+    # Manually compact a session-backed agent. Extension commands and host
+    # applications use this for an explicit "compact now" action; automatic
+    # threshold compaction still runs through the same private helper before a
+    # provider turn. Returns true when a compaction entry was written, false when
+    # there was nothing useful to compact.
+    def compact(custom_instructions: nil, signal: nil)
+      raise Error, "compact requires a session-backed agent" unless @session
+
+      model = @model_spec if @model_spec.is_a?(Model)
+      model ||= Models.find(@model)
+      raise Error, "compact requires a known catalog model" unless model
+
+      run_compaction(model, signal, custom_instructions: custom_instructions)
+    end
+
     # Reset history back to just the system prompt (keeps tools + listeners) and
     # clear the accumulated usage.
     def reset
@@ -298,11 +313,13 @@ module Truffle
     # boolean lets overflow recovery decide whether a retry is worth attempting:
     # retrying without having shrunk the context would just overflow again. Port
     # of pi's _runAutoCompaction.
-    def run_compaction(model, signal)
+    def run_compaction(model, signal, custom_instructions: nil)
       preparation = Compaction.prepare_compaction(@session.entries, @compaction_settings)
       return false unless preparation
 
-      result = Compaction.compact(preparation, @provider, model, signal: signal)
+      result = Compaction.compact(preparation, @provider, model,
+                                  custom_instructions: custom_instructions,
+                                  signal: signal)
       @session.append_compaction(
         summary: result.summary, first_kept_entry_id: result.first_kept_entry_id,
         tokens_before: result.tokens_before, details: result.details

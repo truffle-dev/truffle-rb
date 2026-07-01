@@ -127,6 +127,9 @@ class TestAgentExtensions < Minitest::Test
           file.puts "system=\#{ctx.system_prompt}"
           file.puts "usage=\#{ctx.context_usage.input}"
           file.puts "signal=\#{ctx.signal.class.name}"
+          file.puts "session_name=\#{ctx.session_name}"
+          file.puts "models=\#{ctx.models_for_provider(:openai).map(&:id).include?('gpt-4o-mini')}"
+          file.puts "system_reader=\#{ctx.get_system_prompt}"
         end
         "inspected \#{ctx.args_string}"
       end
@@ -152,10 +155,69 @@ class TestAgentExtensions < Minitest::Test
         "cwd=#{@dir}",
         "system=Be precise",
         "usage=0",
-        "signal=Truffle::AbortSignal"
+        "signal=Truffle::AbortSignal",
+        "session_name=",
+        "models=true",
+        "system_reader=Be precise"
       ],
       File.readlines(log_path, chomp: true)
     )
+  end
+
+  def test_extension_command_can_set_session_display_name
+    session = Truffle::Session.create(dir: File.join(@dir, "sessions"), cwd: @dir)
+    extensions = load_extension(<<~'RUBY')
+      truffle.register_command("name-session") do |args, ctx|
+        "named #{ctx.set_session_name(args)}"
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("should not be used")])
+    agent = Truffle::Agent.new(provider: provider, session: session, extensions: extensions)
+
+    assert_equal "named New Name", agent.run("/name-session  New Name  ")
+    assert_equal "New Name", session.session_name
+    assert_equal "New Name", Truffle::Session.load(session.file).session_name
+    assert_empty provider.calls
+  end
+
+  def test_extension_command_session_actions_require_a_session
+    extensions = load_extension(<<~RUBY)
+      truffle.register_command("name-session") do |_args, ctx|
+        ctx.set_session_name("missing")
+      end
+    RUBY
+    agent = Truffle::Agent.new(provider: StubProvider.new([]), extensions: extensions)
+
+    error = assert_raises(Truffle::Error) { agent.run("/name-session") }
+
+    assert_match(/set_session_name requires a session-backed agent/, error.message)
+  end
+
+  def test_extension_command_can_trigger_manual_compaction
+    session = Truffle::Session.create(dir: File.join(@dir, "sessions"), cwd: @dir)
+    5.times do |index|
+      session.append_message(Truffle::Message.user("user #{index}"))
+      session.append_message(Truffle::Message.assistant(content: "assistant #{index}"))
+    end
+    session.flush
+    extensions = load_extension(<<~'RUBY')
+      truffle.register_command("compact-now") do |_args, ctx|
+        "compacted=#{ctx.compact}"
+      end
+    RUBY
+    provider = CompactingStub.new([], summary: "## Goal\nKeep going.")
+    agent = Truffle::Agent.new(provider: provider, model: "claude-opus-4-5",
+                               session: session, extensions: extensions)
+    events = []
+    agent.on(:compaction) { |payload| events << payload }
+
+    assert_equal "compacted=true", agent.run("/compact-now")
+
+    assert_equal 1, provider.summary_calls.length
+    assert_equal 1, events.length
+    assert(session.entries.any? { |entry| entry[:type] == "compaction" })
+    assert_includes agent.messages.first.text, "compacted into the following summary"
+    assert_empty provider.loop_calls
   end
 
   def test_extension_commands_share_duplicate_suffixing
