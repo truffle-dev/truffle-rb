@@ -7,6 +7,13 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Session discovery for resume. `Session.most_recent(cwd:)` returns the path of
+  the most recently active session for a project (nil when there is none), and
+  `Session.list(cwd:)` returns summaries newest-first; both default their
+  directory to the per-project location and can be pointed at any `dir:`.
+  `Session.read_header(path)` reads and validates just a session file's header
+  without loading the conversation. Corrupt files are skipped and a missing
+  directory lists nothing, matching pi's findMostRecentSession.
 - `Truffle::Settings.load_project` reads `.truffle/settings.json` into a
   read-only runtime settings object. It maps pi-style `defaultProvider` /
   `defaultModel`, `compaction`, and `retry` values onto the options Truffle

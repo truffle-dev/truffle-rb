@@ -120,6 +120,59 @@ module Truffle
       self.open(FileStore.new(path))
     end
 
+    # A lightweight view of a session on disk, enough to choose one to resume
+    # without reading the whole conversation back.
+    Summary = Struct.new(:path, :id, :cwd, :timestamp, :mtime, keyword_init: true)
+
+    # Read and validate just a session file's header line, cheaply: a resume
+    # picker only needs the header, not the whole conversation. Returns the header
+    # as a symbol-keyed hash, or nil when the file is missing, empty, malformed, or
+    # not a session (matching pi's readSessionHeader, which swallows read errors).
+    def self.read_header(path)
+      line = File.open(path, &:gets)
+      return nil unless line
+
+      header = JSON.parse(line).transform_keys(&:to_sym)
+      return nil unless header[:type] == "session" && header[:id].is_a?(String)
+
+      header
+    rescue JSON::ParserError, SystemCallError
+      nil
+    end
+
+    # List the sessions on disk under a directory, newest first. `cwd:` defaults
+    # `dir:` to that project's session directory and keeps only sessions recorded
+    # against the same working directory, so `Session.list(cwd: Dir.pwd)` answers
+    # "what can I resume here". Files that do not parse as a session header are
+    # skipped rather than raising, and a missing directory lists nothing. Ordering
+    # is by last-modified time (a resume wants the most recently active session),
+    # with the filename as a stable tiebreak.
+    def self.list(cwd: nil, dir: cwd && Config.default_session_dir(cwd: cwd))
+      raise ArgumentError, "pass cwd: or dir:" unless dir
+
+      resolved_cwd = cwd && File.expand_path(cwd)
+      summaries = Dir.glob(File.join(dir, "*.jsonl")).filter_map do |path|
+        header = read_header(path)
+        next if header.nil?
+        next if resolved_cwd && !session_cwd_matches?(header[:cwd], resolved_cwd)
+
+        Summary.new(path: path, id: header[:id], cwd: header[:cwd],
+                    timestamp: header[:timestamp], mtime: File.mtime(path))
+      end
+      summaries.sort_by { |summary| [summary.mtime, summary.path] }.reverse
+    end
+
+    # The path of the most recently active session for a project or directory, or
+    # nil when there is none. Port of pi's findMostRecentSession.
+    def self.most_recent(cwd: nil, dir: cwd && Config.default_session_dir(cwd: cwd))
+      list(cwd: cwd, dir: dir).first&.path
+    end
+
+    def self.session_cwd_matches?(recorded, resolved_cwd)
+      recorded.is_a?(String) && !recorded.empty? && File.expand_path(recorded) == resolved_cwd
+    end
+    private_class_method :session_cwd_matches?
+
     def initialize(store:, header:, entries:, flushed: true)
       @store = store
       @header = header

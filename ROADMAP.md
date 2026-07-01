@@ -552,6 +552,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       encoding the cwd the way pi does so two projects never collide.
       `Session.create` and `Agent#dump` default `dir:` to it, so a caller gets
       per-project session history without naming a directory.
+    - [x] **Session discovery.** `Session.most_recent(cwd:)` and
+      `Session.list(cwd:)` read the per-project directory back to choose a session
+      to resume, newest-first, filtered by recorded cwd; `Session.read_header`
+      reads a header without loading the conversation. Port of pi's
+      findMostRecentSession.
     - [x] **Project settings load.** `Truffle::Settings.load_project` reads
       `.truffle/settings.json` into a read-only runtime settings object, mapping
       pi-style `defaultProvider` / `defaultModel`, `compaction`, and `retry`

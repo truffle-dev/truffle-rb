@@ -109,6 +109,16 @@ write under `~/.truffle/agent/sessions/--<encoded-cwd>--/`, a per-project
 directory keyed by the working directory, so you get session history without
 choosing a path (pass `dir:` to override, or set `TRUFFLE_AGENT_DIR`).
 
+To resume, read that directory back. `Session.most_recent(cwd: Dir.pwd)` returns
+the path of the most recently active session for the project (nil when there is
+none), and `Session.list(cwd: Dir.pwd)` returns every session there, newest
+first:
+
+```ruby
+path = Truffle::Session.most_recent(cwd: Dir.pwd)
+agent = Truffle::Agent.load(path, provider: provider) if path
+```
+
 ## A Real Example
 
 The support-triage example shows the shape Truffle is built for: a Ruby app
