@@ -35,10 +35,14 @@ All notable changes to Truffle are documented here. The format follows
   session with that exact id is reopened, while a missing id creates the new
   session under that id. Invalid ids and conflicting resume flags fail before
   any provider call.
+- `truffle --fork <path|id>` now creates a new project session from an existing
+  session file or local session reference, records the source file as the
+  parent session, and resumes the REPL from the fork. `--session-id` can name the
+  fork target when the id is not already in use.
 - `truffle --continue` now loads the most recent session for the current project
   in both print mode and the interactive REPL. `--session <path|id>` resolves a
   specific session file or unique project session reference. The interactive
-  picker, fork, and session-id creation paths remain later CLI slices.
+  picker remains a later CLI slice.
 - Fresh interactive CLI runs now create a project session by default, recording
   the model and enabled builtin tool names before the first turn. `--no-session`
   keeps the REPL ephemeral, and fresh print-mode runs stay sessionless.

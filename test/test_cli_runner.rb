@@ -725,6 +725,57 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_fork_repl_copies_a_session_and_loads_the_fork
+    in_tmpdir do |dir|
+      source = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("forked")])
+      loaded = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **kwargs|
+        loaded = [path, kwargs]
+        agent
+      }) do
+        status, out, err = run_repl_cli(["--fork", source.id, "--session-id", "fork-1"],
+                                        input: StringIO.new("again\n/exit\n"))
+
+        assert_equal 0, status
+        assert_includes out, "forked\n"
+        assert_empty err
+      end
+
+      forked = Truffle::Session.load(loaded.first)
+
+      refute_equal source.file, loaded.first
+      assert_equal "fork-1", forked.id
+      assert_equal dir, forked.cwd
+      assert_equal source.file, forked.parent_session
+      assert_equal %w[hello hi], forked.messages.map(&:text)
+      assert_nil forked.tools
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_fork_rejects_an_existing_target_session_id
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+
+      status, out, err = run_repl_cli(["--fork", session.id, "--session-id", session.id],
+                                      input: StringIO.new("/exit\n"))
+
+      assert_equal 1, status
+      assert_empty out
+      assert_includes err, "Session already exists with id"
+    end
+  end
+
+  def test_fork_cannot_be_combined_with_continue
+    status, out, err = run_cli(["--fork", "abc", "--continue"])
+
+    assert_equal 1, status
+    assert_empty out
+    assert_includes err, "--fork cannot be combined with --continue"
+  end
+
   def test_no_session_keeps_a_fresh_repl_agent_ephemeral
     in_tmpdir do |dir|
       args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",

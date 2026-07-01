@@ -106,6 +106,29 @@ class TestSession < Minitest::Test
     assert_equal "abc123", session.parent_session
   end
 
+  def test_fork_from_copies_entries_into_a_new_parented_session
+    source = Truffle::Session.create(dir: @dir, cwd: "/source", tools: %w[read bash])
+    source.append_model_change(provider: "openai", model_id: "gpt-4o-mini")
+    source.append_message(Truffle::Message.user("hello"))
+    source.append_message(Truffle::Message.assistant(content: "hi"))
+    source.flush
+
+    fork_dir = File.join(@dir, "forks")
+    forked = Truffle::Session.fork_from(
+      source.file,
+      cwd: "/target",
+      dir: fork_dir,
+      id: "fork-1"
+    )
+
+    assert_equal "fork-1", forked.id
+    assert_equal "/target", forked.cwd
+    assert_equal source.file, forked.parent_session
+    assert_equal %w[read bash], forked.tools
+    assert_equal %w[hello hi], forked.messages.map(&:text)
+    assert_equal "gpt-4o-mini", forked.context.model.model_id
+  end
+
   def test_append_message_returns_an_entry_id_and_advances_the_leaf
     session = Truffle::Session.create(dir: @dir, cwd: "/work")
     id = session.append_message(Truffle::Message.user("hello"))

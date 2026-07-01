@@ -568,8 +568,8 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] **CLI session continue.** `truffle --continue` loads the most recent
       session for the current project and works in both print mode and the
       line-oriented REPL. `--session <path|id>` resolves a specific session file
-      or unique project session reference. The interactive picker and fork remain
-      later CLI slices.
+      or unique project session reference. The interactive picker remains a
+      later CLI slice.
     - [x] **Default REPL session persistence.** Fresh interactive CLI runs now
       create a project session by default, record the active model and enabled
       builtin tool names, and mirror turns through the session-backed agent path.
@@ -584,6 +584,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `--session-id`: an exact existing project session id reopens that session,
       and a missing id creates the new session under that id. Invalid ids and
       conflicting resume flags fail before the provider is built.
+    - [x] **CLI session fork.** `truffle --fork <path|id>` creates a new session
+      in the current project from an existing session file or local session
+      reference, records the source file as `parent_session`, preserves the
+      source tool names for resume rebinding, and loads the REPL from that fork.
+      `--session-id` can name the fork target when the id is not already in use.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with
