@@ -191,6 +191,42 @@ class TestAnthropicStream < Minitest::Test
     assert_equal({}, toolcall_end.tool_call.arguments)
   end
 
+  def test_toolcall_delta_snapshot_parses_partial_arguments
+    frames = [
+      message_start,
+      { "type" => "content_block_start", "index" => 0,
+        "content_block" => { "type" => "tool_use", "id" => "t", "name" => "add", "input" => {} } },
+      { "type" => "content_block_delta", "index" => 0,
+        "delta" => { "type" => "input_json_delta", "partial_json" => '{"a":1,' } }
+    ]
+    events, = collect(frames, finish: false)
+
+    call = events.find { |e| e.type == :toolcall_delta }.partial.tool_calls.first
+
+    assert_equal({ "a" => 1 }, call.arguments)
+  end
+
+  def test_toolcall_end_repairs_malformed_string_literals
+    frames = [
+      message_start,
+      { "type" => "content_block_start", "index" => 0,
+        "content_block" => { "type" => "tool_use", "id" => "t", "name" => "note", "input" => {} } },
+      { "type" => "content_block_delta", "index" => 0,
+        "delta" => {
+          "type" => "input_json_delta",
+          "partial_json" => "{\"body\":\"line one\nline two\"}"
+        } },
+      block_stop(0),
+      message_delta(stop_reason: "tool_use"),
+      message_stop
+    ]
+    events, = collect(frames)
+
+    call = events.find { |e| e.type == :toolcall_end }.tool_call
+
+    assert_equal({ "body" => "line one\nline two" }, call.arguments)
+  end
+
   # --- stop reasons -------------------------------------------------------
 
   def test_max_tokens_maps_to_length_stop_reason

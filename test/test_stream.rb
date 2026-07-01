@@ -108,6 +108,36 @@ class TestStream < Minitest::Test
     assert_equal [call], acc.response.message.tool_calls
   end
 
+  def test_toolcall_delta_snapshot_parses_partial_arguments
+    events, = collect([
+                        { "choices" => [{ "delta" => { "tool_calls" => [
+                          { "index" => 0, "id" => "call_1",
+                            "function" => { "name" => "add", "arguments" => "{\"a\":1," } }
+                        ] } }] }
+                      ], finish: false)
+
+    call = events.find { |e| e.type == :toolcall_delta }.partial.tool_calls.first
+
+    assert_equal({ "a" => 1 }, call.arguments)
+  end
+
+  def test_toolcall_end_repairs_malformed_string_literals
+    events, = collect([
+                        { "choices" => [{ "delta" => { "tool_calls" => [
+                          { "index" => 0, "id" => "call_1",
+                            "function" => {
+                              "name" => "note",
+                              "arguments" => "{\"body\":\"line one\nline two\"}"
+                            } }
+                        ] } }] },
+                        text_chunk(nil, finish_reason: "tool_calls")
+                      ])
+
+    call = events.find { |e| e.type == :toolcall_end }.tool_call
+
+    assert_equal({ "body" => "line one\nline two" }, call.arguments)
+  end
+
   def test_two_tool_calls_tracked_by_stream_index
     events, = collect([
                         { "choices" => [{ "delta" => { "tool_calls" => [

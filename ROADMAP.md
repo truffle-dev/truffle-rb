@@ -549,7 +549,9 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the `JsonRepair` complete-document path over it and always returns an object,
       porting pi's `parseStreamingJson` so in-flight tool-call arguments are usable
       before the closing token arrives. Faithfulness verified against the reference
-      package across ~600 differential inputs; provider serializers still wire it.
+      package across ~600 differential inputs. OpenAI and Anthropic streaming
+      accumulators now use it for partial tool-call previews, and use
+      `Providers.parse_tool_arguments` for completed streaming tool arguments.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial

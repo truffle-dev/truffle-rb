@@ -305,25 +305,17 @@ module Truffle
       end
 
       # Best-effort parse of an in-progress arguments buffer, for the live preview
-      # on toolcall_delta/partial. Returns {} until the buffer parses, which it
-      # does once the call completes.
+      # on toolcall_delta/partial. Ports pi's parseStreamingJson path through the
+      # zero-dep PartialJson parser.
       def parse_streaming_json(raw)
-        return {} if raw.nil? || raw.strip.empty?
-
-        JSON.parse(raw)
-      rescue JSON::ParserError
-        {}
+        PartialJson.parse_streaming(raw)
       end
 
       # Parse a completed arguments buffer. A model very occasionally emits
-      # malformed JSON; surface it under a sentinel key rather than crashing,
-      # matching the non-streaming path in Providers::Anthropic.
+      # malformed JSON; repair string literals first, then surface unrepaired
+      # input under a sentinel key, matching the non-streaming provider path.
       def parse_arguments(raw)
-        return {} if raw.nil? || raw == ""
-
-        JSON.parse(raw)
-      rescue JSON::ParserError
-        { "_raw" => raw }
+        Providers.parse_tool_arguments(raw)
       end
 
       # A mutable scratch block accumulated during a stream, finalized into a

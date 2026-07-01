@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- OpenAI and Anthropic streaming tool-call deltas now parse partial argument
+  buffers with `Truffle::PartialJson.parse_streaming`, and completed streaming
+  arguments use the shared `Providers.parse_tool_arguments` repair path.
 - Built-in providers now run completed string-shaped tool-call arguments through
   `Truffle::JsonRepair.parse` before falling back to `_raw`, so malformed string
   literals from a model can still dispatch as normal parsed arguments.
