@@ -12,6 +12,10 @@ All notable changes to Truffle are documented here. The format follows
   unversioned `.truffle/settings.json` objects with the current version while
   preserving other keys. Malformed or newer settings are left untouched with a
   warning.
+- `Truffle::Migrations.run_agent` moves legacy root-level session JSONL files
+  into their per-project session directory based on the session header `cwd`,
+  matching pi's startup migration. `truffle init` runs it with the project
+  migration pass; malformed files and existing targets are skipped.
 - Session discovery for resume. `Session.most_recent(cwd:)` returns the path of
   the most recently active session for a project (nil when there is none), and
   `Session.list(cwd:)` returns summaries newest-first; both default their

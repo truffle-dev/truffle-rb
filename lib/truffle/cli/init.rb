@@ -25,7 +25,7 @@ module Truffle
 
       module_function
 
-      def project(cwd: Dir.pwd)
+      def project(cwd: Dir.pwd, agent_dir: Config.agent_dir)
         root = File.expand_path(cwd)
         created = []
         existing = []
@@ -38,7 +38,7 @@ module Truffle
                     created, existing)
         ensure_file(File.join(root, "AGENTS.md"), MEMORY_TEMPLATE, created, existing)
 
-        migrations = Migrations.run_project(cwd: root)
+        migrations = Migrations.run(cwd: root, agent_dir: agent_dir)
         Result.new(created: relative_paths(created, root),
                    existing: relative_paths(existing, root),
                    migrated: relative_paths(migrations.applied, root),

@@ -93,7 +93,15 @@ class TestCLIRunner < Minitest::Test
 
   def in_tmpdir
     Dir.mktmpdir do |dir|
+      previous_agent_dir = ENV.fetch("TRUFFLE_AGENT_DIR", nil)
+      ENV["TRUFFLE_AGENT_DIR"] = File.join(dir, ".truffle-agent")
       Dir.chdir(dir) { yield dir }
+    ensure
+      if previous_agent_dir.nil?
+        ENV.delete("TRUFFLE_AGENT_DIR")
+      else
+        ENV["TRUFFLE_AGENT_DIR"] = previous_agent_dir
+      end
     end
   end
 
@@ -266,6 +274,32 @@ class TestCLIRunner < Minitest::Test
       refute_includes out, "migrated:"
       assert_includes err, "Warning: could not migrate .truffle/settings.json"
       assert_equal "{", File.read(".truffle/settings.json")
+    end
+  end
+
+  def test_init_migrates_legacy_root_sessions
+    in_tmpdir do |dir|
+      agent_dir = ENV.fetch("TRUFFLE_AGENT_DIR")
+      FileUtils.mkdir_p(agent_dir)
+      header = {
+        type: "session",
+        version: Truffle::Session::SESSION_VERSION,
+        id: "sess-1",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        cwd: dir
+      }
+      File.write(File.join(agent_dir, "session.jsonl"), "#{JSON.generate(header)}\n")
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      target = File.join(Truffle::Config.default_session_dir(cwd: dir, agent_dir: agent_dir),
+                         "session.jsonl")
+
+      assert_includes out, "migrated: #{target.delete_prefix("#{dir}/")}"
+      assert_path_exists target
+      refute_path_exists File.join(agent_dir, "session.jsonl")
     end
   end
 

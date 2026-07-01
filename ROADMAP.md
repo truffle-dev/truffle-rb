@@ -571,6 +571,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       stamping existing unversioned `.truffle/settings.json` objects with the
       current version while preserving other keys; malformed or newer settings
       are left untouched with a warning.
+    - [x] **Legacy root session migration.** `Truffle::Migrations.run_agent`
+      ports pi's `migrateSessionsFromAgentRoot`: JSONL sessions found directly
+      under the agent directory are moved into the correct per-project session
+      directory based on their header `cwd`. Malformed files and existing targets
+      are skipped, and `truffle init` runs the migration with the project
+      migration pass.
 
 ## Guiding constraints
 

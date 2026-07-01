@@ -20,9 +20,22 @@ module Truffle
 
     module_function
 
+    def run(cwd: Dir.pwd, agent_dir: Config.agent_dir)
+      result = Result.new(applied: [], warnings: [])
+      migrate_project_settings(cwd: cwd, result: result)
+      migrate_root_sessions(agent_dir: agent_dir, result: result)
+      result
+    end
+
     def run_project(cwd: Dir.pwd)
       result = Result.new(applied: [], warnings: [])
       migrate_project_settings(cwd: cwd, result: result)
+      result
+    end
+
+    def run_agent(agent_dir: Config.agent_dir)
+      result = Result.new(applied: [], warnings: [])
+      migrate_root_sessions(agent_dir: agent_dir, result: result)
       result
     end
 
@@ -57,6 +70,50 @@ module Truffle
       result.warnings << "could not migrate #{path}: #{e.message}"
     end
     private_class_method :migrate_project_settings
+
+    def migrate_root_sessions(agent_dir:, result:)
+      root_files(agent_dir).each do |path|
+        header = read_session_header(path)
+        next unless header
+
+        target_dir = Config.default_session_dir(cwd: header.fetch("cwd"), agent_dir: agent_dir)
+        target_path = File.join(target_dir, File.basename(path))
+        next if File.exist?(target_path)
+
+        FileUtils.mkdir_p(target_dir)
+        File.rename(path, target_path)
+        result.applied << target_path
+      rescue SystemCallError
+        next
+      end
+    end
+    private_class_method :migrate_root_sessions
+
+    def root_files(agent_dir)
+      Dir.children(agent_dir)
+         .select { |entry| entry.end_with?(".jsonl") }
+         .map { |entry| File.join(agent_dir, entry) }
+    rescue SystemCallError
+      []
+    end
+    private_class_method :root_files
+
+    def read_session_header(path)
+      line = File.open(path, &:gets)
+      return nil if line.to_s.strip.empty?
+
+      header = JSON.parse(line)
+      return nil unless header.is_a?(Hash)
+      return nil unless header["type"] == "session"
+
+      cwd = header["cwd"]
+      return nil unless cwd.is_a?(String) && !cwd.empty?
+
+      header
+    rescue JSON::ParserError, SystemCallError
+      nil
+    end
+    private_class_method :read_session_header
 
     def integer_version(value)
       Integer(value, exception: false)
