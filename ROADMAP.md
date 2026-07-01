@@ -501,6 +501,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [ ] Bound extension runtime context: session/UI actions, model access,
       compaction, project trust, command contexts, and event dispatch from pi's
       `core/extensions/runner.ts`.
+      - [x] **Event handler context dispatch.** Agent-bound extension event
+        handlers now receive a Ruby runtime context as their second argument,
+        exposing the active agent, session, provider, model id, model metadata,
+        usage, system prompt, cwd, mode, and abort signal. UI, project trust,
+        pending-message, idle, and context-usage helpers are present with
+        conservative values until the richer runtime slices land.
 
 ## Phase 5: adoption + the CLI
 

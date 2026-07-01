@@ -11,6 +11,8 @@ module Truffle
     private
 
     def run_loop(user_input, images:, signal:, streaming:, stream_block:)
+      previous_extension_signal = @extension_signal
+      @extension_signal = signal
       prepared = prepare_user_input(user_input, images)
       return run_slash_action(prepared.fetch(:command)) if prepared[:action]
 
@@ -18,6 +20,8 @@ module Truffle
       state = process_turns(streaming, signal, stream_block)
       emit_agent_end(state.final_text, state.final_response, state.aborted)
       state.final_text
+    ensure
+      @extension_signal = previous_extension_signal
     end
 
     def prepare_user_input(user_input, images)

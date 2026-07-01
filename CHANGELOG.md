@@ -39,6 +39,11 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- Extension event handlers now receive a Ruby runtime context as their second
+  argument, matching pi's event handler shape. The first context slice exposes
+  the active agent, session, provider, model id, model metadata, usage,
+  system prompt, cwd, mode, and abort signal, plus conservative state helpers
+  for UI, trust, idle, pending-message, and context-usage checks.
 - Live provider coverage now includes a shared streaming tool-loop matrix for
   OpenAI, Anthropic, and Gemini. When the matching API keys are present, the
   test runs `Agent#run_stream` end to end: streamed tool call, Ruby tool

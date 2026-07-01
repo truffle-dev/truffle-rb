@@ -39,6 +39,35 @@ module Truffle
     LoadError = Struct.new(:path, :error, keyword_init: true)
     HandlerError = Struct.new(:extension_path, :event, :error, :exception, keyword_init: true)
     LoadResult = Struct.new(:extensions, :errors, :runtime, keyword_init: true)
+    EventContext = Struct.new(
+      :agent, :session, :provider, :model, :model_spec, :usage, :system_prompt,
+      :cwd, :mode, :signal, :idle, :has_ui, :project_trusted, :pending_messages,
+      keyword_init: true
+    ) do
+      def idle?
+        !!idle
+      end
+
+      def ui?
+        !!has_ui
+      end
+
+      def project_trusted?
+        !!project_trusted
+      end
+
+      def pending_messages?
+        !!pending_messages
+      end
+
+      def ui
+        nil
+      end
+
+      def context_usage
+        usage
+      end
+    end
 
     STALE_CONTEXT_MESSAGE =
       "This extension API is stale after extension runtime invalidation."

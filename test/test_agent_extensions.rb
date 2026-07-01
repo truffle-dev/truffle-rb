@@ -300,11 +300,67 @@ class TestAgentExtensions < Minitest::Test
     assert_equal "done", agent.run("hello")
     assert_equal(
       [
-        "agent_start:agent_start:hello:true",
+        "agent_start:agent_start:hello:false",
         "turn_start:1",
         "message:done",
         "turn_end:1",
-        "agent_end:done:true"
+        "agent_end:done:false"
+      ],
+      File.readlines(log_path, chomp: true)
+    )
+  end
+
+  def test_extension_handlers_receive_runtime_context
+    log_path = File.join(@dir, "context.log")
+    session = Truffle::Session.create(dir: File.join(@dir, "sessions"), cwd: @dir)
+    model = Truffle::Models.find("gpt-4o-mini")
+    signal = Truffle::AbortSignal.new
+    extensions = load_extension(<<~RUBY)
+      log_path = #{log_path.inspect}
+
+      truffle.on("agent_start") do |event, ctx|
+        File.open(log_path, "w") do |file|
+          file.puts "event=\#{event[:type]}"
+          file.puts "agent=\#{ctx.agent.class.name}"
+          file.puts "provider=\#{ctx.provider.name}"
+          file.puts "model=\#{ctx.model}"
+          file.puts "model_spec=\#{ctx.model_spec.name}"
+          file.puts "session_cwd=\#{ctx.session.cwd}"
+          file.puts "cwd=\#{ctx.cwd}"
+          file.puts "system=\#{ctx.system_prompt}"
+          file.puts "usage=\#{ctx.context_usage.input}"
+          file.puts "signal=\#{ctx.signal.class.name}"
+          file.puts "mode=\#{ctx.mode}"
+          file.puts "idle=\#{ctx.idle?}"
+          file.puts "ui=\#{ctx.ui?}:\#{ctx.ui.nil?}"
+          file.puts "trusted=\#{ctx.project_trusted?}"
+          file.puts "pending=\#{ctx.pending_messages?}"
+        end
+      end
+    RUBY
+    provider = StubProvider.new([StubProvider.text("done")])
+    agent = Truffle::Agent.new(provider: provider, model: model,
+                               system_prompt: "Be precise",
+                               session: session, extensions: extensions)
+
+    assert_equal "done", agent.run("hello", signal: signal)
+    assert_equal(
+      [
+        "event=agent_start",
+        "agent=Truffle::Agent",
+        "provider=stub",
+        "model=gpt-4o-mini",
+        "model_spec=GPT-4o mini",
+        "session_cwd=#{@dir}",
+        "cwd=#{@dir}",
+        "system=Be precise",
+        "usage=0",
+        "signal=Truffle::AbortSignal",
+        "mode=print",
+        "idle=false",
+        "ui=false:true",
+        "trusted=false",
+        "pending=false"
       ],
       File.readlines(log_path, chomp: true)
     )

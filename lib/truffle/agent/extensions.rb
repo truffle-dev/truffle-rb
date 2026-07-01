@@ -71,8 +71,28 @@ module Truffle
     end
 
     def dispatch_extension_handlers(event, payload)
-      errors = Extensions.dispatch_handlers(@extensions, event, payload)
+      errors = Extensions.dispatch_handlers(@extensions, event, payload,
+                                            context: extension_event_context)
       @extension_errors.concat(errors)
+    end
+
+    def extension_event_context
+      Extensions::EventContext.new(
+        agent: self,
+        session: @session,
+        provider: @provider,
+        model: @model,
+        model_spec: @model_spec,
+        usage: @usage,
+        system_prompt: @system_prompt,
+        cwd: @session&.cwd || Dir.pwd,
+        mode: :print,
+        signal: @extension_signal,
+        idle: false,
+        has_ui: false,
+        project_trusted: false,
+        pending_messages: false
+      )
     end
 
     def prepare_provider_turn(signal)
