@@ -598,7 +598,35 @@ class TestCLIRunner < Minitest::Test
       assert_equal session.file, loaded.first
       assert_nil loaded.last[:provider]
       assert_nil loaded.last[:model]
+      assert_includes loaded.last[:system_prompt], "operating inside Truffle"
+      assert_includes loaded.last[:system_prompt], "Current working directory: #{dir}"
       assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_continue_rebuilds_cli_system_prompt_with_append_sections
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("continued")])
+      loaded = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **kwargs|
+        loaded = [path, kwargs]
+        agent
+      }) do
+        status, out, err = run_print_cli([
+                                           "--continue", "--append-system-prompt",
+                                           "Stay terse.", "-p", "again"
+                                         ])
+
+        assert_equal 0, status
+        assert_equal "continued\n", out
+        assert_empty err
+      end
+
+      assert_equal session.file, loaded.first
+      assert_includes loaded.last[:system_prompt], "\n\nStay terse.\nCurrent date:"
+      assert_equal %w[read write bash edit find grep], loaded.last[:tools].map(&:name)
     end
   end
 
@@ -668,6 +696,53 @@ class TestCLIRunner < Minitest::Test
       agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
 
       assert_nil agent.session
+    end
+  end
+
+  def test_fresh_cli_agent_builds_system_prompt_for_enabled_tools
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                      "--no-session", "--tools", "read,bash"])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_includes agent.system_prompt, "operating inside Truffle"
+      assert_includes agent.system_prompt, "- read: Read the contents of a text file"
+      assert_includes agent.system_prompt, "- bash: Execute a bash command"
+      refute_includes agent.system_prompt, "- write:"
+      assert_includes agent.system_prompt, "Current working directory: #{dir}"
+    end
+  end
+
+  def test_fresh_cli_agent_honors_custom_and_appended_system_prompt
+    in_tmpdir do |dir|
+      args = Truffle::CLI.parse_args([
+                                       "--provider", "openai", "--api-key", "test",
+                                       "--no-session", "--system-prompt", "Base.",
+                                       "--append-system-prompt", "First.",
+                                       "--append-system-prompt", "Second."
+                                     ])
+      agent = Truffle::CLI.send(:build_cli_agent, args, cwd: dir)
+
+      assert_includes agent.system_prompt, "Base.\n\nFirst.\n\nSecond."
+      refute_includes agent.system_prompt, "Available tools:"
+      assert_includes agent.system_prompt, "Current working directory: #{dir}"
+    end
+  end
+
+  def test_fresh_cli_agent_loads_context_files_unless_disabled
+    in_tmpdir do |dir|
+      File.write("AGENTS.md", "Use short answers.")
+      enabled = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                         "--no-session"])
+      disabled = Truffle::CLI.parse_args(["--provider", "openai", "--api-key", "test",
+                                          "--no-session", "--no-context-files"])
+
+      enabled_agent = Truffle::CLI.send(:build_cli_agent, enabled, cwd: dir)
+      disabled_agent = Truffle::CLI.send(:build_cli_agent, disabled, cwd: dir)
+
+      assert_includes enabled_agent.system_prompt, "<project_context>"
+      assert_includes enabled_agent.system_prompt, "Use short answers."
+      refute_includes disabled_agent.system_prompt, "Use short answers."
     end
   end
 

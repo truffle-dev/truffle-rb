@@ -13,6 +13,10 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- CLI-built agents now use the shared system prompt builder for fresh and
+  resumed runs. `--system-prompt`, repeated `--append-system-prompt`, enabled
+  builtin tool descriptions, and AGENTS/CLAUDE context files now flow into the
+  agent prompt unless `--no-context-files` is passed.
 - `truffle --continue` now loads the most recent session for the current project
   in both print mode and the interactive REPL. `--session <path|id>` resolves a
   specific session file or unique project session reference. The interactive

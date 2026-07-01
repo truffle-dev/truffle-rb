@@ -187,8 +187,9 @@ module Truffle
 
       tools = print_tools(args, cwd)
       session = new_cli_session(args, cwd: cwd, tools: tools)
+      system_prompt = cli_system_prompt(args, cwd: cwd, tools: tools)
       options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
-                  tools: tools, session: session }
+                  system_prompt: system_prompt, tools: tools, session: session }
       options[:api_key] = args.api_key if args.api_key
       agent = Truffle.agent(**options)
       record_cli_model_change(agent, session)
@@ -216,14 +217,43 @@ module Truffle
 
       path = continued_session_path(args, cwd: cwd)
       provider = cli_provider(args)
+      tools = print_tools(args, cwd)
       Truffle::Agent.load(
         path,
         provider: provider,
         model: args.model,
-        system_prompt: args.system_prompt,
-        tools: print_tools(args, cwd),
+        system_prompt: cli_system_prompt(args, cwd: cwd, tools: tools),
+        tools: tools,
         extension_provider_overrides: cli_provider_options(args)
       )
+    end
+
+    def cli_system_prompt(args, cwd:, tools:)
+      Truffle::SystemPrompt.build(
+        cwd: cwd,
+        custom_prompt: args.system_prompt,
+        append_system_prompt: cli_append_system_prompt(args),
+        selected_tools: tools.map(&:name),
+        tool_snippets: cli_tool_snippets(tools),
+        context_files: cli_context_files(args, cwd)
+      )
+    end
+
+    def cli_append_system_prompt(args)
+      parts = Array(args.append_system_prompt).reject { |part| part.to_s.strip.empty? }
+      return nil if parts.empty?
+
+      parts.join("\n\n")
+    end
+
+    def cli_tool_snippets(tools)
+      tools.to_h { |tool| [tool.name, tool.description] }
+    end
+
+    def cli_context_files(args, cwd)
+      return [] if args.no_context_files
+
+      Truffle::ContextFiles.load(cwd: cwd, agent_dir: Truffle::Config.agent_dir)
     end
 
     def cli_provider(args)
@@ -310,7 +340,9 @@ module Truffle
                          :run_print, :final_print_response, :print_input,
                          :print_file_input, :piped_stdin, :build_cli_agent, :print_tools,
                          :new_cli_session, :record_cli_model_change,
-                         :load_cli_agent, :cli_provider, :cli_provider_options,
+                         :load_cli_agent, :cli_system_prompt, :cli_append_system_prompt,
+                         :cli_tool_snippets, :cli_context_files,
+                         :cli_provider, :cli_provider_options,
                          :continued_session_path, :resolve_session_reference,
                          :cli_session_dir,
                          :report_diagnostics, :color?, :print_mode?

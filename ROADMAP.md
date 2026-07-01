@@ -558,6 +558,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       builtin tool names, and mirror turns through the session-backed agent path.
       `--no-session` keeps the loop ephemeral; fresh print mode remains
       sessionless.
+    - [x] **CLI system prompt wiring.** Fresh and resumed CLI agents now
+      regenerate the pi-style system prompt from the same shared builder used by
+      the library. `--system-prompt`, repeated `--append-system-prompt`, enabled
+      builtin tool descriptions, and AGENTS/CLAUDE context files are included;
+      `--no-context-files` keeps project memory out.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with
