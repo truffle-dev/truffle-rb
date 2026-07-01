@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `script/refresh-models` regenerates `lib/truffle/models.rb` from
+  `models.dev/api.json` as an explicit maintenance step. The generator uses
+  `Net::HTTP`, filters to provider-backed text-output models Truffle can route,
+  emits all four `Model` cost keys, skips duplicate dated snapshots when the
+  base id is present, and stays out of runtime loading.
 - `Truffle::Schema` is an immutable JSON-Schema value object for structured
   output, built by a block DSL that mirrors `Tool::Builder`'s `param`. It
   describes the shape a model should return: an object root with

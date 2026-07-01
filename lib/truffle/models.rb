@@ -6,8 +6,10 @@ module Truffle
   # The model catalog: every model Truffle knows how to address and price, the
   # way pi keeps a generated table per provider. This is the single source of
   # truth for pricing (Pricing reads it) and for any "what can this model do"
-  # lookup. Keep it current: the values below are transcribed from Anthropic's
-  # and OpenAI's published model and pricing docs, and a stale entry is a bug.
+  # lookup. Keep it current: the values below are transcribed from provider
+  # docs, and a stale entry is a bug. Use script/refresh-models to regenerate a
+  # candidate catalog from models.dev/api.json; the runtime catalog never fetches
+  # the network at require time.
   #
   # Costs are US dollars per million tokens. cache_write is the 5-minute write
   # rate; the 1-hour write (2x base input) is derived at cost time. OpenAI does

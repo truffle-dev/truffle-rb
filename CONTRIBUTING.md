@@ -57,6 +57,17 @@ COVERAGE=true script/rb rake test
 The HTML report is written under `coverage/`, and the LCOV report uploaded by CI
 is written to `coverage/lcov.info`.
 
+Refresh the committed model catalog only as an explicit maintenance step:
+
+```sh
+script/rb ruby script/refresh-models
+script/rb ruby script/refresh-models --check
+```
+
+The refresh script reads `https://models.dev/api.json`, emits full cost keys for
+`Model.new`, and writes `lib/truffle/models.rb`. Truffle never fetches model data
+at runtime.
+
 ## Pull requests
 
 - Reference the roadmap item or issue you are addressing.

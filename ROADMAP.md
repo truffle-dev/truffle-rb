@@ -69,6 +69,9 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
      per-token cost hash, mirroring pi's generated `*.models.ts` tables and kept
      current to each provider's published docs. `Pricing` reads its rates; a
      freshness test guards against the lineup going stale.
+   - [x] **Offline model-catalog refresh.** `script/refresh-models` regenerates a
+     candidate committed catalog from `models.dev/api.json` with full cost keys
+     and no runtime network path.
    - [x] **Provider resolution.** Resolve a bare `model:` string to the right
      provider automatically the way pi's `ai` package does, so the caller need
      not also name the provider. `Models.resolve` ports pi's

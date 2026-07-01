@@ -1,0 +1,150 @@
+{
+  "anthropic": {
+    "models": {
+      "claude-fixture-1": {
+        "id": "claude-fixture-1",
+        "name": "Claude Fixture 1",
+        "reasoning": true,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text", "image", "pdf"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 200000,
+          "output": 64000
+        },
+        "cost": {
+          "input": 3.0,
+          "output": 15.0,
+          "cache_read": 0.3,
+          "cache_write": 3.75
+        }
+      },
+      "claude-fixture-1-20260101": {
+        "id": "claude-fixture-1-20260101",
+        "name": "Claude Fixture 1 Snapshot",
+        "reasoning": true,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text", "image", "pdf"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 200000,
+          "output": 64000
+        },
+        "cost": {
+          "input": 3.0,
+          "output": 15.0,
+          "cache_read": 0.3,
+          "cache_write": 3.75
+        }
+      }
+    }
+  },
+  "openai": {
+    "models": {
+      "gpt-fixture": {
+        "id": "gpt-fixture",
+        "name": "GPT Fixture",
+        "reasoning": false,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text", "image"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 400000,
+          "output": 128000
+        },
+        "cost": {
+          "input": 1.25,
+          "output": 10.0,
+          "cache_read": 0.125
+        }
+      },
+      "text-embedding-3-small": {
+        "id": "text-embedding-3-small",
+        "name": "Embedding Fixture",
+        "reasoning": false,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 8191,
+          "output": 1536
+        },
+        "cost": {
+          "input": 0.02,
+          "output": 0.02
+        }
+      }
+    }
+  },
+  "google": {
+    "models": {
+      "gemini-fixture-1": {
+        "id": "gemini-fixture-1",
+        "name": "Gemini Fixture 1",
+        "reasoning": true,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text", "image", "audio", "video", "pdf"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 1048576,
+          "output": 65536
+        },
+        "cost": {
+          "input": 0.3,
+          "output": 2.5,
+          "cache_read": 0.03
+        }
+      },
+      "gemini-image-fixture": {
+        "id": "gemini-image-fixture",
+        "name": "Gemini Image Fixture",
+        "reasoning": false,
+        "open_weights": false,
+        "modalities": {
+          "input": ["text", "image"],
+          "output": ["text", "image"]
+        },
+        "limit": {
+          "context": 32768,
+          "output": 32768
+        },
+        "cost": {
+          "input": 0.3,
+          "output": 2.5
+        }
+      },
+      "gemma-fixture": {
+        "id": "gemma-fixture",
+        "name": "Gemma Fixture",
+        "reasoning": false,
+        "open_weights": true,
+        "modalities": {
+          "input": ["text", "image"],
+          "output": ["text"]
+        },
+        "limit": {
+          "context": 262144,
+          "output": 32768
+        },
+        "cost": {}
+      }
+    }
+  },
+  "mistral": {
+    "models": {
+      "mistral-fixture": {
+        "id": "mistral-fixture"
+      }
+    }
+  }
+}

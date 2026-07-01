@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+require "fileutils"
+
+require_relative "../lib/truffle/model_catalog_refresh"
+
+options = {
+  output: File.expand_path("../lib/truffle/models.rb", __dir__),
+  source: Truffle::ModelCatalogRefresh::SOURCE_URL
+}
+
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: script/refresh-models [options]"
+
+  opts.on("--input PATH", "Read a local models.dev JSON fixture instead of fetching") do |path|
+    options[:input] = path
+  end
+
+  opts.on("--source URL", "Fetch a different models.dev-compatible source URL") do |url|
+    options[:source] = url
+  end
+
+  opts.on("--output PATH", "Write a different models.rb path") do |path|
+    options[:output] = path
+  end
+
+  opts.on("--check", "Exit non-zero if the output file is stale") do
+    options[:check] = true
+  end
+end
+
+parser.parse!(ARGV)
+
+data =
+  if options[:input]
+    Truffle::ModelCatalogRefresh.load(options[:input])
+  else
+    Truffle::ModelCatalogRefresh.fetch(options[:source])
+  end
+
+catalog = Truffle::ModelCatalogRefresh.generate(data)
+existing = File.exist?(options[:output]) ? File.read(options[:output]) : nil
+
+if options[:check]
+  if existing == catalog.content
+    puts "#{options[:output]} is current (#{catalog.models.length} models)"
+    exit 0
+  end
+
+  warn "#{options[:output]} is stale; run script/refresh-models"
+  exit 1
+end
+
+FileUtils.mkdir_p(File.dirname(options[:output]))
+File.write(options[:output], catalog.content)
+puts "Wrote #{options[:output]} (#{catalog.models.length} models)"
