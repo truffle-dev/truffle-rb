@@ -37,6 +37,7 @@ module Truffle
     def run(argv, out: $stdout, err: $stderr, input: $stdin, agent_builder: nil)
       args = parse_args(argv)
       validate_fork_args(args)
+      validate_resume_args(args)
       validate_session_id_args(args)
       report_diagnostics(args.diagnostics, err)
       return 1 if args.diagnostics.any? { |diagnostic| diagnostic[:type] == :error }
@@ -63,6 +64,8 @@ module Truffle
         err.puts "#{APP_NAME}: rpc mode is not implemented yet"
         return EXIT_NOT_IMPLEMENTED
       end
+
+      return 0 if args.resume && !select_resume_session?(args, out: out, input: input)
 
       if print_mode?(args)
         return run_print(args, out: out, err: err, input: input, agent_builder: agent_builder)
@@ -357,6 +360,7 @@ module Truffle
                          :exact_session_id_path, :resolve_session_reference,
                          :cli_session_dir,
                          :report_diagnostics, :color?, :print_mode?,
-                         :validate_fork_args, :validate_session_id_args
+                         :select_resume_session?, :validate_fork_args,
+                         :validate_resume_args, :validate_session_id_args
   end
 end

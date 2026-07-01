@@ -568,8 +568,8 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] **CLI session continue.** `truffle --continue` loads the most recent
       session for the current project and works in both print mode and the
       line-oriented REPL. `--session <path|id>` resolves a specific session file
-      or unique project session reference. The interactive picker remains a
-      later CLI slice.
+      or unique project session reference. The richer TUI picker remains a later
+      CLI slice.
     - [x] **Default REPL session persistence.** Fresh interactive CLI runs now
       create a project session by default, record the active model and enabled
       builtin tool names, and mirror turns through the session-backed agent path.
@@ -589,6 +589,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       reference, records the source file as `parent_session`, preserves the
       source tool names for resume rebinding, and loads the REPL from that fork.
       `--session-id` can name the fork target when the id is not already in use.
+    - [x] **CLI resume picker.** `truffle --resume` shows a numbered,
+      line-oriented picker over current-project sessions before building the
+      agent. A selection flows through the existing `--session` load path; blank
+      input or `q` exits without a provider call. Pi's full TUI selector remains
+      part of the richer TUI work.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with

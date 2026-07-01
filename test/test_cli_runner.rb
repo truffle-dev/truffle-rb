@@ -662,6 +662,108 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_resume_repl_prompts_for_a_session_and_loads_the_selection
+    in_tmpdir do |dir|
+      older = create_cli_session(dir)
+      sleep 0.01
+      newer = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("resumed")])
+      loaded_path = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **_kwargs|
+        loaded_path = path
+        agent
+      }) do
+        status, out, err = run_repl_cli(["--resume"], input: StringIO.new("2\nagain\n/exit\n"))
+
+        assert_equal 0, status
+        assert_empty err
+        assert_includes out, "Select a session to resume:"
+        assert_includes out, "1. #{newer.id}"
+        assert_includes out, "2. #{older.id}"
+        assert_includes out, "resumed\n"
+      end
+
+      assert_equal older.file, loaded_path
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_resume_print_loads_the_selected_session_before_prompt_input
+    in_tmpdir do |dir|
+      session = create_cli_session(dir)
+      agent = PrintStubAgent.new([assistant_payload("printed")])
+      loaded_path = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **_kwargs|
+        loaded_path = path
+        agent
+      }) do
+        status, out, err = run_print_cli(["--resume", "-p", "again"],
+                                         input: StringIO.new("1\n"))
+
+        assert_equal 0, status
+        assert_empty err
+        assert_includes out, "Select a session to resume:"
+        assert_includes out, "printed\n"
+      end
+
+      assert_equal session.file, loaded_path
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_resume_without_sessions_exits_without_building_agent
+    in_tmpdir do
+      built = false
+      out = StringIO.new
+      err = StringIO.new
+
+      status = Truffle::CLI.run(
+        ["--resume"],
+        out: out,
+        err: err,
+        input: StringIO.new(""),
+        agent_builder: ->(_args) { built = true }
+      )
+
+      assert_equal 0, status
+      assert_empty err.string
+      assert_includes out.string, "No sessions found"
+      refute built
+    end
+  end
+
+  def test_resume_cancel_exits_without_loading_agent
+    in_tmpdir do |dir|
+      create_cli_session(dir)
+      built = false
+      out = StringIO.new
+      err = StringIO.new
+
+      status = Truffle::CLI.run(
+        ["--resume"],
+        out: out,
+        err: err,
+        input: StringIO.new("q\n"),
+        agent_builder: ->(_args) { built = true }
+      )
+
+      assert_equal 0, status
+      assert_empty err.string
+      assert_includes out.string, "No session selected"
+      refute built
+    end
+  end
+
+  def test_resume_cannot_be_combined_with_continue
+    status, out, err = run_cli(["--resume", "--continue"])
+
+    assert_equal 1, status
+    assert_empty out
+    assert_includes err, "--resume cannot be combined with --continue"
+  end
+
   def test_session_id_cannot_be_combined_with_continue
     status, out, err = run_cli(["--session-id", "project-1", "--continue"])
 

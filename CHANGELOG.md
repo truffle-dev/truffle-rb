@@ -39,10 +39,13 @@ All notable changes to Truffle are documented here. The format follows
   session file or local session reference, records the source file as the
   parent session, and resumes the REPL from the fork. `--session-id` can name the
   fork target when the id is not already in use.
+- `truffle --resume` now shows a numbered, line-oriented picker for current
+  project sessions before building the agent. Selecting a session reuses the
+  existing resume path; blank input or `q` exits without a provider call.
 - `truffle --continue` now loads the most recent session for the current project
   in both print mode and the interactive REPL. `--session <path|id>` resolves a
   specific session file or unique project session reference. The interactive
-  picker remains a later CLI slice.
+  picker remains a later richer-TUI slice.
 - Fresh interactive CLI runs now create a project session by default, recording
   the model and enabled builtin tool names before the first turn. `--no-session`
   keeps the REPL ephemeral, and fresh print-mode runs stay sessionless.
