@@ -107,6 +107,12 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       coercion layer (`ai/src/utils/validation.ts`): scalar nudges, nested
       objects, `additionalProperties`, tuple/single arrays, and `allOf`/`anyOf`/
       `oneOf` resolved through the first validating member. Non-mutating.
+    - [x] **Short hash for id rewriting.** `Truffle::ShortHash.of` ports pi's
+      `shortHash` (`ai/src/utils/hash.ts`) byte for byte, the folding the OpenAI
+      Responses provider uses to rewrite foreign tool-call and message ids
+      (`fc_#{hash}`, `msg_#{hash}`). UTF-16 code-unit iteration and 32-bit
+      `Math.imul`/shift semantics reproduced; verified against pi across 27
+      inputs including astral emoji surrogate pairs.
 
 ## Phase 3: the coding-agent surface
 

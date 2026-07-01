@@ -29,6 +29,15 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::ShortHash.of` folds a string into a compact base-36 token,
+  reproducing pi's `shortHash` (`ai/src/utils/hash.ts`) byte for byte. pi bakes
+  this into rewritten tool-call and message ids (`fc_#{hash}`, `msg_#{hash}`)
+  that the OpenAI Responses API round-trips, so the same input must hash the
+  same across processes and languages. The port walks UTF-16 code units the way
+  JavaScript `charCodeAt` does, so a non-BMP character contributes both
+  surrogate halves, and every step stays 32-bit to match `Math.imul` and the
+  unsigned shifts. Verified against pi across 27 inputs including astral emoji.
+  Zero runtime dependencies.
 - `Truffle::SchemaCoercion.coerce` nudges a parsed value toward the types a
   JSON-Schema declares before validation runs. Model tool arguments arrive as
   JSON, where an integer shows up as `"42"` and a boolean as `"true"`, so this
