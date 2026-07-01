@@ -9,7 +9,7 @@ module Truffle
     # project-config slice: it creates the local Truffle directory, its settings
     # file, and a project memory file without overwriting existing files.
     module Init
-      Result = Struct.new(:created, :existing, keyword_init: true)
+      Result = Struct.new(:created, :existing, :migrated, :warnings, keyword_init: true)
 
       SETTINGS = { "version" => 1 }.freeze
       MEMORY_TEMPLATE = <<~MARKDOWN
@@ -38,7 +38,11 @@ module Truffle
                     created, existing)
         ensure_file(File.join(root, "AGENTS.md"), MEMORY_TEMPLATE, created, existing)
 
-        Result.new(created: relative_paths(created, root), existing: relative_paths(existing, root))
+        migrations = Migrations.run_project(cwd: root)
+        Result.new(created: relative_paths(created, root),
+                   existing: relative_paths(existing, root),
+                   migrated: relative_paths(migrations.applied, root),
+                   warnings: migrations.warnings.map { |warning| relative_warning(warning, root) })
       end
 
       def ensure_dir(path, created, existing)
@@ -73,6 +77,11 @@ module Truffle
         end
       end
       private_class_method :relative_paths
+
+      def relative_warning(warning, root)
+        warning.gsub("#{root}/", "")
+      end
+      private_class_method :relative_warning
     end
   end
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "fileutils"
 require "json"
 require "stringio"
 require "tmpdir"
@@ -230,6 +231,41 @@ class TestCLIRunner < Minitest::Test
       assert_includes out, "existing: .truffle/"
       assert_includes out, "existing: .truffle/settings.json"
       refute_includes out, "created:"
+    end
+  end
+
+  def test_init_migrates_existing_unversioned_project_settings
+    in_tmpdir do |dir|
+      FileUtils.mkdir_p(".truffle")
+      settings_json = JSON.pretty_generate({ "defaultProvider" => "openai" })
+      File.write(".truffle/settings.json", "#{settings_json}\n")
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_empty err
+      assert_includes out, "existing: .truffle/settings.json"
+      assert_includes out, "migrated: .truffle/settings.json"
+
+      settings = JSON.parse(File.read(File.join(dir, ".truffle", "settings.json")))
+
+      assert_equal "openai", settings["defaultProvider"]
+      assert_equal 1, settings["version"]
+    end
+  end
+
+  def test_init_reports_unmigrated_malformed_project_settings
+    in_tmpdir do
+      FileUtils.mkdir_p(".truffle")
+      File.write(".truffle/settings.json", "{")
+
+      status, out, err = run_cli(["init"])
+
+      assert_equal 0, status
+      assert_includes out, "existing: .truffle/settings.json"
+      refute_includes out, "migrated:"
+      assert_includes err, "Warning: could not migrate .truffle/settings.json"
+      assert_equal "{", File.read(".truffle/settings.json")
     end
   end
 

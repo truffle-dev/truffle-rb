@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Migrations.run_project` adds the first project-local migration
+  runner. `truffle init` now runs it after scaffolding, stamping existing
+  unversioned `.truffle/settings.json` objects with the current version while
+  preserving other keys. Malformed or newer settings are left untouched with a
+  warning.
 - Session discovery for resume. `Session.most_recent(cwd:)` returns the path of
   the most recently active session for a project (nil when there is none), and
   `Session.list(cwd:)` returns summaries newest-first; both default their

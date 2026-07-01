@@ -54,7 +54,7 @@ module Truffle
         return 0
       end
 
-      return run_init(out: out) if args.init
+      return run_init(out: out, err: err) if args.init
 
       if args.mode == "rpc"
         err.puts "#{APP_NAME}: rpc mode is not implemented yet"
@@ -69,11 +69,13 @@ module Truffle
       EXIT_NOT_IMPLEMENTED
     end
 
-    def run_init(out: $stdout)
+    def run_init(out: $stdout, err: $stderr)
       result = Init.project
       out.puts "Initialized Truffle project."
       print_init_paths("created", result.created, out)
       print_init_paths("existing", result.existing, out)
+      print_init_paths("migrated", result.migrated, out)
+      result.warnings.each { |warning| err.puts "Warning: #{warning}" }
       0
     end
 

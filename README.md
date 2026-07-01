@@ -97,7 +97,8 @@ interactive REPL are still in progress.
 
 Run `truffle init` in an app repo to create `.truffle/` project state and an
 `AGENTS.md` project memory file. It is safe to rerun; existing files are left
-unchanged.
+unchanged, and project-state migrations run after scaffolding so older
+`.truffle/settings.json` files are brought forward safely.
 
 `.truffle/settings.json` can set the runtime defaults a project wants:
 `defaultProvider`, `defaultModel`, `compaction`, and `retry`. `Truffle.agent`
