@@ -197,7 +197,7 @@ module Truffle
     when nil, false
       Settings.empty
     when :project, true
-      Settings.load_project(cwd: cwd)
+      Settings.try_load_project(cwd: cwd)
     when Settings
       settings
     else

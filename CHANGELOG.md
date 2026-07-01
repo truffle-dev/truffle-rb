@@ -98,6 +98,11 @@ All notable changes to Truffle are documented here. The format follows
   image resizing, and the interactive REPL remain later slices.
 
 ### Fixed
+- `Truffle.agent` now treats the default project settings load like pi's
+  tolerant settings path: a malformed `.truffle/settings.json` no longer blocks
+  explicit provider/model construction. `Truffle::Settings.load_project` remains
+  strict for callers that want validation, and `try_load_project` exposes the
+  captured load errors.
 - The `find` tool now clamps a non-positive `limit` to one result instead of
   returning an empty body with a nonsensical `0 results limit reached` notice.
 - Tool calls with missing required params or undeclared keyword params now return

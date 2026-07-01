@@ -22,6 +22,14 @@ class AgentFactoryTest < Minitest::Test
     end
   end
 
+  def with_raw_project_settings(value)
+    Dir.mktmpdir("truffle-agent-settings") do |dir|
+      FileUtils.mkdir_p(File.join(dir, ".truffle"))
+      File.write(File.join(dir, ".truffle", "settings.json"), value)
+      yield dir
+    end
+  end
+
   def test_inferred_provider_from_a_bare_model_id
     agent = Truffle.agent(model: "claude-opus-4-8", api_key: "k")
 
@@ -106,6 +114,15 @@ class AgentFactoryTest < Minitest::Test
       end
 
       assert_match(/provider:/, error.message)
+    end
+  end
+
+  def test_explicit_options_ignore_invalid_default_project_settings
+    with_raw_project_settings("{") do |dir|
+      agent = Truffle.agent(cwd: dir, provider: :openai, model: "gpt-4o", api_key: "k")
+
+      assert_instance_of Truffle::Providers::OpenAI, agent.provider
+      assert_equal "gpt-4o", agent_model(agent)
     end
   end
 

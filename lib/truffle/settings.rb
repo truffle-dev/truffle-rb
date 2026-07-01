@@ -16,10 +16,10 @@ module Truffle
       max_delay_ms: 60_000
     }.freeze
 
-    attr_reader :path
+    attr_reader :path, :errors
 
-    def self.empty(path: nil)
-      new({}, path: path)
+    def self.empty(path: nil, errors: [])
+      new({}, path: path, errors: errors)
     end
 
     def self.load_project(cwd: Dir.pwd, trusted: true)
@@ -34,9 +34,16 @@ module Truffle
       raise Error, "invalid settings file #{path}: #{e.message}"
     end
 
-    def initialize(values, path: nil)
+    def self.try_load_project(cwd: Dir.pwd, trusted: true)
+      load_project(cwd: cwd, trusted: trusted)
+    rescue StandardError => e
+      empty(path: Config.project_settings_path(cwd: cwd), errors: [e])
+    end
+
+    def initialize(values, path: nil, errors: [])
       @values = deep_freeze(values)
       @path = path
+      @errors = errors.dup.freeze
     end
 
     def to_h

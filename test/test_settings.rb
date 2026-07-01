@@ -129,6 +129,20 @@ class TestSettings < Minitest::Test
     end
   end
 
+  def test_try_load_project_captures_invalid_json
+    Dir.mktmpdir("truffle-settings") do |dir|
+      FileUtils.mkdir_p(File.join(dir, ".truffle"))
+      File.write(File.join(dir, ".truffle", "settings.json"), "{")
+
+      settings = Truffle::Settings.try_load_project(cwd: dir)
+
+      assert_equal({}, settings.to_h)
+      assert_equal File.join(dir, ".truffle", "settings.json"), settings.path
+      assert_equal 1, settings.errors.length
+      assert_includes settings.errors.first.message, "invalid settings file"
+    end
+  end
+
   def test_non_object_json_raises_a_truffle_error
     Dir.mktmpdir("truffle-settings") do |dir|
       FileUtils.mkdir_p(File.join(dir, ".truffle"))
