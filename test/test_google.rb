@@ -311,6 +311,31 @@ class TestGoogle < Minitest::Test
     assert_equal({}, call.arguments)
   end
 
+  def test_deserialize_repairs_string_function_call_args
+    content = {
+      "parts" => [
+        {
+          "functionCall" => {
+            "name" => "note",
+            "args" => "{\"body\":\"line one\nline two\"}"
+          }
+        }
+      ]
+    }
+
+    call = Google.deserialize_message(content).tool_calls.first
+
+    assert_equal({ "body" => "line one\nline two" }, call.arguments)
+  end
+
+  def test_deserialize_keeps_unrepairable_string_function_call_args_under_raw
+    content = { "parts" => [{ "functionCall" => { "name" => "broken", "args" => "{not json" } }] }
+
+    call = Google.deserialize_message(content).tool_calls.first
+
+    assert_equal({ "_raw" => "{not json" }, call.arguments)
+  end
+
   def test_deserialize_nil_content_is_an_empty_message
     message = Google.deserialize_message(nil)
 

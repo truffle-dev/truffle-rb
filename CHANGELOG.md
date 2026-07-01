@@ -7,6 +7,9 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Built-in providers now run completed string-shaped tool-call arguments through
+  `Truffle::JsonRepair.parse` before falling back to `_raw`, so malformed string
+  literals from a model can still dispatch as normal parsed arguments.
 - Built-in provider serializers now sanitize outbound system, user, assistant,
   thinking, and tool-result text before building JSON request bodies, matching
   pi's provider boundary behavior and avoiding invalid UTF-8 surrogate errors.

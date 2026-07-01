@@ -539,9 +539,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       characters are escaped and a backslash before an invalid escape is doubled,
       so a model's tool-call arguments parse instead of crashing. `.parse` retries
       the repaired text only when the first parse fails and the repair changed the
-      input. Wiring it into the provider `parse_arguments` paths, and a zero-dep
-      port of pi's `parseStreamingJson` (which needs a from-scratch partial-JSON
-      completer), are later slices.
+      input. OpenAI, Anthropic, and Gemini final tool-call deserializers now run
+      string-shaped arguments through `Providers.parse_tool_arguments`; unrepaired
+      JSON still lands under `_raw`. A zero-dep port of pi's `parseStreamingJson`
+      (which needs a from-scratch partial-JSON completer) remains a later slice.
     - [x] Print-mode text `@file` input. Text file arguments are resolved through
       the same path normalizer as the file tools, skipped when empty, wrapped as
       pi's `<file name="absolute/path">` blocks, and inserted into the initial

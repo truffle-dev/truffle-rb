@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require_relative "../json_repair"
 require_relative "../unicode_sanitizer"
 
 module Truffle
@@ -23,6 +24,21 @@ module Truffle
       return text if text.nil?
 
       UnicodeSanitizer.sanitize_surrogates(text.to_s)
+    end
+
+    # Final tool-call arguments should be a parsed Ruby object by the time they
+    # leave a provider. Most providers already return a Hash. OpenAI-compatible
+    # providers return a JSON string, and models can occasionally emit malformed
+    # string literals; repair those completed payloads before falling back to a
+    # raw sentinel.
+    def self.parse_tool_arguments(raw)
+      return {} if raw.nil?
+      return raw unless raw.is_a?(String)
+      return {} if raw.empty?
+
+      JsonRepair.parse(raw)
+    rescue JSON::ParserError
+      { "_raw" => raw }
     end
 
     # The contract every provider implements. This single seam is what makes

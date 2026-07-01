@@ -65,6 +65,43 @@ class TestOpenAIProvider < Minitest::Test
     ], content
   end
 
+  def test_deserialize_repairs_malformed_tool_argument_string_literals
+    provider = Truffle::Providers::OpenAI.new(api_key: "test-key")
+    raw = {
+      "content" => nil,
+      "tool_calls" => [
+        {
+          "id" => "call_1",
+          "function" => {
+            "name" => "note",
+            "arguments" => "{\"body\":\"line one\nline two\"}"
+          }
+        }
+      ]
+    }
+
+    call = provider.send(:deserialize_message, raw).tool_calls.first
+
+    assert_equal({ "body" => "line one\nline two" }, call.arguments)
+  end
+
+  def test_deserialize_keeps_unrepairable_tool_arguments_under_raw
+    provider = Truffle::Providers::OpenAI.new(api_key: "test-key")
+    raw = {
+      "content" => nil,
+      "tool_calls" => [
+        {
+          "id" => "call_1",
+          "function" => { "name" => "broken", "arguments" => "{not json" }
+        }
+      ]
+    }
+
+    call = provider.send(:deserialize_message, raw).tool_calls.first
+
+    assert_equal({ "_raw" => "{not json" }, call.arguments)
+  end
+
   # --- structured output: response_format schema seam --------------------
 
   def schema_fixture

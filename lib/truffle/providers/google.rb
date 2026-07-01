@@ -302,7 +302,8 @@ module Truffle
           if part.key?("functionCall")
             call = part["functionCall"] || {}
             tool_calls << ToolCall.new(id: call["id"] || "#{call["name"]}-#{index}",
-                                       name: call["name"], arguments: call["args"] || {})
+                                       name: call["name"],
+                                       arguments: Providers.parse_tool_arguments(call["args"]))
           elsif part.key?("text")
             blocks << text_block(part)
           end

@@ -283,6 +283,31 @@ class TestAnthropic < Minitest::Test
     assert_equal({}, call.arguments)
   end
 
+  def test_deserialize_repairs_string_tool_use_input
+    content = [
+      {
+        "type" => "tool_use",
+        "id" => "call_9",
+        "name" => "note",
+        "input" => "{\"body\":\"line one\nline two\"}"
+      }
+    ]
+
+    call = Anthropic.deserialize_message(content).tool_calls.first
+
+    assert_equal({ "body" => "line one\nline two" }, call.arguments)
+  end
+
+  def test_deserialize_keeps_unrepairable_string_tool_use_input_under_raw
+    content = [
+      { "type" => "tool_use", "id" => "call_9", "name" => "broken", "input" => "{not json" }
+    ]
+
+    call = Anthropic.deserialize_message(content).tool_calls.first
+
+    assert_equal({ "_raw" => "{not json" }, call.arguments)
+  end
+
   # --- map_stop_reason ---------------------------------------------------
 
   def test_map_stop_reason_clean_stops

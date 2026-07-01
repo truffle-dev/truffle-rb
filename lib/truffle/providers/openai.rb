@@ -222,20 +222,10 @@ module Truffle
           ToolCall.new(
             id: tc["id"],
             name: fn["name"],
-            arguments: parse_arguments(fn["arguments"])
+            arguments: Providers.parse_tool_arguments(fn["arguments"])
           )
         end
         Message.assistant(content: raw["content"], tool_calls: tool_calls)
-      end
-
-      def parse_arguments(raw)
-        return {} if raw.nil? || raw == ""
-
-        JSON.parse(raw)
-      rescue JSON::ParserError
-        # A model very occasionally emits malformed JSON for arguments. Surface
-        # the raw string under a sentinel key rather than crashing the loop.
-        { "_raw" => raw }
       end
 
       def post(path, body, headers: nil)

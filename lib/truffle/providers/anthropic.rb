@@ -288,7 +288,7 @@ module Truffle
                                             signature: item["data"], redacted: true)
           when "tool_use"
             tool_calls << ToolCall.new(id: item["id"], name: item["name"],
-                                       arguments: item["input"] || {})
+                                       arguments: Providers.parse_tool_arguments(item["input"]))
           end
         end
         Message.assistant(content: blocks, tool_calls: tool_calls)
