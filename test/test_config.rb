@@ -24,6 +24,8 @@ class TestConfig < Minitest::Test
     Dir.mktmpdir("truffle-project") do |cwd|
       assert_equal File.join(cwd, ".truffle"), Config.project_dir(cwd: cwd)
       assert_equal File.join(cwd, ".truffle", "prompts"), Config.project_prompts_dir(cwd: cwd)
+      assert_equal File.join(cwd, ".truffle", "settings.json"),
+                   Config.project_settings_path(cwd: cwd)
       assert_equal File.join(cwd, ".truffle", "agent", "prompts"),
                    Config.prompts_dir(agent_dir: File.join(cwd, ".truffle", "agent"))
     end

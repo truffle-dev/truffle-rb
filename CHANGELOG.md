@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Settings.load_project` reads `.truffle/settings.json` into a
+  read-only runtime settings object. It maps pi-style `defaultProvider` /
+  `defaultModel`, `compaction`, and `retry` values onto the options Truffle
+  already supports, and `Truffle.agent` uses those project defaults only when
+  the caller leaves the matching option unset.
 - Sessions now have a default per-project directory. `Config.default_session_dir`
   puts a session's JSONL under `~/.truffle/agent/sessions/--<encoded-cwd>--/`,
   encoding the working directory the way pi does (leading separator stripped,

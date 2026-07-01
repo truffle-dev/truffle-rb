@@ -6,8 +6,8 @@ require "json"
 module Truffle
   module CLI
     # Non-destructive project scaffolding for `truffle init`. This is the first
-    # project-config slice: it creates the local Truffle directory and a project
-    # memory file without teaching the runtime new settings semantics yet.
+    # project-config slice: it creates the local Truffle directory, its settings
+    # file, and a project memory file without overwriting existing files.
     module Init
       Result = Struct.new(:created, :existing, keyword_init: true)
 

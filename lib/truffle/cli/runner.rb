@@ -183,7 +183,7 @@ module Truffle
     # Truffle::Error when neither a provider nor a model-named provider resolves,
     # which `run_print` turns into a stderr message and exit 1.
     def build_print_agent(args, cwd: Dir.pwd)
-      options = { provider: args.provider&.to_sym, model: args.model,
+      options = { provider: args.provider&.to_sym, model: args.model, cwd: cwd,
                   tools: print_tools(args, cwd) }
       options[:api_key] = args.api_key if args.api_key
       Truffle.agent(**options)

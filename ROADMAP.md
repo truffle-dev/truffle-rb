@@ -552,8 +552,12 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       encoding the cwd the way pi does so two projects never collide.
       `Session.create` and `Agent#dump` default `dir:` to it, so a caller gets
       per-project session history without naming a directory.
-    - [ ] Load project settings from `.truffle/settings.json` once there is a
-      runtime settings object to apply them to.
+    - [x] **Project settings load.** `Truffle::Settings.load_project` reads
+      `.truffle/settings.json` into a read-only runtime settings object, mapping
+      pi-style `defaultProvider` / `defaultModel`, `compaction`, and `retry`
+      values onto the options Truffle already understands. `Truffle.agent`
+      applies those project defaults only when the caller leaves the matching
+      option unset.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
     (sessions, memory) so upgrades are safe.
 

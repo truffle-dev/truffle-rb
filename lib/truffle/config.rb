@@ -31,6 +31,10 @@ module Truffle
       File.join(project_dir(cwd: cwd), "prompts")
     end
 
+    def project_settings_path(cwd: Dir.pwd)
+      File.join(project_dir(cwd: cwd), "settings.json")
+    end
+
     # The agent-level directory that holds one session subdirectory per project.
     def sessions_dir(agent_dir: self.agent_dir)
       File.join(File.expand_path(agent_dir), "sessions")

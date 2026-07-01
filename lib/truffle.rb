@@ -14,6 +14,7 @@ require_relative "truffle/message"
 require_relative "truffle/uuid"
 require_relative "truffle/frontmatter"
 require_relative "truffle/config"
+require_relative "truffle/settings"
 require_relative "truffle/prompt_templates"
 require_relative "truffle/slash_commands"
 require_relative "truffle/session"
@@ -135,27 +136,19 @@ module Truffle
   # expects. An explicit `provider:` is left untouched, so an unlisted or custom
   # model id still works when the provider is named.
   def agent(provider: nil, system_prompt: nil, tools: [], model: nil,
-            max_turns: Agent::DEFAULT_MAX_TURNS, tool_execution: :parallel,
+            max_turns: nil, tool_execution: :parallel,
             prompt_templates: [], slash_commands: nil, extensions: nil,
+            compaction_settings: nil, retry_settings: nil,
+            settings: :project, cwd: Dir.pwd,
             **provider_options)
-    if provider.nil?
-      raise Error, "pass provider:, or a model: that names one" if model.nil?
+    runtime_settings = resolve_settings(settings, cwd: cwd)
+    provider ||= runtime_settings.default_provider
+    model ||= runtime_settings.default_model
+    max_turns ||= Agent::DEFAULT_MAX_TURNS
+    compaction_settings ||= runtime_settings.compaction_settings
+    retry_settings ||= runtime_settings.retry_settings
 
-      resolved = Models.resolve(model)
-      if resolved.nil?
-        resolved = Extensions.model_reference(extensions, model)
-        resolved ||= ProviderRegistry.model_reference(model)
-        if resolved.nil?
-          raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
-        end
-
-        provider = resolved.provider
-        model = resolved.model_id
-      else
-        provider = resolved.provider
-        model = resolved.id
-      end
-    end
+    provider, model = resolve_agent_model(provider, model, extensions)
 
     provider_name = provider.is_a?(Providers::Base) ? provider.name : provider.to_s
     prov = provider(provider, extensions: extensions, **provider_options)
@@ -165,6 +158,8 @@ module Truffle
       tools: tools,
       model: model,
       max_turns: max_turns,
+      compaction_settings: compaction_settings,
+      retry_settings: retry_settings,
       tool_execution: tool_execution,
       prompt_templates: prompt_templates,
       slash_commands: slash_commands,
@@ -174,6 +169,20 @@ module Truffle
     )
   end
 
+  def resolve_agent_model(provider, model, extensions)
+    return [provider, model] unless provider.nil?
+    raise Error, "pass provider:, or a model: that names one" if model.nil?
+
+    resolved = Models.resolve(model) || Extensions.model_reference(extensions, model) ||
+               ProviderRegistry.model_reference(model)
+    unless resolved
+      raise Error, "cannot infer a provider from model #{model.inspect}; pass provider:"
+    end
+
+    [resolved.provider, resolved.respond_to?(:model_id) ? resolved.model_id : resolved.id]
+  end
+  private_class_method :resolve_agent_model
+
   def openai_compatible_provider(registered_options, caller_options)
     combined_options = registered_options.merge(caller_options)
     if registered_options[:headers].is_a?(Hash) && caller_options[:headers].is_a?(Hash)
@@ -182,6 +191,20 @@ module Truffle
     Providers::OpenAI.new(**combined_options)
   end
   private_class_method :openai_compatible_provider
+
+  def resolve_settings(settings, cwd:)
+    case settings
+    when nil, false
+      Settings.empty
+    when :project, true
+      Settings.load_project(cwd: cwd)
+    when Settings
+      settings
+    else
+      raise Error, "settings must be a Truffle::Settings, :project, true, false, or nil"
+    end
+  end
+  private_class_method :resolve_settings
 
   # Define a tool: Truffle.tool("name", "desc") { param ...; run { ... } }.
   def tool(name, description, execution_mode: :parallel, &)

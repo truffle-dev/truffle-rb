@@ -99,6 +99,11 @@ Run `truffle init` in an app repo to create `.truffle/` project state and an
 `AGENTS.md` project memory file. It is safe to rerun; existing files are left
 unchanged.
 
+`.truffle/settings.json` can set the runtime defaults a project wants:
+`defaultProvider`, `defaultModel`, `compaction`, and `retry`. `Truffle.agent`
+uses those values only when the caller leaves the matching option unset, so app
+code can still override them per agent.
+
 Sessions have a default home. `Agent#dump` and `Session.create` without a `dir:`
 write under `~/.truffle/agent/sessions/--<encoded-cwd>--/`, a per-project
 directory keyed by the working directory, so you get session history without
