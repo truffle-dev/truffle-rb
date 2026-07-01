@@ -181,6 +181,24 @@ agent.on               { |type, payload| logger.debug(type => payload) }
 Events are ordered and include turn starts, assistant messages, tool calls, tool
 results, retries, compaction, and the final `agent_end`.
 
+For token-level UI updates, use the streaming loop. It yields the same
+`Truffle::StreamEvent` objects that providers emit and still returns the final
+text when the multi-turn run is complete:
+
+```ruby
+answer = agent.run_stream("Draft a reply") do |event|
+  case event.type
+  when :text_delta
+    broadcast(event.delta)
+  when :toolcall_end
+    audit(event.tool_call)
+  end
+end
+```
+
+The transport is application code: send the events to SSE, ActionCable,
+WebSocket, logs, or a terminal renderer.
+
 ### Providers And Models
 
 ```ruby

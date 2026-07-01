@@ -59,6 +59,15 @@ module Truffle
       @provider.chat(messages: @messages, tools: @toolbox.to_schema, model: @model)
     end
 
+    def stream_current_turn(signal)
+      refresh_extension_provider
+      @provider.chat_stream(messages: @messages, tools: @toolbox.to_schema, model: @model,
+                            signal: signal) do |event|
+        emit(:stream, event: event)
+        yield event if block_given?
+      end
+    end
+
     def default_extension_provider_name(provider)
       return nil if @extension_source.nil?
 

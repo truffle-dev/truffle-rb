@@ -48,7 +48,7 @@ module Truffle
   class Agent
     DEFAULT_MAX_TURNS = 12
 
-    EVENTS = %i[agent_start turn_start message tool_call tool_result turn_end
+    EVENTS = %i[agent_start turn_start stream message tool_call tool_result turn_end
                 agent_end compaction retry].freeze
 
     # Auto-retry defaults, ported from pi's getRetrySettings plus its provider
@@ -167,56 +167,17 @@ module Truffle
     # accepts Truffle::Content::Image blocks for multimodal turns. Pass signal:
     # a Truffle::AbortSignal to stop at turn boundaries.
     def run(user_input, images: [], signal: nil)
-      command_result = Array(images).empty? ? resolve_slash_command(user_input) : nil
-      return run_slash_action(command_result) if command_result&.type == :action
+      run_loop(user_input, images: images, signal: signal, streaming: false, stream_block: nil)
+    end
 
-      user_input = command_result.content if command_result&.type == :prompt
-      emit(:agent_start, input: user_input)
-      append(Message.user_with_images(user_input, images: images))
-      @overflow_recovery_attempted = false
-      @retry_attempt = 0
-
-      final_text = nil
-      final_response = nil
-      aborted = false
-      turns = 0
-
-      loop do
-        aborted = true if signal&.aborted?
-        break if aborted
-
-        prepare_provider_turn(signal)
-
-        turns += 1
-        if turns > max_turns
-          final_response = Response.new(message: Message.assistant(content: []),
-                                        stop_reason: StopReason::ERROR,
-                                        error_message: max_turns_error_message)
-          break
-        end
-
-        emit(:turn_start, turn: turns)
-        response = chat_current_turn
-        final_response = response
-        append(response.message)
-        @usage += response.usage
-        @last_usage = response.usage
-        emit(:message, message: response.message, usage: response.usage)
-
-        next if handle_recovery(response, signal) == :retry
-
-        unless response.tool_calls?
-          final_text = response.text
-          emit(:turn_end, turn: turns, tool_results: [])
-          break
-        end
-
-        tool_results = run_tool_calls(response.tool_calls)
-        emit(:turn_end, turn: turns, tool_results: tool_results)
-      end
-
-      emit_agent_end(final_text, final_response, aborted)
-      final_text
+    # Streaming counterpart to #run. The agent loop stays the same, including
+    # tool dispatch, retry, compaction, usage accounting, and final return value,
+    # but each assistant turn is requested through the provider's #chat_stream.
+    # The block receives Truffle::StreamEvent objects as the provider emits them;
+    # host apps can bridge those events to SSE, ActionCable, WebSocket, or logs.
+    # Non-streaming #run deliberately remains unchanged.
+    def run_stream(user_input, images: [], signal: nil, &block)
+      run_loop(user_input, images: images, signal: signal, streaming: true, stream_block: block)
     end
 
     # Reset history back to just the system prompt (keeps tools + listeners) and

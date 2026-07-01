@@ -7,6 +7,11 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Agent#run_stream` drives the normal multi-turn agent loop through provider
+  streaming, yielding normalized `Truffle::StreamEvent` objects for token-level
+  UI updates while keeping `Agent#run` unchanged. Streamed tool calls still run
+  tools and continue the loop, aborts end with `stop_reason: :aborted`, and the
+  final return value remains the assistant text.
 - `script/refresh-models` regenerates `lib/truffle/models.rb` from
   `models.dev/api.json` as an explicit maintenance step. The generator uses
   `Net::HTTP`, filters to provider-backed text-output models Truffle can route,

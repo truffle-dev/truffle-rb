@@ -522,6 +522,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       does not resize images or add image-processing dependencies.
       `Truffle::Content::Image.from_file` and `.from_bytes` expose the same
       conversion for app code.
+    - [x] Agent-level streaming. `Agent#run_stream` uses provider `#chat_stream`
+      inside the same multi-turn loop as `#run`, yielding normalized
+      `StreamEvent`s for text/thinking/tool-call deltas while preserving tool
+      dispatch, abort, retry, compaction, usage accounting, and the final return
+      value.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
