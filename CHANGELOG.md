@@ -22,6 +22,15 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- `Truffle::SchemaCoercion.coerce` nudges a parsed value toward the types a
+  JSON-Schema declares before validation runs. Model tool arguments arrive as
+  JSON, where an integer shows up as `"42"` and a boolean as `"true"`, so this
+  moves each value toward its declared type when the move is unambiguous and
+  leaves it alone otherwise. It handles scalar coercion, nested objects,
+  `additionalProperties`, tuple and single-schema arrays, and `allOf`/`anyOf`/
+  `oneOf`, picking the first union member whose coerced form validates against
+  `Truffle::Schema`. The input is deep-copied, never mutated. Ports pi's
+  coercion layer (`ai/src/utils/validation.ts`). Zero runtime dependencies.
 - `Truffle::PartialJson.parse` and `.parse_streaming` complete a truncated JSON
   document mid-stream, so a model's in-flight tool-call arguments become a usable
   object before the closing token arrives. `parse` is a from-scratch port of the

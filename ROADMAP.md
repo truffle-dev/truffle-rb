@@ -102,6 +102,11 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       plus `responseMimeType`). OpenAI drops it for a non-native base URL.
     - [x] **Parsed accessor.** `Response#parsed` lazily `JSON.parse`s the final
       text, with an advisory `Schema#valid?`/`#errors` for callers that validate.
+    - [x] **Argument coercion.** `Truffle::SchemaCoercion.coerce` moves a parsed
+      value toward its declared JSON-Schema types before validation, porting pi's
+      coercion layer (`ai/src/utils/validation.ts`): scalar nudges, nested
+      objects, `additionalProperties`, tuple/single arrays, and `allOf`/`anyOf`/
+      `oneOf` resolved through the first validating member. Non-mutating.
 
 ## Phase 3: the coding-agent surface
 
