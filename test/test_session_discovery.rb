@@ -91,6 +91,37 @@ class TestSessionDiscovery < Minitest::Test
     assert_nil Truffle::Session.most_recent(dir: File.join(@dir, "nope"))
   end
 
+  def test_list_all_scans_every_default_project_session_directory
+    Dir.mktmpdir("truffle-home") do |home|
+      with_agent_dir(File.join(home, "agent")) do
+        now = Time.now
+        older = Truffle::Session.create(cwd: "/work/one")
+        older.append_message(Truffle::Message.user("one"))
+        older.flush
+        newer = Truffle::Session.create(cwd: "/work/two")
+        newer.append_message(Truffle::Message.user("two"))
+        newer.flush
+        File.utime(now - 60, now - 60, older.file)
+        File.utime(now, now, newer.file)
+
+        summaries = Truffle::Session.list_all
+
+        assert_equal [newer.id, older.id], summaries.map(&:id)
+        assert_equal ["/work/two", "/work/one"], summaries.map(&:cwd)
+      end
+    end
+  end
+
+  def test_list_all_with_custom_dir_lists_that_directory_only
+    write_session("one", cwd: "/work/one")
+    other = File.join(@dir, "other")
+    FileUtils.mkdir_p(other)
+    File.write(File.join(other, "two.jsonl"),
+               "#{JSON.generate({ type: "session", id: "two", cwd: "/work/two" })}\n")
+
+    assert_equal %w[one], Truffle::Session.list_all(dir: @dir).map(&:id)
+  end
+
   def test_list_without_cwd_or_dir_is_rejected
     assert_raises(ArgumentError) { Truffle::Session.list }
   end

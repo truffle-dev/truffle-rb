@@ -31,6 +31,10 @@ All notable changes to Truffle are documented here. The format follows
   `oneOf`, picking the first union member whose coerced form validates against
   `Truffle::Schema`. The input is deep-copied, never mutated. Ports pi's
   coercion layer (`ai/src/utils/validation.ts`). Zero runtime dependencies.
+- `Session.list_all` scans every per-project session directory under the agent
+  sessions root. The CLI now uses it after current-project lookup, so
+  `--session <id>` and `--fork <id>` can resolve a unique session from another
+  project while direct file paths still win first.
 - `Truffle::PartialJson.parse` and `.parse_streaming` complete a truncated JSON
   document mid-stream, so a model's in-flight tool-call arguments become a usable
   object before the closing token arrives. `parse` is a from-scratch port of the

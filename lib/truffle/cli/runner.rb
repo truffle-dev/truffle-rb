@@ -299,13 +299,33 @@ module Truffle
       path = File.expand_path(reference, cwd)
       return path if File.file?(path)
 
-      matches = Truffle::Session.list(cwd: cwd, dir: cli_session_dir(args, cwd)).select do |summary|
-        summary.id.start_with?(reference) || File.basename(summary.path).include?(reference)
-      end
-      return matches.first.path if matches.length == 1
-      return nil if matches.empty?
+      local_match = unique_session_reference(
+        reference, Truffle::Session.list(cwd: cwd, dir: cli_session_dir(args, cwd))
+      )
+      return local_match.path if local_match
+
+      global_match = unique_session_reference(
+        reference, Truffle::Session.list_all(dir: args.session_dir && cli_session_dir(args, cwd))
+      )
+      return global_match.path if global_match
 
       raise Truffle::Error, "session reference is ambiguous: #{reference}"
+    end
+
+    def unique_session_reference(reference, summaries)
+      exact = summaries.select { |summary| summary.id == reference }
+      return exact.first if exact.length == 1
+      raise Truffle::Error, "session reference is ambiguous: #{reference}" if exact.length > 1
+
+      partial = summaries.select { |summary| session_reference_match?(summary, reference) }
+      return partial.first if partial.length == 1
+      return nil if partial.empty?
+
+      raise Truffle::Error, "session reference is ambiguous: #{reference}"
+    end
+
+    def session_reference_match?(summary, reference)
+      summary.id.start_with?(reference) || File.basename(summary.path).include?(reference)
     end
 
     def cli_session_dir(args, cwd)
@@ -358,6 +378,7 @@ module Truffle
                          :continued_session_path, :fork_cli_session,
                          :validate_session_path,
                          :exact_session_id_path, :resolve_session_reference,
+                         :unique_session_reference, :session_reference_match?,
                          :cli_session_dir,
                          :report_diagnostics, :color?, :print_mode?,
                          :select_resume_session?, :validate_fork_args,

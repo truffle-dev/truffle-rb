@@ -488,3 +488,5 @@ module Truffle
     end
   end
 end
+
+require_relative "session_discovery"

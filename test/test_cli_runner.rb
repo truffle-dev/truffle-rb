@@ -713,6 +713,30 @@ class TestCLIRunner < Minitest::Test
     end
   end
 
+  def test_session_flag_can_load_a_session_from_another_project
+    in_tmpdir do |dir|
+      other_cwd = File.join(dir, "other-project")
+      FileUtils.mkdir_p(other_cwd)
+      session = create_cli_session(other_cwd)
+      agent = PrintStubAgent.new([assistant_payload("global")])
+      loaded_path = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **_kwargs|
+        loaded_path = path
+        agent
+      }) do
+        status, out, err = run_print_cli(["--session", session.id, "-p", "again"])
+
+        assert_equal 0, status
+        assert_equal "global\n", out
+        assert_empty err
+      end
+
+      assert_equal session.file, loaded_path
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
   def test_resume_without_sessions_exits_without_building_agent
     in_tmpdir do
       built = false
@@ -853,6 +877,37 @@ class TestCLIRunner < Minitest::Test
       assert_equal source.file, forked.parent_session
       assert_equal %w[hello hi], forked.messages.map(&:text)
       assert_nil forked.tools
+      assert_equal ["again"], agent.prompts
+    end
+  end
+
+  def test_fork_can_copy_a_session_from_another_project
+    in_tmpdir do |dir|
+      other_cwd = File.join(dir, "other-project")
+      FileUtils.mkdir_p(other_cwd)
+      source = create_cli_session(other_cwd)
+      agent = PrintStubAgent.new([assistant_payload("forked")])
+      loaded = nil
+
+      Truffle::Agent.stub(:load, lambda { |path, **kwargs|
+        loaded = [path, kwargs]
+        agent
+      }) do
+        status, out, err = run_repl_cli(["--fork", source.id, "--session-id", "fork-global"],
+                                        input: StringIO.new("again\n/exit\n"))
+
+        assert_equal 0, status
+        assert_includes out, "forked\n"
+        assert_empty err
+      end
+
+      forked = Truffle::Session.load(loaded.first)
+
+      refute_equal source.file, loaded.first
+      assert_equal "fork-global", forked.id
+      assert_equal dir, forked.cwd
+      assert_equal source.file, forked.parent_session
+      assert_equal %w[hello hi], forked.messages.map(&:text)
       assert_equal ["again"], agent.prompts
     end
   end

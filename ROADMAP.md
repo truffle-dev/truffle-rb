@@ -609,6 +609,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       agent. A selection flows through the existing `--session` load path; blank
       input or `q` exits without a provider call. Pi's full TUI selector remains
       part of the richer TUI work.
+    - [x] **Cross-project session lookup.** `Session.list_all` scans every
+      per-project session directory under the agent sessions root, and
+      `--session <id>` / `--fork <id>` now resolve a unique exact or prefix match
+      from the current project first and then from all projects. Direct file
+      paths still win before ID lookup.
 20. **`truffle init` + config.** Create a project config dir, a memory file, and
     on-disk state. Document the layout.
     - [x] **Project initializer.** `truffle init` creates `.truffle/` with
