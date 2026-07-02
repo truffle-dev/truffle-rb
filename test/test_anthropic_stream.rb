@@ -346,6 +346,7 @@ class TestSSERequestEncoding < Minitest::Test
   def test_stream_request_sends_identity_accept_encoding
     provider = Truffle::Providers::Anthropic.new(api_key: "k")
     request = provider.send(:build_stream_request, URI("https://example.com/v1/messages"), { a: 1 })
+
     assert_equal "identity", request["Accept-Encoding"]
   end
 end

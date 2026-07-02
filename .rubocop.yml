@@ -41,6 +41,9 @@ Metrics/AbcSize:
 
 Metrics/ClassLength:
   Max: 250
+  # Providers are wire adapters full of literal request/response hashes; count
+  # each literal as one line, the same way MethodLength does above.
+  CountAsOne: ["array", "hash", "heredoc"]
   Exclude:
     - "test/**/*.rb"
 
