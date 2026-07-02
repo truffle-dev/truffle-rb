@@ -57,6 +57,18 @@ class TestAnthropic < Minitest::Test
     assert_equal "low", merged[:effort]
   end
 
+  def test_eager_input_streaming_flag_survives_tool_conversion
+    tool = Truffle::Tool.define("make_file", "Write a file", eager_input_streaming: true) do
+      param :content, :string, "file body", required: true
+      run { |content:| content }
+    end
+    converted = Anthropic.convert_tools([tool.to_schema])
+    assert converted.first[:eager_input_streaming]
+
+    plain = Anthropic.convert_tools([add_tool.to_schema])
+    refute plain.first.key?(:eager_input_streaming)
+  end
+
   # --- build_body: system extraction -------------------------------------
 
   def test_system_message_becomes_top_level_field_not_a_message

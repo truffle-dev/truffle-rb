@@ -290,7 +290,7 @@ module Truffle
       def self.convert_tools(tools)
         tools.map do |tool|
           schema = tool[:parameters] || {}
-          {
+          converted = {
             name: tool[:name],
             description: tool[:description],
             input_schema: {
@@ -299,6 +299,10 @@ module Truffle
               required: schema[:required] || []
             }
           }
+          # Stream this tool's input without server-side JSON buffering, so large
+          # arguments (file bodies) arrive as they are generated.
+          converted[:eager_input_streaming] = true if tool[:eager_input_streaming]
+          converted
         end
       end
 

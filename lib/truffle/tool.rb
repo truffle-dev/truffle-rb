@@ -24,15 +24,22 @@ module Truffle
 
     attr_reader :name, :description, :parameters, :handler, :execution_mode
 
-    def initialize(name:, description:, parameters:, handler:, execution_mode: :parallel)
+    def initialize(name:, description:, parameters:, handler:, execution_mode: :parallel,
+                   eager_input_streaming: false)
       @name = name.to_s
       @description = description.to_s
       @parameters = parameters
       @handler = handler
       @execution_mode = self.class.normalize_execution_mode(execution_mode)
+      # Providers that support it stream this tool's input fragments without
+      # server-side JSON buffering — a large argument (a file body) arrives live
+      # instead of all at once when generation finishes.
+      @eager_input_streaming = eager_input_streaming
     end
 
-    def self.define(name, description, execution_mode: :parallel, &block)
+    def eager_input_streaming? = @eager_input_streaming
+
+    def self.define(name, description, execution_mode: :parallel, eager_input_streaming: false, &block)
       builder = Builder.new
       builder.instance_eval(&block) if block
       new(
@@ -40,7 +47,8 @@ module Truffle
         description: description,
         parameters: builder.schema,
         handler: builder.handler,
-        execution_mode: execution_mode
+        execution_mode: execution_mode,
+        eager_input_streaming: eager_input_streaming
       )
     end
 
@@ -68,11 +76,13 @@ module Truffle
     # JSON-Schema-shaped function spec, provider-neutral. Providers wrap this in
     # whatever envelope they need (OpenAI: {type:"function", function:{...}}).
     def to_schema
-      {
+      schema = {
         name: name,
         description: description,
         parameters: parameters
       }
+      schema[:eager_input_streaming] = true if eager_input_streaming?
+      schema
     end
 
     private
