@@ -64,17 +64,20 @@ module Truffle
       repaired
     end
 
-    # Parse JSON, repairing malformed string literals only if the first parse
-    # fails and the repair actually changed the input. When repair changes
-    # nothing, the original error is raised so a genuinely broken document still
-    # surfaces its parse error.
+    # Parse JSON after repairing malformed string literals. repair runs on every
+    # input, so correctness does not depend on how strict the installed json gem
+    # is: some stdlib json versions silently drop an invalid escape instead of
+    # raising, which would let a corrupted tool-call argument (a dropped backslash
+    # in a path or regex) through unnoticed. repair only rewrites the escapes and
+    # control characters a conforming parser rejects, so it is a no-op on
+    # already-valid JSON and changes nothing for well-formed input. A document
+    # repair cannot fix still raises JSON::ParserError.
+    #
+    # pi's parseJsonWithRepair gates repair behind a thrown error, which is safe
+    # because V8's JSON.parse is always strict about invalid escapes. Ruby's
+    # stdlib json strictness is version-dependent, so this port repairs first.
     def parse(json)
-      JSON.parse(json)
-    rescue JSON::ParserError => e
-      repaired = repair(json)
-      raise e if repaired == json
-
-      JSON.parse(repaired)
+      JSON.parse(repair(json))
     end
 
     # Repair a backslash escape starting at chars[index]. Appends the repaired

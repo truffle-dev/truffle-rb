@@ -21,6 +21,13 @@ All notable changes to Truffle are documented here. The format follows
   and 50KB byte ceiling append the same bracketed notices as `find`.
 
 ### Fixed
+- `JsonRepair.parse` now repairs every input before parsing instead of only after
+  a raised parse error. Some stdlib `json` versions (for example the `json` 2.7.2
+  that ships with Ruby 3.3) silently drop an invalid escape rather than raising,
+  which let a corrupted tool-call argument (a dropped backslash in a path or
+  regex) reach a tool unnoticed. Repairing first removes the dependency on the
+  installed json gem's strictness. `repair` is a no-op on valid JSON, so
+  well-formed input is unaffected.
 - Gem metadata now uses distinct homepage, source, changelog, and issue links so
   `gem build truffle.gemspec` is warning-free and RubyGems can show each public
   project link separately.

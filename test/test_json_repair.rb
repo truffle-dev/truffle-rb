@@ -68,8 +68,28 @@ class TestJsonRepair < Minitest::Test
     assert_equal valid, repair(valid)
   end
 
-  def test_parse_reads_valid_json_without_repair
+  def test_parse_reads_valid_json_unchanged
+    # repair is a no-op on well-formed JSON, so a valid document parses to the
+    # same value it always did.
     assert_equal({ "a" => 1, "b" => [1, 2] }, parse('{"a":1,"b":[1,2]}'))
+  end
+
+  def test_parse_feeds_the_repaired_string_to_the_parser
+    # The fix: repair runs on every input, so the parser only ever sees repaired
+    # text and correctness does not depend on the installed json gem's strictness.
+    # Under the strict bundled json this is the only visible difference from the
+    # old try-parse-first code, which fed the raw input to the parser first.
+    raw = '{"a":"c:\path"}'
+    seen = nil
+    JSON.stub(:parse, lambda { |arg, *|
+      seen = arg
+      { "ok" => true }
+    }) do
+      parse(raw)
+    end
+
+    assert_equal repair(raw), seen
+    refute_equal raw, seen
   end
 
   def test_parse_repairs_a_raw_control_character

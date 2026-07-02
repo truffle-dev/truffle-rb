@@ -616,9 +616,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       and `.parse` port the dependency-free half of pi's `utils/json-parse.ts`
       (`repairJson`, `parseJsonWithRepair`): inside string literals, raw control
       characters are escaped and a backslash before an invalid escape is doubled,
-      so a model's tool-call arguments parse instead of crashing. `.parse` retries
-      the repaired text only when the first parse fails and the repair changed the
-      input. OpenAI, Anthropic, and Gemini final tool-call deserializers now run
+      so a model's tool-call arguments parse instead of crashing. `.parse` repairs
+      every input before parsing, so a lenient stdlib json version cannot silently
+      drop an invalid escape: correctness does not depend on the installed json
+      gem's strictness. OpenAI, Anthropic, and Gemini final tool-call deserializers now run
       string-shaped arguments through `Providers.parse_tool_arguments`; unrepaired
       JSON still lands under `_raw`.
     - [x] Streaming partial-JSON completer. `Truffle::PartialJson.parse` is a
