@@ -7,6 +7,16 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Paths` ports the general path helpers from pi's `paths.ts`:
+  `local_path?` classifies a value as a local path or a remote package source
+  (`npm:`, `git:`, `github:`, `http:`, `https:`, `ssh:`; a `file:` URL is local),
+  `canonicalize` resolves symlinks and falls back to the input on a missing path,
+  `cwd_relative_path` returns a path relative to a working directory when it sits
+  inside it (`.` for the directory itself, `nil` when it escapes), and
+  `format_relative_to_cwd_or_absolute` renders a path for display, relative when
+  inside cwd and absolute otherwise, always forward-slashed. The tool-input
+  resolver stays in `Truffle::Tools::Path`; wiring these into path display and
+  package-source handling is a follow-up.
 - `Truffle::Changelog` ports pi's `changelog.ts` parsing surface: `parse` reads a
   CHANGELOG.md into `Entry` records (walking `## [x.y.z]` headers and collecting
   each section's body to the next header or EOF), `compare_versions` orders two

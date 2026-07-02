@@ -133,6 +133,17 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       `transformMessages` (cross-model thinking, tool-call-id normalization,
       synthetic tool results) waits on assistant-message provider/model metadata
       the flat `Message` does not yet carry.
+    - [x] **General path helpers.** `Truffle::Paths` ports the classification and
+      display half of pi's `paths.ts`: `local_path?` (local path versus a remote
+      `npm:`/`git:`/`github:`/`http:`/`https:`/`ssh:` source, with `file:` local),
+      `canonicalize` (realpath through symlinks, input as fallback on a missing
+      path), `cwd_relative_path` (relative when inside cwd, `.` for cwd itself,
+      `nil` when it escapes), and `format_relative_to_cwd_or_absolute` (relative
+      when inside cwd, absolute otherwise, forward-slashed). Resolution uses
+      `File.expand_path` with `Pathname#relative_path_from`; the tool-input
+      resolver (unicode fold, `@`-strip, literal `~user`) stays in
+      `Truffle::Tools::Path`, and `markPathIgnoredByCloudSync` (OS xattr) is out
+      of scope.
 
 ## Phase 3: the coding-agent surface
 
