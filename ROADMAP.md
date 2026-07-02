@@ -435,6 +435,10 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       templates before the provider turn, dispatches handler commands without a
       provider response, exposes pi's built-in command info for UI/help surfaces,
       and suffixes duplicate invocation names like pi extension commands.
+      - [x] **Changelog data layer.** `Truffle::Changelog` ports pi's
+        `changelog.ts` parsing (`parse`, `compare_versions`, `new_entries`), the
+        entries the `changelog` built-in command renders. pi's monorepo-specific
+        link rewriter is out of scope; wiring the parser into the handler remains.
 18. **Extensions.** A plugin seam so third parties add tools, providers, and
     commands without forking.
     - [x] **Event bus.** `Truffle::EventBus` ports pi's `core/event-bus.ts`: the

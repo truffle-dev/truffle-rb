@@ -7,6 +7,12 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Changelog` ports pi's `changelog.ts` parsing surface: `parse` reads a
+  CHANGELOG.md into `Entry` records (walking `## [x.y.z]` headers and collecting
+  each section's body to the next header or EOF), `compare_versions` orders two
+  entries by major/minor/patch, and `new_entries` filters entries past a `x.y.z`
+  baseline. pi's monorepo-specific link rewriter is not ported. This is the data
+  layer the `changelog` slash command needs; wiring it in is a follow-up.
 - The built-in `ls` tool (`Truffle::Tools.ls`) ports pi's `ls.ts`: list a
   directory's entries one per line, sorted case-insensitively, with a `/` suffix
   on directories and dotfiles included. Optional `path` (default current
