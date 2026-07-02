@@ -947,7 +947,7 @@ class TestCLIRunner < Minitest::Test
 
       assert_equal session.file, loaded.first
       assert_includes loaded.last[:system_prompt], "\n\nStay terse.\nCurrent date:"
-      assert_equal %w[read write bash edit find grep], loaded.last[:tools].map(&:name)
+      assert_equal %w[read write bash edit find grep ls], loaded.last[:tools].map(&:name)
     end
   end
 
@@ -1132,7 +1132,7 @@ class TestCLIRunner < Minitest::Test
 
       assert_instance_of Truffle::Session, agent.session
       assert_equal dir, agent.session.cwd
-      assert_equal %w[read write bash edit find grep], agent.session.tools
+      assert_equal %w[read write bash edit find grep ls], agent.session.tools
 
       model_change = agent.session.entries.first
 
@@ -1404,7 +1404,7 @@ class TestCLIRunner < Minitest::Test
     args = Truffle::CLI.parse_args(["-p", "ask"])
     names = Truffle::CLI.send(:print_tools, args, Dir.pwd).map(&:name)
 
-    assert_equal %w[read write bash edit find grep], names
+    assert_equal %w[read write bash edit find grep ls], names
   end
 
   def test_print_tools_are_empty_under_no_tools

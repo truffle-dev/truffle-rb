@@ -27,7 +27,8 @@ module Truffle
     BUILTIN_TOOL_FACTORIES = {
       "read" => Tools.method(:read), "write" => Tools.method(:write),
       "bash" => Tools.method(:bash), "edit" => Tools.method(:edit),
-      "find" => Tools.method(:find), "grep" => Tools.method(:grep)
+      "find" => Tools.method(:find), "grep" => Tools.method(:grep),
+      "ls" => Tools.method(:ls)
     }.freeze
     FileInput = Struct.new(:text, :images, keyword_init: true)
     PrintInput = Struct.new(:prompts, :images, keyword_init: true)
