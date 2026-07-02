@@ -144,6 +144,12 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       resolver (unicode fold, `@`-strip, literal `~user`) stays in
       `Truffle::Tools::Path`, and `markPathIgnoredByCloudSync` (OS xattr) is out
       of scope.
+    - [x] **ANSI stripping.** `Truffle::Ansi.strip` ports pi's `stripAnsi`
+      (the ansi-regex/strip-ansi code from `ansi.ts`): removes OSC and CSI/C1
+      escape sequences with the same regex, a fast path that returns the input
+      object when it has no ESC/CSI introducer, and a `TypeError` guard on a
+      non-string. Wiring it plus a binary-output sanitizer into the bash tool's
+      output cleaning is a follow-up.
 
 ## Phase 3: the coding-agent surface
 

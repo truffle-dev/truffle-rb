@@ -7,6 +7,12 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Ansi.strip` ports pi's `stripAnsi` (the ansi-regex/strip-ansi code
+  vendored in `ansi.ts`): it removes OSC (`ESC ] ... ST`) and CSI/C1 escape
+  sequences, keeps a fast path that returns the input object unchanged when it
+  holds no ESC or 8-bit CSI introducer, and raises `TypeError` on a non-string.
+  Wiring it into the bash tool's output cleaning (alongside a binary-output
+  sanitizer and carriage-return removal, as pi does) is a follow-up.
 - `Truffle::Paths` ports the general path helpers from pi's `paths.ts`:
   `local_path?` classifies a value as a local path or a remote package source
   (`npm:`, `git:`, `github:`, `http:`, `https:`, `ssh:`; a `file:` URL is local),
