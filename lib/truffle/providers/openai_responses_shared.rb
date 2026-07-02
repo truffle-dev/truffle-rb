@@ -206,9 +206,13 @@ module Truffle
       # function tools: name, description, and parameters sit at the top level
       # of the tool object rather than under a "function" wrapper. strict
       # defaults on server-side, so it is pinned false to keep the neutral
-      # schemas valid as-is.
+      # schemas valid as-is. A hash that already names its own :type is one of
+      # the API's built-in tools (web_search, code_interpreter, ...) and passes
+      # through verbatim.
       def convert_tools(tools)
         tools.map do |tool|
+          next tool if tool[:type] || tool["type"]
+
           {
             type: "function",
             name: tool[:name],

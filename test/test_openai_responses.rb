@@ -403,3 +403,16 @@ class TestOpenAIResponses < Minitest::Test
     assert_raises(ArgumentError) { Truffle::Providers::OpenAIResponses.new(api_key: "") }
   end
 end
+
+# Built-in tools (web_search, code_interpreter, ...) carry their own :type and
+# must reach the wire verbatim instead of being wrapped as function tools.
+class TestOpenAIResponsesBuiltInTools < Minitest::Test
+  def test_raw_typed_tools_pass_through_verbatim
+    converted = Truffle::Providers::OpenAIResponsesShared.convert_tools(
+      [{ type: "web_search" }, { name: "add", description: "adds", parameters: {} }]
+    )
+
+    assert_equal({ type: "web_search" }, converted.first)
+    assert_equal "function", converted.last[:type]
+  end
+end
