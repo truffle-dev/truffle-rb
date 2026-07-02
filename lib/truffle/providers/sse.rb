@@ -80,6 +80,10 @@ module Truffle
         request = Net::HTTP::Post.new(uri)
         request["Content-Type"] = "application/json"
         request["Accept"] = "text/event-stream"
+        # Net::HTTP silently requests gzip and its inflater buffers the whole
+        # compressed stream, delivering the "live" events in one burst at the
+        # end. Identity keeps SSE fragments arriving as the provider sends them.
+        request["Accept-Encoding"] = "identity"
         stream_request_headers(headers: headers).each { |key, value| request[key] = value }
         request.body = JSON.generate(body)
         request
