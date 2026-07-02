@@ -19,6 +19,44 @@ class TestAnthropic < Minitest::Test
     end
   end
 
+  # --- build_body: thinking, effort, caching -----------------------------
+
+  def test_thinking_option_lands_in_the_body
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "m", 100,
+                                { thinking: { type: "adaptive", display: "summarized" } })
+    assert_equal({ type: "adaptive", display: "summarized" }, body[:thinking])
+  end
+
+  def test_effort_merges_into_output_config_alongside_a_schema_format
+    schema = { type: "object", properties: {} }
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "m", 100,
+                                { effort: "medium", schema: schema })
+    assert_equal "medium", body[:output_config][:effort]
+    assert body[:output_config][:format], "schema format should survive the effort merge"
+  end
+
+  def test_cache_option_adds_top_level_ephemeral_cache_control
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "m", 100, { cache: true })
+    assert_equal({ type: "ephemeral" }, body[:cache_control])
+  end
+
+  def test_no_thinking_effort_or_cache_keys_by_default
+    body = Anthropic.build_body([Truffle::Message.user("hi")], [], "m", 100, {})
+    refute body.key?(:thinking)
+    refute body.key?(:cache_control)
+    refute body.key?(:output_config)
+  end
+
+  def test_constructor_defaults_flow_into_requests_and_per_call_options_win
+    provider = Anthropic.new(api_key: "k", thinking: { type: "adaptive" }, effort: "high", cache: true)
+    defaults = provider.send(:request_defaults)
+    assert_equal({ type: "adaptive" }, defaults[:thinking])
+    assert_equal "high", defaults[:effort]
+    assert defaults[:cache]
+    merged = defaults.merge({ effort: "low" })
+    assert_equal "low", merged[:effort]
+  end
+
   # --- build_body: system extraction -------------------------------------
 
   def test_system_message_becomes_top_level_field_not_a_message

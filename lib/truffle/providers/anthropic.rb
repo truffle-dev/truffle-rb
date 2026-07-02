@@ -37,6 +37,7 @@ module Truffle
 
       def initialize(api_key: ENV.fetch("ANTHROPIC_API_KEY", nil), model: DEFAULT_MODEL,
                      base_url: DEFAULT_BASE_URL, max_tokens: DEFAULT_MAX_TOKENS,
+                     thinking: nil, effort: nil, cache: false,
                      open_timeout: 15, read_timeout: 120)
         super()
         if api_key.nil? || api_key.empty?
@@ -48,6 +49,14 @@ module Truffle
         @model = model
         @base_url = base_url.chomp("/")
         @max_tokens = max_tokens
+        # Request-shaping defaults, overridable per call the way max_tokens is.
+        # thinking: e.g. {type: "adaptive", display: "summarized"} — on Opus 4.8+
+        # thinking is off unless requested, and display defaults to omitted.
+        # effort: output_config.effort (max|xhigh|high|medium|low).
+        # cache: true adds top-level automatic prompt caching (cache_control).
+        @thinking = thinking
+        @effort = effort
+        @cache = cache
         @open_timeout = open_timeout
         @read_timeout = read_timeout
       end
@@ -56,8 +65,18 @@ module Truffle
         "anthropic"
       end
 
+      # Instance-level request shaping merged under per-call options.
+      def request_defaults
+        defaults = {}
+        defaults[:thinking] = @thinking if @thinking
+        defaults[:effort] = @effort if @effort
+        defaults[:cache] = true if @cache
+        defaults
+      end
+
       def chat(messages:, tools: [], model: nil, **options)
         request_model = model || @model
+        options = request_defaults.merge(options)
         max_tokens = options[:max_tokens] || @max_tokens
         payload = post("/v1/messages",
                        self.class.build_body(messages, tools, request_model, max_tokens, options))
@@ -94,6 +113,7 @@ module Truffle
       # stream: true is added to the body and the decode runs event by event.
       def chat_stream(messages:, tools: [], model: nil, signal: nil, **options, &block)
         request_model = model || @model
+        options = request_defaults.merge(options)
         max_tokens = options[:max_tokens] || @max_tokens
         body = self.class.build_body(messages, tools, request_model, max_tokens, options)
         body[:stream] = true
@@ -121,8 +141,20 @@ module Truffle
           end
         end
         body[:temperature] = options[:temperature] if options.key?(:temperature)
+        body[:thinking] = options[:thinking] if options[:thinking]
+        # Top-level automatic prompt caching; reads bill at 0.1x input.
+        body[:cache_control] = { type: "ephemeral" } if options[:cache]
         apply_output_config(body, options)
+        apply_effort(body, options)
         body
+      end
+
+      # effort rides in output_config alongside a structured-output format, so it
+      # merges rather than overwrites what apply_output_config set.
+      def self.apply_effort(body, options)
+        return unless options[:effort]
+
+        body[:output_config] = (body[:output_config] || {}).merge(effort: options[:effort])
       end
 
       # Wire a structured-output request from a schema: option into Anthropic's
