@@ -7,12 +7,23 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::BinaryOutput.sanitize` ports pi's `sanitizeBinaryOutput`
+  (`shell-output.ts`): it drops the C0 control characters other than tab, line
+  feed, and carriage return, drops the Unicode interlinear annotation format
+  characters (U+FFF9 to U+FFFB), and keeps everything else, so DEL and the C1
+  controls survive, matching pi's `<= 0x1f` cutoff exactly.
 - `Truffle::Ansi.strip` ports pi's `stripAnsi` (the ansi-regex/strip-ansi code
   vendored in `ansi.ts`): it removes OSC (`ESC ] ... ST`) and CSI/C1 escape
   sequences, keeps a fast path that returns the input object unchanged when it
   holds no ESC or 8-bit CSI introducer, and raises `TypeError` on a non-string.
-  Wiring it into the bash tool's output cleaning (alongside a binary-output
-  sanitizer and carriage-return removal, as pi does) is a follow-up.
+
+### Changed
+- The bash tool now cleans captured output the way pi's `bash-executor` does:
+  ANSI escape sequences are stripped, binary and control noise is removed, and
+  carriage returns are dropped (`BinaryOutput.sanitize(Ansi.strip(output))` then
+  carriage-return removal). The cleaned text feeds both the returned tail and the
+  full-output temp file, so the file holds the same cleaned output the tail was
+  taken from.
 - `Truffle::Paths` ports the general path helpers from pi's `paths.ts`:
   `local_path?` classifies a value as a local path or a remote package source
   (`npm:`, `git:`, `github:`, `http:`, `https:`, `ssh:`; a `file:` URL is local),

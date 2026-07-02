@@ -4,6 +4,8 @@ require "open3"
 require "tmpdir"
 require "securerandom"
 require_relative "truncate"
+require_relative "../ansi"
+require_relative "../binary_output"
 
 module Truffle
   module Tools
@@ -53,10 +55,17 @@ module Truffle
         end
 
         raw, status, timed_out = capture(command, cwd, timeout, shell)
+        # pi cleans each captured chunk through stripAnsi, then sanitizeBinaryOutput,
+        # then drops carriage returns (bash-executor.ts). The cleaned text is what
+        # feeds both the returned tail and the full-output temp file. We buffer the
+        # whole output rather than stream it, so clean the joined string once here;
+        # for well-behaved output that is identical, and it correctly handles a
+        # multibyte character split across two reads, which per-chunk cleaning cannot.
         decoded = raw.dup.force_encoding("UTF-8").scrub
-        truncation = Truncate.tail(decoded)
-        full_output_path = truncation.truncated ? write_full_output(raw) : nil
-        last_line_bytes = partial_line_bytes(truncation, decoded)
+        cleaned = BinaryOutput.sanitize(Ansi.strip(decoded)).delete("\r")
+        truncation = Truncate.tail(cleaned)
+        full_output_path = truncation.truncated ? write_full_output(cleaned) : nil
+        last_line_bytes = partial_line_bytes(truncation, cleaned)
 
         if timed_out
           text = format_output(truncation, full_output_path, last_line_bytes, "")
@@ -136,11 +145,13 @@ module Truffle
         nil
       end
 
-      # Write the full (raw, untruncated) output to a temp file and return its
-      # path, the way pi preserves output that did not fit the tail.
-      def write_full_output(raw)
+      # Write the full (cleaned, untruncated) output to a temp file and return its
+      # path, the way pi preserves output that did not fit the tail. pi writes the
+      # sanitized text to this file, not the raw bytes, so it holds the same cleaned
+      # output the tail was taken from.
+      def write_full_output(cleaned)
         path = File.join(Dir.tmpdir, "truffle-bash-#{SecureRandom.hex(8)}.log")
-        File.binwrite(path, raw)
+        File.binwrite(path, cleaned)
         path
       end
 

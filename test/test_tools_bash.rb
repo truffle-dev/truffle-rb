@@ -94,6 +94,30 @@ class TestToolsBash < Minitest::Test
     assert_equal "(no output)", out
   end
 
+  def test_strips_ansi_color_from_output
+    # pi runs captured output through stripAnsi, so color codes never reach the
+    # transcript. The \033[31m ... \033[0m wrapping is removed, leaving the text.
+    out = bash_tool.call("command" => "printf '\\033[31mred\\033[0m\\n'")
+
+    assert_equal "red\n", out
+  end
+
+  def test_drops_binary_control_characters_from_output
+    # A stray C0 control (BEL, 0x07) is not an ANSI sequence, so sanitizeBinaryOutput
+    # is what removes it. The surrounding letters are kept.
+    out = bash_tool.call("command" => "printf 'a\\007b\\n'")
+
+    assert_equal "ab\n", out
+  end
+
+  def test_normalizes_carriage_returns_in_output
+    # sanitizeBinaryOutput keeps CR; the final .replace(/\r/g, "") is what drops it,
+    # so a CRLF collapses to a single LF.
+    out = bash_tool.call("command" => "printf 'a\\r\\nb\\n'")
+
+    assert_equal "a\nb\n", out
+  end
+
   def test_timeout_kills_the_command_and_raises
     error = assert_raises(RuntimeError) do
       bash_tool.call("command" => "sleep 5", "timeout" => 1)

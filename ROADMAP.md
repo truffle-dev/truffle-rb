@@ -148,8 +148,15 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       (the ansi-regex/strip-ansi code from `ansi.ts`): removes OSC and CSI/C1
       escape sequences with the same regex, a fast path that returns the input
       object when it has no ESC/CSI introducer, and a `TypeError` guard on a
-      non-string. Wiring it plus a binary-output sanitizer into the bash tool's
-      output cleaning is a follow-up.
+      non-string.
+    - [x] **Binary-output sanitizing and the bash cleaning pipeline.**
+      `Truffle::BinaryOutput.sanitize` ports pi's `sanitizeBinaryOutput`
+      (`shell-output.ts`): drops the C0 controls other than tab/LF/CR and the
+      Unicode interlinear annotation format characters (U+FFF9 to U+FFFB), keeping
+      DEL and the C1 controls (pi's `<= 0x1f` cutoff). The bash tool now cleans its
+      captured output the way pi's `bash-executor` does, ANSI strip then binary
+      sanitize then carriage-return removal, feeding both the returned tail and the
+      full-output temp file from the cleaned text.
 
 ## Phase 3: the coding-agent surface
 
