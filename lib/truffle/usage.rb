@@ -90,6 +90,27 @@ module Truffle
       pricing ? usage.with_cost(pricing) : usage
     end
 
+    # Build a Usage from the OpenAI Responses API usage hash. Like Chat
+    # Completions, input_tokens is inclusive of cached tokens, so input is the
+    # residual after input_tokens_details.cached_tokens; reasoning comes from
+    # output_tokens_details.reasoning_tokens, a subset of output. The Responses
+    # API exposes no cache-write counter (OpenAI bills no cache write), so
+    # cache_write is 0. Faithful to the usage capture in pi's
+    # processResponsesStream.
+    def self.from_openai_responses(raw, pricing: nil)
+      raw ||= {}
+      input_details = raw["input_tokens_details"] || {}
+      output_details = raw["output_tokens_details"] || {}
+
+      cache_read = (input_details["cached_tokens"] || 0).to_i
+      input = [0, (raw["input_tokens"] || 0).to_i - cache_read].max
+
+      usage = new(input: input, output: (raw["output_tokens"] || 0).to_i,
+                  cache_read: cache_read,
+                  reasoning: (output_details["reasoning_tokens"] || 0).to_i)
+      pricing ? usage.with_cost(pricing) : usage
+    end
+
     # Build a Usage from Anthropic's Messages API usage hash. Unlike OpenAI,
     # Anthropic reports input_tokens directly (already net of cache reads and
     # writes), so input is taken as-is rather than computed as a residual.

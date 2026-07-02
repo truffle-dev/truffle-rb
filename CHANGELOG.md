@@ -79,6 +79,16 @@ All notable changes to Truffle are documented here. The format follows
   agent end so later reloads resume cost accounting too.
 
 ### Added
+- OpenAI Responses API provider (`provider: :openai_responses`), a port of pi's
+  `openai-responses.ts`/`openai-responses-shared.ts` pair: stateless multi-turn
+  requests (`store: false` with `reasoning.encrypted_content` included and
+  reasoning items replayed verbatim from the Thinking block signature),
+  reasoning summaries streamed as thinking events, assistant message ids and
+  `phase` labels round-tripped on Text block signatures, Responses-native
+  function tools and `function_call_output` results (image parts included),
+  structured output via `text.format`, and usage with cached and reasoning
+  tokens. Streaming rides the shared SSE transport through a new
+  `OpenAIResponsesStream` accumulator.
 - Extension event and command contexts now expose `abort`, `has_ui?`,
   `has_pending_messages?`, `get_context_usage`, and `system_prompt_text`
   helpers. `abort` trips the active run's `AbortSignal` and raises clearly when

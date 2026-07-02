@@ -39,7 +39,8 @@ module Truffle
 
     def eager_input_streaming? = @eager_input_streaming
 
-    def self.define(name, description, execution_mode: :parallel, eager_input_streaming: false, &block)
+    def self.define(name, description, execution_mode: :parallel, eager_input_streaming: false,
+                    &block)
       builder = Builder.new
       builder.instance_eval(&block) if block
       new(
