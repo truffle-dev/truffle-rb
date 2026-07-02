@@ -355,6 +355,22 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       shapes (clean cut, split turn, prior-compaction continuation), on both the
       summarized history and the rebuilt session context. Mutation-proven against
       a `valid_cut_points` that admits tool results.
+    - [ ] **Branch summarization** (pi's `compaction/branch-summarization.ts`):
+      summarize the branch left behind when the session navigates to a different
+      point in the tree, so its context is not lost.
+      - [x] **Entry collection.**
+        `Truffle::Compaction::BranchSummarization.collect_entries_for_branch_summary`
+        walks from the old leaf back to its deepest common ancestor with a target
+        position, returning those entries oldest-first plus the common ancestor;
+        compaction boundaries are not stops. Read-only over the public
+        `session.entry(id)` / `parent_id` contract, no leaf mutation. Ports pi's
+        `collectEntriesForBranchSummary`.
+      - [ ] **Entry-to-message + budget selection.** `getMessageFromEntry` and
+        `prepareBranchEntries`: turn collected entries into messages and choose
+        the newest that fit a token budget, folding in file operations.
+      - [ ] **Summarizing model call.** `generateBranchSummary`: build the branch
+        prompt and run it through the provider seam, returning the summary plus
+        read/modified file lists.
 13. **Retries + timeouts.** Configurable HTTP timeout and bounded backoff in each
     provider; typed errors.
     - [x] `Retry.retryable_assistant_error?`: classify whether a failed error turn

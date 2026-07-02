@@ -7,6 +7,15 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Compaction::BranchSummarization` begins the port of pi's coding-agent
+  `compaction/branch-summarization.ts`, which summarizes a conversation branch
+  before the session navigates away from it. This first slice,
+  `collect_entries_for_branch_summary(session, old_leaf_id, target_id)`, walks the
+  session tree from the old leaf back to its deepest common ancestor with the
+  target (compaction boundaries are not stops) and returns those entries
+  oldest-first plus that ancestor, so a later slice can turn them into a summary.
+  It reads the session only through the public `entry(id)` look-up and the entry
+  `parent_id` links, never moving the leaf.
 - `Truffle::Tools::FileMutationQueue` ports pi's coding-agent
   `file-mutation-queue.ts`: `FileMutationQueue.with(path) { ... }` serializes
   mutations that target the same file while letting mutations of different files

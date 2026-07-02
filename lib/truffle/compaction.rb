@@ -5,6 +5,7 @@ require "set"
 require_relative "message"
 require_relative "session"
 require_relative "compaction/utils"
+require_relative "compaction/branch_summarization"
 
 module Truffle
   # The decision layer for context compaction: how many context tokens a
