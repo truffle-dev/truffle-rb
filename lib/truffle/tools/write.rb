@@ -2,6 +2,7 @@
 
 require "fileutils"
 require_relative "path"
+require_relative "file_mutation_queue"
 
 module Truffle
   module Tools
@@ -31,8 +32,12 @@ module Truffle
     # passed, not the resolved absolute, exactly as pi does.
     def self.write_file(path:, content:, cwd:)
       absolute = Path.resolve(path, cwd)
-      FileUtils.mkdir_p(File.dirname(absolute))
-      File.write(absolute, content)
+      # Serialize with any other mutation of this same file so a concurrent edit
+      # or write cannot interleave its read and this one's overwrite.
+      FileMutationQueue.with(absolute) do
+        FileUtils.mkdir_p(File.dirname(absolute))
+        File.write(absolute, content)
+      end
       "Successfully wrote #{content.bytesize} bytes to #{path}"
     end
   end

@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "path"
+require_relative "file_mutation_queue"
 
 module Truffle
   module Tools
@@ -75,15 +76,19 @@ module Truffle
         end
 
         absolute = Path.resolve(path, cwd)
-        ensure_editable(absolute, path)
+        # Serialize with any other mutation of this same file so a concurrent edit
+        # or write cannot read a half-written copy or clobber this one's result.
+        FileMutationQueue.with(absolute) do
+          ensure_editable(absolute, path)
 
-        raw = File.read(absolute, encoding: "UTF-8")
-        bom, content = strip_bom(raw)
-        ending = detect_line_ending(content)
-        _base, new_content = apply_edits(normalize_to_lf(content), edits, path)
+          raw = File.read(absolute, encoding: "UTF-8")
+          bom, content = strip_bom(raw)
+          ending = detect_line_ending(content)
+          _base, new_content = apply_edits(normalize_to_lf(content), edits, path)
 
-        File.write(absolute, bom + restore_line_endings(new_content, ending))
-        "Successfully replaced #{edits.length} block(s) in #{path}."
+          File.write(absolute, bom + restore_line_endings(new_content, ending))
+          "Successfully replaced #{edits.length} block(s) in #{path}."
+        end
       end
 
       # pi's prepareArguments: some models send `edits` as a JSON string, and an

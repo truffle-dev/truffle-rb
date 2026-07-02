@@ -7,6 +7,17 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Tools::FileMutationQueue` ports pi's coding-agent
+  `file-mutation-queue.ts`: `FileMutationQueue.with(path) { ... }` serializes
+  mutations that target the same file while letting mutations of different files
+  run in parallel. The `edit` and `write` tools now run their read-modify-write
+  under this queue, so two concurrent tool calls on one file can no longer
+  interleave a read with the other's overwrite. The key is the real,
+  symlink-resolved path, falling back to the resolved path when the file does not
+  exist yet (the create case), so two names for one file share a slot. A
+  reference count drops a key's entry once no caller holds or waits on it, the
+  Ruby stand-in for pi deleting its Map entry when the chain it appended is still
+  the tail.
 - `Truffle::Exec` ports pi's coding-agent `exec.ts`: `Exec.command` runs an
   external program directly from an argument list with no shell, so nothing in a
   caller-supplied argument is reinterpreted, and captures stdout and stderr

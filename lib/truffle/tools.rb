@@ -7,6 +7,7 @@
 require_relative "tools/truncate"
 require_relative "tools/output_accumulator"
 require_relative "tools/path"
+require_relative "tools/file_mutation_queue"
 require_relative "tools/read"
 require_relative "tools/write"
 require_relative "tools/bash"

@@ -388,6 +388,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     messages in source order. `tool_execution: :sequential` on the agent, or
     `execution_mode: :sequential` on any tool in the batch, keeps the historical
     one-at-a-time behavior.
+    - [x] **Serialized file mutations.** `Truffle::Tools::FileMutationQueue`
+      ports pi's `file-mutation-queue.ts`: `FileMutationQueue.with(path) { ... }`
+      serializes mutations of the same file while different files run in parallel.
+      The `edit` and `write` tools run their read-modify-write under this queue, so
+      two concurrent calls on one file cannot interleave a read with the other's
+      overwrite. The key is the real, symlink-resolved path, falling back to the
+      resolved path for a file that does not exist yet, and a reference count drops
+      an idle key's entry so the registry does not grow without bound.
     - [x] **System prompt assembly.** `Truffle::SystemPrompt.build` ports pi's
       `core/system-prompt.ts` `buildSystemPrompt`: the pure string the agent runs
       under, in either the custom-prompt branch or the default coding-agent branch,
