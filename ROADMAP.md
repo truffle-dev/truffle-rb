@@ -771,6 +771,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       values onto the options Truffle already understands. `Truffle.agent`
       applies those project defaults only when the caller leaves the matching
       option unset.
+    - [x] **Config-value resolution.** `Truffle::ConfigValue` ports pi's
+      `resolve-config-value.ts`, the resolver pi uses for provider API keys and
+      request headers so a secret can live as `!op read op://vault/item/field` or
+      `${OPENAI_API_KEY}` instead of plaintext. A `!`-prefixed value runs once
+      through `/bin/sh` (10-second timeout, process-lifetime cache that honors a
+      cached failure); any other value is a template where `$NAME`/`${NAME}`
+      interpolate the environment, `$$`/`$!` escape literals, an unterminated `${`
+      or invalid name stays verbatim, an empty value counts as absent, and any
+      unresolved variable makes the whole value nil. Ships with `resolve_or_raise`,
+      the `env_var_name(s)` / `missing_env_var_names` inspectors, `command?` /
+      `configured?`, and header-map variants. Wiring it into provider and settings
+      key and header resolution is a follow-up.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
     (sessions, memory) so upgrades are safe.
     - [x] **Project settings version migration.** `Truffle::Migrations.run_project`

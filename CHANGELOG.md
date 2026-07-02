@@ -7,6 +7,21 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::ConfigValue` ports pi's `resolve-config-value.ts`: it resolves a
+  config value that is a literal, an environment-variable template, or a shell
+  command. A value beginning with `!` runs once through `/bin/sh`, its trimmed
+  stdout becomes the value, and the result (including a failure that yields nil)
+  is cached for the process lifetime; a 10-second timeout kills a command that
+  hangs. Any other value is a template where `$NAME` and `${NAME}` interpolate an
+  environment variable, `$$` and `$!` escape a literal `$` and `!`, an
+  unterminated `${` or an invalid name like `${1bad}` stays verbatim, and an empty
+  string counts as absent so it falls through from the caller's `env` hash to the
+  process environment. A template with any unresolved variable resolves to nil.
+  Alongside `resolve` and `resolve_uncached` it exposes `resolve_or_raise` (with a
+  message naming the failed command or the missing variables), `env_var_name`,
+  `env_var_names`, `missing_env_var_names`, `command?`, `configured?`, and
+  `resolve_headers`/`resolve_headers_or_raise` for header maps. Wiring this into
+  provider and settings key and header resolution is a follow-up.
 - `Truffle::Tools::OutputAccumulator` ports pi's `output-accumulator.ts`: it
   takes streaming command output one raw chunk at a time, keeps a bounded decoded
   rolling tail (about twice the display byte limit), counts lines and bytes as
