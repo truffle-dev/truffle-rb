@@ -7,6 +7,21 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::ProjectTrust` ports pi's `trust-manager.ts`: a working directory is
+  trusted when the user has allowed Truffle to load its `.truffle` settings and
+  resources. `ProjectTrust::Store` persists per-path decisions to `trust.json`
+  under the agent directory, resolving a directory to its own decision or the
+  nearest trusted ancestor's, with `set_many` applying a batch atomically (a nil
+  decision deletes an entry) and writes kept key-sorted with a trailing newline.
+  `trust_requiring_resources?` reports whether a directory has project-local
+  resources that must be gated (`.truffle/settings.json`, `extensions`, `skills`,
+  `prompts`, `themes`, `SYSTEM.md`, `APPEND_SYSTEM.md`, or a `.agents/skills`
+  directory in the tree, excluding the user-level `~/.agents/skills`). `options`
+  and `parent_path` build the trust, parent, and session choices a UI can
+  present. Concurrent writers are serialized with a `File#flock` advisory lock
+  rather than a runtime dependency. The extension-event and settings-driven
+  orchestrator (pi's `resolveProjectTrusted`) is a follow-up in the session
+  layer.
 - `Truffle::ConfigValue` ports pi's `resolve-config-value.ts`: it resolves a
   config value that is a literal, an environment-variable template, or a shell
   command. A value beginning with `!` runs once through `/bin/sh`, its trimmed

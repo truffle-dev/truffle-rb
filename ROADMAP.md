@@ -783,6 +783,17 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       the `env_var_name(s)` / `missing_env_var_names` inspectors, `command?` /
       `configured?`, and header-map variants. Wiring it into provider and settings
       key and header resolution is a follow-up.
+    - [x] **Project trust store.** `Truffle::ProjectTrust` ports pi's
+      `trust-manager.ts`: a `Store` persists per-path trust decisions to
+      `trust.json` under the agent directory, resolving a directory to its own
+      decision or the nearest trusted ancestor's, applying batched updates
+      atomically (a nil decision deletes) and writing key-sorted output.
+      `trust_requiring_resources?` detects project-local resources that must be
+      gated (`.truffle` config resources or a `.agents/skills` directory,
+      excluding user-level `~/.agents/skills`); `options` / `parent_path` build
+      the choices a UI presents. Locking uses `File#flock` to avoid a runtime
+      dependency. The extension-event and settings-driven orchestrator (pi's
+      `resolveProjectTrusted`) is a follow-up in the session layer.
 21. **Migrations.** A versioned migration path for a host project's on-disk state
     (sessions, memory) so upgrades are safe.
     - [x] **Project settings version migration.** `Truffle::Migrations.run_project`
