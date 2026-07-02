@@ -7,6 +7,10 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Json.strip_comments` ports pi's `stripJsonComments` (`json.ts`): it
+  strips `//` line comments and trailing commas from JSONC in two passes, leaving
+  string literals untouched (a `//` or a `,]` inside a string is kept), so a config
+  file with comments and trailing commas can be handed to a strict JSON parser.
 - `Truffle::BinaryOutput.sanitize` ports pi's `sanitizeBinaryOutput`
   (`shell-output.ts`): it drops the C0 control characters other than tab, line
   feed, and carriage return, drops the Unicode interlinear annotation format

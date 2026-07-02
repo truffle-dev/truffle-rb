@@ -157,6 +157,11 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
       captured output the way pi's `bash-executor` does, ANSI strip then binary
       sanitize then carriage-return removal, feeding both the returned tail and the
       full-output temp file from the cleaned text.
+    - [x] **JSONC comment stripping.** `Truffle::Json.strip_comments` ports pi's
+      `stripJsonComments` (`json.ts`): strips `//` line comments and trailing commas
+      in two passes while leaving string literals untouched, so a config file with
+      comments and trailing commas can be handed to a strict JSON parser. Foundation
+      for a custom-models config loader.
 
 ## Phase 3: the coding-agent surface
 
