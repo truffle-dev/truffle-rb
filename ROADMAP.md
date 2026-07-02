@@ -138,7 +138,7 @@ Match pi's `packages/agent` and the type system in `packages/ai/src/types.ts`.
 
 Match `packages/coding-agent`: the tools and runtime that make an actual agent.
 
-10. **Built-in tools.** bash, read, write, edit, find, grep, written from
+10. **Built-in tools.** bash, read, write, edit, find, grep, ls, written from
     scratch, matching pi's tool contracts and safety behavior.
     - [x] **read.** `Truffle::Tools.read` ports pi's `read.ts` text path: a
       `path` resolved against a bound cwd (or absolute), a 1-indexed `offset`, an
@@ -197,6 +197,15 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
     - [x] **gitignore respect for grep.** Inherited for free: grep's file walk
       runs through `find`, so the same `.gitignore` stack and `.git`/`node_modules`
       floor apply.
+    - [x] **ls.** `Truffle::Tools.ls` ports pi's `ls.ts` execute path: an optional
+      `path` (default `.`) and an optional `limit` (default 500). Entries are read
+      with `Dir.children` (dotfiles included, `.`/`..` excluded), sorted
+      case-insensitively, and each directory gets a `/` suffix; entries that fail
+      to stat (a dangling symlink) are skipped. The limit is passed through
+      without a floor, matching pi, so `limit=0` yields an empty listing; an empty
+      result reports `(empty directory)`. The entry limit and the 50KB byte
+      ceiling produce pi's bracketed notices. pi's TUI `renderCall`/`renderResult`
+      is out of scope.
 11. **Sessions + persistence.** `Agent#dump` / `Agent.load` to round-trip a
     session (history + tool definitions by name) so it can be paused and resumed.
     - [x] **Session store.** `Truffle::Session`: an append-only JSONL file (header

@@ -6,6 +6,14 @@ All notable changes to Truffle are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The built-in `ls` tool (`Truffle::Tools.ls`) ports pi's `ls.ts`: list a
+  directory's entries one per line, sorted case-insensitively, with a `/` suffix
+  on directories and dotfiles included. Optional `path` (default current
+  directory) and `limit` (default 500) arguments; entries that cannot be stat'd
+  are skipped, an empty result reports `(empty directory)`, and the entry limit
+  and 50KB byte ceiling append the same bracketed notices as `find`.
+
 ### Fixed
 - Gem metadata now uses distinct homepage, source, changelog, and issue links so
   `gem build truffle.gemspec` is warning-free and RubyGems can show each public
