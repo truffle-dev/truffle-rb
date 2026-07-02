@@ -42,6 +42,9 @@ require_relative "truffle/providers/base"
 require_relative "truffle/providers/sse"
 require_relative "truffle/providers/openai"
 require_relative "truffle/providers/openai_stream"
+require_relative "truffle/providers/openai_responses_shared"
+require_relative "truffle/providers/openai_responses"
+require_relative "truffle/providers/openai_responses_stream"
 require_relative "truffle/providers/anthropic"
 require_relative "truffle/providers/anthropic_stream"
 require_relative "truffle/providers/google"
@@ -100,6 +103,7 @@ module Truffle
 
   PROVIDERS = {
     openai: Providers::OpenAI,
+    openai_responses: Providers::OpenAIResponses,
     anthropic: Providers::Anthropic,
     google: Providers::Google
   }.freeze

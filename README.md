@@ -60,9 +60,10 @@ agent runtime that can live inside those apps without hiding the moving parts.
 Truffle owns the model loop, tool dispatch, message history, session state, and
 events. Your app owns the tools and business rules.
 
-- **Provider-agnostic.** OpenAI, Anthropic, and Google Gemini providers ship in
-  the box, each hand-written against the wire API. You can also pass any object
-  that implements `chat(messages:, tools:, model:)`.
+- **Provider-agnostic.** OpenAI (Chat Completions and the Responses API),
+  Anthropic, and Google Gemini providers ship in the box, each hand-written
+  against the wire API. You can also pass any object that implements
+  `chat(messages:, tools:, model:)`.
 - **Plain Ruby tools.** A tool is a named block with typed params. Truffle
   generates the JSON Schema for the model and calls your block with keyword args.
 - **Observable loop.** Subscribe to tool calls, tool results, turn boundaries,
@@ -274,6 +275,20 @@ OpenAI-compatible endpoints. The resolved capability record is available as
 examples above use `gpt-5.4-mini` for a fast, low-cost default; reach for a
 flagship such as `gpt-5.5`, `claude-opus-4-8`, or `claude-sonnet-4-6` when a
 task needs deeper reasoning.
+
+`provider: :openai_responses` speaks OpenAI's Responses API instead of Chat
+Completions: statelessly (Truffle keeps the session; nothing is stored
+server-side), with reasoning items and message ids round-tripped across turns,
+and reasoning summaries streamed as thinking events:
+
+```ruby
+agent = Truffle.agent(
+  provider: :openai_responses,
+  model: "gpt-5.5",
+  reasoning: { effort: "high" },
+  tools: [add]
+)
+```
 
 Register an OpenAI-compatible endpoint in-process when an app already has the
 connection details and does not need an extension file:
