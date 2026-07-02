@@ -339,3 +339,13 @@ class TestAnthropicStream < Minitest::Test
     assert_equal Truffle::StopReason::ABORTED, acc.response.stop_reason
   end
 end
+
+# The SSE request must opt out of transparent gzip: Net::HTTP's inflater buffers
+# the whole compressed stream and delivers every event in one burst at the end.
+class TestSSERequestEncoding < Minitest::Test
+  def test_stream_request_sends_identity_accept_encoding
+    provider = Truffle::Providers::Anthropic.new(api_key: "k")
+    request = provider.send(:build_stream_request, URI("https://example.com/v1/messages"), { a: 1 })
+    assert_equal "identity", request["Accept-Encoding"]
+  end
+end
