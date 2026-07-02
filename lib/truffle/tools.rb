@@ -5,6 +5,7 @@
 # tools/ and is built by a factory bound to a working directory. `read` is the
 # first; write, bash, edit, find, grep, and ls follow.
 require_relative "tools/truncate"
+require_relative "tools/output_accumulator"
 require_relative "tools/path"
 require_relative "tools/read"
 require_relative "tools/write"

@@ -185,8 +185,11 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
       `timeout` (seconds) that kills the process group, nonzero exit / timeout
       raises with output plus a status line. Tail truncation via a new
       `Truncate.tail` (port of `truncateTail`), full output to a temp file when
-      truncated. The streaming `OutputAccumulator` is deferred; buffering the
-      full output keeps the observable contract identical.
+      truncated. The streaming `OutputAccumulator` (port of pi's
+      `output-accumulator.ts`) now lands as a standalone class in
+      `tools/output_accumulator.rb`; wiring it into the bash tool in place of the
+      buffered path is a follow-up, and buffering keeps the observable contract
+      identical until then.
     - [x] **edit.** `Truffle::Tools.edit` ports pi's `edit.ts` plus the matching
       core in `edit-diff.ts`: a `path` and an `edits` array of `{oldText,
       newText}`. Each `oldText` is matched against the original (exact first,

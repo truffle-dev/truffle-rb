@@ -7,6 +7,18 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Tools::OutputAccumulator` ports pi's `output-accumulator.ts`: it
+  takes streaming command output one raw chunk at a time, keeps a bounded decoded
+  rolling tail (about twice the display byte limit), counts lines and bytes as
+  they stream past, and spills the full raw output to a temp file once the display
+  limits are crossed, so an unbounded command cannot grow the agent's heap without
+  limit. A `#snapshot` reports the tail the model should see plus the truncation
+  bookkeeping computed from the running totals, not the bounded tail alone. A
+  streaming UTF-8 decoder stands in for Node's incremental `TextDecoder`, holding
+  back only an incomplete trailing multibyte sequence for the next chunk and
+  scrubbing genuinely invalid bytes to U+FFFD. The temp file holds the raw bytes
+  exactly as received; wiring this into the bash tool in place of the buffered
+  path is a follow-up.
 - `Truffle::Json.strip_comments` ports pi's `stripJsonComments` (`json.ts`): it
   strips `//` line comments and trailing commas from JSONC in two passes, leaving
   string literals untouched (a `//` or a `,]` inside a string is kept), so a config
