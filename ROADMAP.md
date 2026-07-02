@@ -581,6 +581,18 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         active run's `AbortSignal` and fails clearly when no run signal is
         available; shutdown, TUI overlays, and session-switch actions remain
         future interactive-runtime work.
+      - [x] **Command execution helper.** `Truffle::Exec.command` ports pi's
+        coding-agent `exec.ts`, the executor pi hands to extensions and custom
+        tools as `exec(command, args, options)`. It runs a program directly from
+        an argument list with no shell, captures stdout and stderr separately,
+        and bounds a run by a `timeout_ms` deadline or an aborted `signal`, both
+        escalating SIGTERM then SIGKILL after five seconds. The exit code follows
+        pi's `code ?? 0` (normal status, `0` for a signal-killed process with
+        `killed` set, `1` for an unspawnable program); `AbortSignal` is poll-based
+        so a watcher thread checks the deadline and signal on a short interval.
+        Binding this as an `exec` action on the extension runtime context, and
+        pi's post-exit descendant-pipe idle grace (earendil-works/pi#5303), are
+        follow-ups.
 
 ## Phase 5: adoption + the CLI
 

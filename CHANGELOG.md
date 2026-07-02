@@ -7,6 +7,18 @@ All notable changes to Truffle are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `Truffle::Exec` ports pi's coding-agent `exec.ts`: `Exec.command` runs an
+  external program directly from an argument list with no shell, so nothing in a
+  caller-supplied argument is reinterpreted, and captures stdout and stderr
+  separately. A run is bounded by a `timeout_ms` deadline or an aborted `signal`,
+  and both end the same way, sending SIGTERM and then SIGKILL five seconds later
+  if the process is still alive. The result reports the exit code following pi's
+  `code ?? 0` (a normal exit's status, `0` for a signal-killed process with
+  `killed` set, and `1` for a program that could not be spawned). Since
+  `AbortSignal` is poll-based, a watcher thread checks the deadline and the
+  signal on a short interval instead of registering an event listener. Wiring
+  this into the extension and custom-tool runtimes is a follow-up; this ports the
+  executor itself.
 - `Truffle::ProjectTrust` ports pi's `trust-manager.ts`: a working directory is
   trusted when the user has allowed Truffle to load its `.truffle` settings and
   resources. `ProjectTrust::Store` persists per-path decisions to `trust.json`
