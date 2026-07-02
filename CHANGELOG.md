@@ -16,6 +16,17 @@ All notable changes to Truffle are documented here. The format follows
   oldest-first plus that ancestor, so a later slice can turn them into a summary.
   It reads the session only through the public `entry(id)` look-up and the entry
   `parent_id` links, never moving the leaf.
+- `Truffle::Compaction::BranchSummarization.prepare_branch_entries(entries,
+  token_budget = 0)` continues that port with pi's `getMessageFromEntry` and
+  `prepareBranchEntries`: it turns collected branch entries into the messages a
+  summary is built from, oldest first, dropping the entries that carry no message
+  and the tool-result turns, and seeds file operations from each branch-summary
+  entry's recorded read and modified files. A positive `token_budget` walks the
+  messages newest first and stops before the one that would overflow, but keeps a
+  branch or compaction summary that overflows while the total so far is still
+  under nine tenths of the budget, so a summary boundary is not lost to a tight
+  cutoff. It reads only the shared entry contract, the session's summary-wrap
+  constants, and the shared `Compaction` file-op and token helpers.
 - `Truffle::Tools::FileMutationQueue` ports pi's coding-agent
   `file-mutation-queue.ts`: `FileMutationQueue.with(path) { ... }` serializes
   mutations that target the same file while letting mutations of different files

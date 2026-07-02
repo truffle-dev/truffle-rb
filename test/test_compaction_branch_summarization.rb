@@ -116,4 +116,113 @@ class TestCompactionBranchSummarization < Minitest::Test
     assert_equal([old_leaf, top], result.branch_entries.map { |entry| entry[:id] })
     assert_nil result.common_ancestor_id
   end
+
+  # --- turning entries into summary input ------------------------------------
+
+  # Fetch the stored entry hashes for a list of appended entry ids, in order,
+  # the way collect_entries_for_branch_summary hands them to prepare.
+  def entries_for(*ids)
+    ids.map { |id| @session.entry(id) }
+  end
+
+  def test_maps_each_entry_kind_and_skips_the_ones_without_a_message
+    user = @session.append_message(Truffle::Message.user("alpha"))
+    assistant = @session.append_message(Truffle::Message.assistant(content: "beta"))
+    tool = @session.append_message(
+      Truffle::Message.tool(content: "result", tool_call_id: "call_1", name: "read")
+    )
+    model = @session.append_model_change(provider: "openai", model_id: "gpt-x")
+    branch = @session.branch_with_summary(model, "explored elsewhere")
+    compaction = @session.append_compaction(
+      summary: "earlier work", first_kept_entry_id: user, tokens_before: 100
+    )
+
+    prepared = BranchSummarization.prepare_branch_entries(
+      entries_for(user, assistant, tool, model, branch, compaction)
+    )
+
+    # The tool result and the model change carry no message, so they drop out;
+    # the rest map oldest first, the two summaries wrapped as user turns.
+    assert_equal(%i[user assistant user user], prepared.messages.map(&:role))
+    assert_equal "alpha", prepared.messages[0].text
+    assert_equal "beta", prepared.messages[1].text
+    assert_includes prepared.messages[2].text, "explored elsewhere"
+    assert_includes prepared.messages[3].text, "earlier work"
+  end
+
+  def test_seeds_file_operations_from_branch_summary_details
+    root = @session.append_message(Truffle::Message.user("a"))
+    branch = @session.branch_with_summary(
+      root, "a digest",
+      details: { read_files: ["read.rb"], modified_files: ["edit.rb"] }
+    )
+
+    prepared = BranchSummarization.prepare_branch_entries(entries_for(branch))
+
+    assert_equal ["read.rb"], prepared.file_ops.read.to_a
+    assert_equal ["edit.rb"], prepared.file_ops.edited.to_a
+  end
+
+  # --- token budget selection ------------------------------------------------
+
+  # Three user turns of a known size: "x" * 40 is 40 chars, so ceil(40 / 4) is
+  # ten tokens each, which makes the budget arithmetic below exact.
+  def three_ten_token_turns
+    first = @session.append_message(Truffle::Message.user("x" * 40))
+    second = @session.append_message(Truffle::Message.user("y" * 40))
+    third = @session.append_message(Truffle::Message.user("z" * 40))
+    [first, second, third]
+  end
+
+  def test_zero_budget_keeps_every_message
+    first, second, third = three_ten_token_turns
+
+    prepared = BranchSummarization.prepare_branch_entries(entries_for(first, second, third))
+
+    assert_equal 3, prepared.messages.length
+    assert_equal 30, prepared.total_tokens
+  end
+
+  def test_budget_stops_before_the_message_that_would_overflow
+    first, second, third = three_ten_token_turns
+
+    # Newest first: third then second fit in twenty-five tokens; first would make
+    # thirty, so it is left behind and only the newest two survive.
+    prepared = BranchSummarization.prepare_branch_entries(
+      entries_for(first, second, third), 25
+    )
+
+    assert_equal 20, prepared.total_tokens
+    assert_equal ["y" * 40, "z" * 40], prepared.messages.map(&:text)
+  end
+
+  def test_keeps_an_overflowing_summary_when_it_still_fits_under_the_threshold
+    summary = @session.branch_with_summary(nil, "the abandoned branch")
+    tail_a = @session.append_message(Truffle::Message.user("x" * 40))
+    tail_b = @session.append_message(Truffle::Message.user("y" * 40))
+
+    # The two tails take twenty tokens, under nine tenths of twenty-five (22.5),
+    # so the older summary is kept even though it pushes the total past budget.
+    prepared = BranchSummarization.prepare_branch_entries(
+      entries_for(summary, tail_a, tail_b), 25
+    )
+
+    assert_equal 3, prepared.messages.length
+    assert_includes prepared.messages[0].text, "the abandoned branch"
+  end
+
+  def test_drops_an_overflowing_summary_once_the_total_reaches_the_threshold
+    summary = @session.branch_with_summary(nil, "the abandoned branch")
+    tail_a = @session.append_message(Truffle::Message.user("x" * 40))
+    tail_b = @session.append_message(Truffle::Message.user("y" * 40))
+
+    # Same twenty-token tail, but a budget of twenty-two puts the total at or over
+    # nine tenths of it (19.8), so the summary boundary is not kept past the cut.
+    prepared = BranchSummarization.prepare_branch_entries(
+      entries_for(summary, tail_a, tail_b), 22
+    )
+
+    assert_equal 2, prepared.messages.length
+    assert_equal ["x" * 40, "y" * 40], prepared.messages.map(&:text)
+  end
 end

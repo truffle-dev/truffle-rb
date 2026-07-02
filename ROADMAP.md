@@ -365,9 +365,14 @@ Match `packages/coding-agent`: the tools and runtime that make an actual agent.
         compaction boundaries are not stops. Read-only over the public
         `session.entry(id)` / `parent_id` contract, no leaf mutation. Ports pi's
         `collectEntriesForBranchSummary`.
-      - [ ] **Entry-to-message + budget selection.** `getMessageFromEntry` and
-        `prepareBranchEntries`: turn collected entries into messages and choose
-        the newest that fit a token budget, folding in file operations.
+      - [x] **Entry-to-message + budget selection.**
+        `Truffle::Compaction::BranchSummarization.prepare_branch_entries` turns
+        collected entries into messages oldest-first (skipping the kinds that
+        carry none and the tool-result turns), seeds file operations from each
+        branch-summary entry's details, and walks newest-first to keep the
+        messages that fit a token budget, holding an overflowing summary boundary
+        while the total is still under nine tenths of the budget. Ports pi's
+        `getMessageFromEntry` and `prepareBranchEntries`.
       - [ ] **Summarizing model call.** `generateBranchSummary`: build the branch
         prompt and run it through the provider seam, returning the summary plus
         read/modified file lists.
